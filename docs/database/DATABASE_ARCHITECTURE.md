@@ -149,15 +149,32 @@ Outward stock movements (Material Issues to Production, Dispatches to Customers)
 - **Purchase Return**: Decreases inventory quantity and value at the supplier's invoiced cost. Any variance against current MWAC is recorded as an inventory adjustment variance.
 - **Stock Adjustment**: Relieves or credits stock following physical stock takes; unit valuation is pegged to the active average cost.
 
-#### 3.4.4 Finished Goods Valuation (Batch Actual Costing)
+#### 3.4.4 Finished Goods Valuation (Batch Actual Costing to Warehouse MWAC)
 
-Finished packaged food products do not use purchasing MWAC. Instead, each production run calculates the **Actual Batch Cost**:
+Finished packaged food products do not use purchasing MWAC. Instead, valuation follows an integrated two-tier model:
 
-$$\text{Total Batch Cost} = \text{Raw Material Cost} + \text{Packaging Cost} + \text{Direct Labor} + \text{Utility Overhead}$$
+1. **Tier 1: Production Run Actual Costing**:
+   Each completed `ProductionRun` computes the exact **Actual Batch Cost**:
+   $$\text{Total Batch Cost} = \sum (\text{Material Issues}) - \sum (\text{Material Returns}) + \text{Direct Labor} + \text{Direct Utilities}$$
+   $$\text{Finished Goods Batch Unit Cost} = \frac{\text{Total Batch Cost}}{\text{Good Finished Output Quantity}}$$
+   _Scrap Accounting_: Damaged packaging pouches (e.g., 6 pieces) are already part of the total material issue (194 pieces). They are documented in `production_scrap` for loss tracking and yield reporting, but are **not** added again to the batch cost.
 
-$$\text{Finished Goods Unit Cost} = \frac{\text{Total Batch Cost}}{\text{Good Finished Output Quantity}}$$
+2. **Tier 2: Warehouse Finished Goods Blended MWAC**:
+   When good packets are posted into the finished goods warehouse (`WH-FG-01`) via a `PRODUCTION_RECEIPT` inventory transaction, they blend into the warehouse's finished goods stock using Moving Weighted Average Cost:
+   $$\text{New Warehouse FG Average Cost} = \frac{(\text{Previous FG Qty} \times \text{Current FG Avg Cost}) + (\text{Batch Good Output} \times \text{Batch Unit Cost})}{\text{Previous FG Qty} + \text{Batch Good Output}}$$
+   - **Opening Finished Goods Stock**: Stored at historical opening cost (e.g., 50 packets @ ₹32.00 = ₹1,600.00).
+   - **Batch Intake**: 188 packets @ ₹31.1436 = ₹5,855.00.
+   - **Blended Warehouse Closing Cost**: $(₹1,600.00 + ₹5,855.00) / 238 \text{ packets} = \mathbf{₹31.3235 / \text{packet}}$.
 
-Finished goods inventory receipts are logged at this exact batch unit cost. When finished packets enter the warehouse, the warehouse's finished goods average valuation updates accordingly.
+3. **Partial Production Batches**:
+   If an order for 1,000 packets is fulfilled through discrete production runs, each run records its own actual consumption and good output. Each completed run generates an independent `PRODUCTION_RECEIPT` posting with its specific batch unit cost, updating warehouse inventory iteratively.
+
+4. **Finished Goods Dispatches & Cost of Goods Sold (COGS)**:
+   Customer dispatches relieve finished goods stock at the **current warehouse blended MWAC** (e.g. ₹31.3235/packet). Gross profit per packet on sales invoices is computed as:
+   $$\text{Gross Profit} = \text{Selling Price (₹50.00)} - \text{Relief Unit Cost (₹31.3235)} = \mathbf{₹18.6765 / \text{packet}} \quad (37.35\%)$$
+
+5. **Production Returns and Reversals**:
+   If a finished goods receipt was posted erroneously, a reversal transaction (`movementType: OUT`) removes the batch quantity and value, restoring the warehouse balance and recalculating the average cost without modifying historical records.
 
 ### 3.5 Bill of Materials (BOM) & Recipe Management
 
@@ -220,13 +237,23 @@ GST calculation is derived deterministically by comparing the **Factory State Co
 
 Future changes to master tax rates in `TaxRate` will never recalculate historical invoices.
 
-#### 3.8.3 Payment Allocation Model
+#### 3.8.3 Payment Allocation Model & Invariant Enforcements
 
 - **`Payment`**: Records physical receipt of cash, cheque, UPI, or NEFT/RTGS funds from customers.
-- **`PaymentAllocation`**: Normalized table mapping payments to one or more `SalesInvoice` records. Supports partial payments and multi-invoice settlement.
-- **Calculated Invariant**:
-  $$\text{Invoice.outstandingAmount} = \text{Invoice.totalAmount} - \sum \text{AllocatedPayments}$$
-  $$\text{Payment.unallocatedAmount} = \text{Payment.amount} - \sum \text{Allocations}$$
+- **`PaymentAllocation`**: Normalized table mapping payments to one or more `SalesInvoice` records. Supports partial payments, multi-invoice settlements, and customer advance credits.
+- **Transactional Consistency Invariants**:
+  1. $\sum \text{allocated\_amount for a payment} \le \text{payment.amount}$
+  2. $\text{payment.unallocated\_amount} = \text{payment.amount} - \sum \text{allocated\_amount} \ge 0$
+  3. $\sum \text{allocated\_amount for an invoice} \le \text{invoice.total\_amount}$
+  4. $\text{invoice.paid\_amount} = \sum \text{allocated\_amount}$
+  5. $\text{invoice.outstanding\_amount} = \text{invoice.total\_amount} - \text{invoice.paid\_amount} \ge 0$
+- **Concurrency & Locking Rule for Payments**:
+  When applying an allocation, the transaction executes:
+  ```sql
+  SELECT id, amount, unallocated_amount FROM payments WHERE id = $1 FOR UPDATE;
+  SELECT id, total_amount, paid_amount, outstanding_amount FROM sales_invoices WHERE id = $2 FOR UPDATE;
+  ```
+  Validating available unallocated funds and outstanding balance under exclusive row locks prevents concurrent double-allocations.
 
 ### 3.9 Audit Trail Architecture
 
@@ -242,11 +269,57 @@ Future changes to master tax rates in `TaxRate` will never recalculate historica
 
 ## 4. Concurrency Control & Transaction Safety
 
-To prevent race conditions, duplicate posting, and negative stock:
+### 4.1 Why a `CHECK (quantity_on_hand >= 0)` Constraint Alone is Insufficient
 
-1. **Database Row Locks (`SELECT ... FOR UPDATE`)**: Applied during inventory posting to serialize concurrent updates to the same `InventoryBalance` row.
-2. **Atomic Prisma Transactions (`prisma.$transaction`)**: All multi-table postings (e.g., `GoodsReceipt` $\rightarrow$ `InventoryTransaction` $\rightarrow$ `InventoryBalance` $\rightarrow$ `MWAC recalculation`) run inside strict atomic database transactions. If any step fails, the entire operation rolls back.
-3. **Database Constraints (`CHECK` constraints)**:
-   - `quantity_on_hand >= 0` on `inventory_balances`.
-   - `paid_amount <= total_amount` on `sales_invoices`.
-   - `allocated_amount <= amount` on `payments`.
+While `inventory_balances` enforces a database `CHECK (quantity_on_hand >= 0)` constraint, **a CHECK constraint alone cannot guarantee concurrency safety in a multi-user ERP**:
+
+1. **Lost Updates Under Application Logic**:
+   Suppose the warehouse currently holds 10 packets of Murukku (`quantity_on_hand = 10`). Two concurrent salesmen submit orders:
+   - Transaction A (T1) orders 8 packets. It reads `quantity_on_hand = 10` in memory, computes $10 - 8 = 2$, and prepares `UPDATE inventory_balances SET quantity_on_hand = 2`.
+   - Transaction B (T2) orders 7 packets concurrently. Under standard `READ COMMITTED` isolation, T2 also reads `quantity_on_hand = 10`, computes $10 - 7 = 3$, and prepares `UPDATE inventory_balances SET quantity_on_hand = 3`.
+   - If T1 commits, then T2 commits, T2 **overwrites** T1's update (`Lost Update Anomaly`). The database now records 3 packets on hand when in reality 15 packets were dispatched from 10 packets. The `CHECK` constraint never fired because neither update wrote a negative number!
+2. **Abrupt Application Crashes & Deadlocks**:
+   Even if code uses atomic decrements (`SET quantity_on_hand = quantity_on_hand - 7`), when two transactions race for the last remaining stock, the losing transaction triggers an unhandled PostgreSQL constraint violation (`error 23514 check_violation`). This results in 500 server crashes, prevents clean backorder creation, and cannot generate friendly business shortage alerts (e.g., "Available 88 pkts, Shortage 32 pkts").
+
+### 4.2 Reliable Concurrency Architecture: Pessimistic Row Locking (`SELECT ... FOR UPDATE`)
+
+To ensure absolute mathematical consistency and clean business handling, every stock-mutating transaction follows a strict three-phase protocol inside `prisma.$transaction`:
+
+```sql
+-- Phase 1: Acquire exclusive row lock on the specific item and warehouse
+SELECT id, quantity_on_hand, allocated_quantity, average_cost
+FROM inventory_balances
+WHERE inventory_item_id = $1 AND warehouse_id = $2
+FOR UPDATE;
+
+-- Phase 2: Application evaluates locked state
+-- IF (quantity_on_hand - allocated_quantity < requested_quantity)
+-- THEN clean rejection or record backorder (e.g., 32 packets shortage for Distributor B)
+-- ELSE continue to Phase 3
+
+-- Phase 3: Execute atomic balance update and append immutable ledger line
+UPDATE inventory_balances
+SET quantity_on_hand = quantity_on_hand - $requested_quantity,
+    last_updated_at = NOW()
+WHERE id = $balance_id;
+
+INSERT INTO inventory_transaction_lines (
+  transaction_id, inventory_item_id, warehouse_id, movement_type,
+  quantity, unit_cost, total_value, balance_before, balance_after
+) VALUES (
+  $txn_id, $item_id, $warehouse_id, 'OUT',
+  $requested_quantity, $current_avg_cost, $total_val, $locked_qty, $locked_qty - $requested_quantity
+);
+```
+
+### 4.3 Summary of Transaction Safety Guarantees
+
+| Mechanism                        | Scope                                                  | Purpose                                                                                                                |
+| :------------------------------- | :----------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| **`SELECT ... FOR UPDATE`**      | `inventory_balances`, `payments`, `sales_invoices`     | Serializes concurrent writers per item/document; eliminates lost updates and race conditions.                          |
+| **`prisma.$transaction`**        | Multi-table postings                                   | Atomically binds document status transition, ledger line insertion, and balance updates (all succeed or all rollback). |
+| **Database `CHECK` Constraints** | `quantity_on_hand >= 0`, `paid_amount <= total_amount` | Defense-in-depth safety barrier preventing corrupted data from ever writing to disk.                                   |
+| **Append-Only Immutability**     | `inventory_transaction_lines`, `audit_logs`            | Guarantees audit permanence. Historical balances can be reconstructed by replaying ledger lines.                       |
+
+- `paid_amount <= total_amount` on `sales_invoices`.
+- `allocated_amount <= amount` on `payments`.

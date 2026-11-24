@@ -22,33 +22,38 @@ This document formally records the architectural decisions, trade-offs, evaluate
 
 ---
 
-## Decision 2: Finished Goods Valuation Approach (Batch Actual Costing)
+## Decision 2: Finished Goods Valuation Approach (Batch Actual Costing to Warehouse MWAC)
 
-- **Decision**: Finished goods are valued using **Batch Actual Costing** based on the real materials and overhead consumed during that specific `ProductionRun`.
+- **Decision**: Finished goods are valued using **Batch Actual Costing** for the manufacturing batch run, and blend into warehouse finished goods inventory via **Moving Weighted Average Cost (MWAC)** upon receipt.
 - **Reason**:
   - Food manufacturing yields fluctuate due to moisture loss during frying/baking, dough stickage, and packaging machine jam scrap.
   - Stamping the finished product with its actual production cost guarantees that true yield variances (e.g., a batch producing 188 packets instead of 200) are accurately absorbed into the unit cost of that batch:
-    $$\text{Unit Cost} = \frac{\text{Total Material Cost} + \text{Damaged Packaging Cost} + \text{Direct Labor} + \text{Direct Utilities}}{\text{Good Finished Output Quantity}}$$
+    $$\text{Total Batch Cost} = \sum (\text{Material Issues}) - \sum (\text{Material Returns}) + \text{Direct Labor} + \text{Direct Utilities}$$
+    $$\text{Finished Goods Unit Cost} = \frac{\text{Total Batch Cost}}{\text{Good Finished Output Quantity}} = \frac{₹5,855.00}{188 \text{ packets}} = \mathbf{₹31.1436 / \text{packet}} \quad (\approx \mathbf{₹31.14})$$
+  - When the 188 packets enter `WH-FG-01`, they blend with existing finished stock (50 packets @ ₹32.00 = ₹1,600.00):
+    $$\text{New Warehouse FG MWAC} = \frac{₹1,600.00 + ₹5,855.00}{50 + 188} = \frac{₹7,455.00}{238 \text{ packets}} = \mathbf{₹31.3235 / \text{packet}}$$
 - **Alternatives Considered**:
   - _Theoretical Standard Recipe Costing_: Rejected because it conceals shop-floor wastage, packaging losses, and yield degradation from executive margin reports.
-  - _Weighted Average across All Historical Production Runs_: Rejected as a primary costing method, though finished goods arriving in the warehouse blend into warehouse finished goods inventory via MWAC.
+  - _Weighted Average across All Historical Production Runs Without Batch Costing_: Rejected as a primary costing method because batches manufactured on different machines or with different shift labor rates require distinct operational auditing.
 - **Impact**: Each `ProductionRun` generates a discrete batch unit cost, which is stamped onto the resulting finished goods `InventoryTransactionLine` when goods enter the finished warehouse.
 - **Unresolved Question**: None.
 
 ---
 
-## Decision 3: Immutable Inventory Ledger Architecture
+## Decision 3: Immutable Inventory Ledger Architecture & Pessimistic Concurrency
 
-- **Decision**: Implement an **append-only, immutable inventory ledger** (`inventory_transactions` and `inventory_transaction_lines`). Do not allow direct SQL updates or deletions on posted stock transactions.
+- **Decision**: Implement an **append-only, immutable inventory ledger** (`inventory_transactions` and `inventory_transaction_lines`) backed by explicit **pessimistic row locking (`SELECT ... FOR UPDATE`)** on `inventory_balances`.
 - **Reason**:
   - Guarantees complete audit traceability required by auditors and statutory authorities.
   - Ensures every inventory movement points to a valid source document (`GoodsReceipt`, `MaterialIssue`, `ProductionRun`, `Dispatch`, `StockAdjustment`, `StockTransfer`).
   - Balances can always be reconstructed or audited from the genesis transaction.
+  - **Why CHECK constraint alone is insufficient**: A database `CHECK (quantity_on_hand >= 0)` constraint only checks the final value written to disk. If two concurrent transactions read `balance = 10` in memory, one deducts 8 (writing 2) and the other deducts 7 (writing 3), a **Lost Update** occurs and 3 packets remain in stock when 15 were shipped, and the constraint never fires! Alternatively, if atomic SQL decrements are used, racing threads trigger unhandled database constraint exceptions rather than clean business rejections and backorder alerts.
+  - Exclusive row locking (`SELECT ... FOR UPDATE`) serializes writers at the database engine level, guaranteeing zero lost updates and clean business handling.
 - **Alternatives Considered**:
   - _Mutable Inventory Balances Only (Simple CRUD)_: Rejected as unacceptable for an ERP system. Causes untraceable stock shrinkage and makes financial reconciliation impossible.
-  - _Event Sourcing with No Read-Model Table_: Rejected because querying historical events for every stock availability check during sales order creation creates unacceptable query latency under high transaction volume.
+  - _Optimistic Concurrency Control (OCC via version column)_: High retry abort rates in high-throughput packing floor environments where multiple workers scan dispatches simultaneously.
 - **Impact**:
-  - `InventoryBalance` acts as a high-performance cached snapshot table protected by database `CHECK (quantity_on_hand >= 0)` constraints.
+  - `InventoryBalance` acts as a high-performance cached snapshot table protected by both row locks and database `CHECK (quantity_on_hand >= 0)` constraints.
   - In the event of discrepancy, `InventoryTransactionLine` is legally and architecturally authoritative.
 - **Unresolved Question**: None.
 
@@ -85,16 +90,18 @@ This document formally records the architectural decisions, trade-offs, evaluate
 
 ---
 
-## Decision 6: Treatment of Packaging Loss & Production Scrap
+## Decision 6: Treatment of Packaging Loss & Production Scrap (Non-Double-Counting)
 
-- **Decision**: Model `ProductionScrap` as an explicit first-class entity linked to `ProductionRun`, capturing `scrapType: DAMAGED_PACKAGING | INGREDIENT_WASTE | REJECTED_FINISHED_GOODS`.
+- **Decision**: Model `ProductionScrap` as an explicit first-class entity linked to `ProductionRun` capturing `scrapType: DAMAGED_PACKAGING | INGREDIENT_WASTE | REJECTED_FINISHED_GOODS`, while strictly ensuring that scrap costs are **not** double-counted in batch costing.
 - **Reason**:
   - In packaged food manufacturing, packaging waste (printed multi-layer film pouches bursting in sealing jaws, misprinted lot codes) is a major hidden operational cost.
-  - Standard BOM models 200 pouches for 200 packets; if 6 pouches burst during machine sealing, those 6 pouches must be relieved from inventory and financially absorbed into the batch's total manufacturing cost.
+  - Standard BOM models 200 pouches for 200 packets. In the benchmark run, 194 total pouches were consumed: 188 pouches successfully packaged good packets, and 6 pouches were damaged.
+  - All 194 pouches are issued from inventory via `MaterialIssueItem` ($194 \times ₹2.50 = ₹485.00$). This forms the single inventory relief and material cost debit.
+  - The 6 damaged pouches ($6 \times ₹2.50 = ₹15.00$) are logged in `ProductionScrap` for quality analysis, scrap loss tracking, and packaging variance reporting. Because the ₹15.00 is already part of the ₹485.00 material issue, `ProductionScrap` is an analytical breakdown and is **not** added a second time to total production cost.
 - **Alternatives Considered**:
-  - _Treating Packaging Loss as Generic Warehouse Shrinkage_: Rejected because it conceals machine calibration faults from production management and distorts warehouse accuracy.
-  - _Ignoring Packaging Loss_: Causes severe physical stock discrepancies between warehouse physical counts and ERP system records.
-- **Impact**: Packaging waste is accounted for down to the individual piece, and its cost is incorporated directly into the finished good's unit cost calculation.
+  - _Adding ProductionScrap Separately to Total Batch Cost_: Defective approach. Causes double-counting of material costs because the material was already issued from raw packaging inventory.
+  - _Treating Packaging Loss as Generic Warehouse Shrinkage_: Rejected because it conceals machine calibration faults from production management and distorts warehouse physical counts.
+- **Impact**: Packaging waste is accounted for down to the individual piece without double-counting financial costs.
 - **Unresolved Question**: None.
 
 ---

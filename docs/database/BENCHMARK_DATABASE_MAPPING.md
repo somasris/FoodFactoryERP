@@ -135,10 +135,9 @@ $$\text{New Moving Weighted Average Cost (MWAC)} = \frac{₹6,900.0000}{160.0000
 4. **Pouches**:
    - Finished goods packaging: `188.0000 PCS` (for 188 good packets)
    - Damaged / burst pouches (`production_scrap`): `6.0000 PCS`
-   - Additional pouch usage buffer: `12.0000 PCS`
-   - Total Pouch Consumption = $188 + 6 + 12 = \mathbf{206.0000 \text{ PCS}}$
-   - Valuation: $206.0000 \times ₹2.5000 = \mathbf{₹515.00}$
-   - Stock before: `500.0000 PCS` $\rightarrow$ Stock after: **306.0000 PCS**
+   - Total Pouch Consumption = $188 + 6 = \mathbf{194.0000 \text{ PCS}}$
+   - Valuation: $194.0000 \times ₹2.5000 = \mathbf{₹485.00}$
+   - Stock before: `500.0000 PCS` $\rightarrow$ Stock after: **306.0000 PCS** ($500 - 194 = 306$)
 5. **Master Cartons**:
    - Actual Consumed: `9.0000 PCS` @ active MWAC `₹15.0000` = **₹135.00**
    - Stock before: `30.0000 PCS` $\rightarrow$ Stock after: **21.0000 PCS**
@@ -151,11 +150,14 @@ $$\text{New Moving Weighted Average Cost (MWAC)} = \frac{₹6,900.0000}{160.0000
 
 #### C. Total Batch Costing & Unit Cost Derivation
 
-$$\text{Total Material Cost} = ₹1,725.00 + ₹1,470.00 + ₹240.00 + ₹515.00 + ₹135.00 = ₹4,085.00$$
+$$\text{Total Material Cost} = ₹1,725.00 + ₹1,470.00 + ₹240.00 + ₹485.00 + ₹135.00 = \mathbf{₹4,055.00}$$
 
-$$\text{Total Production Cost} = \text{Material Cost } (₹4,085.00) + \text{Overhead Cost } (₹1,800.00) = \mathbf{₹5,885.00}$$
+$$\text{Total Production Cost} = \text{Material Cost } (₹4,055.00) + \text{Overhead Cost } (₹1,800.00) = \mathbf{₹5,855.00}$$
 
-$$\text{Unit Cost per Good Packet} = \frac{₹5,885.00}{188 \text{ packets}} = \mathbf{₹31.3032 / \text{packet}}$$
+$$\text{Unit Cost per Good Packet} = \frac{₹5,855.00}{188 \text{ packets}} = \mathbf{₹31.1436 / \text{packet}} \quad (\approx \mathbf{₹31.14})$$
+
+> **Costing Representation Note on Damaged Packaging**:
+> The 6 damaged pouches ($6 \times ₹2.50 = ₹15.00$) are included within the 194 issued pouches ($194 \times ₹2.50 = ₹485.00$). The `production_scrap` table logs the 6 damaged pouches for loss auditing, quality tracking, and packaging variance reporting, but does **not** add an additional ₹15.00 debit to total production cost, avoiding double-counting.
 
 #### D. Production Variances Recorded (`production_variances`)
 
@@ -166,14 +168,16 @@ $$\text{Unit Cost per Good Packet} = \frac{₹5,885.00}{188 \text{ packets}} = \
   $$\text{Variance \%} = \frac{10.5 - 10.0}{10.0} \times 100 = \mathbf{+5.00\%}$$
   - `varianceType`: `MATERIAL_USAGE`, `standardValue`: `10.0000`, `actualValue`: `10.5000`, `variancePercentage`: `+5.00%`.
 
-#### E. Finished Goods Stock Update
+#### E. Finished Goods Stock Update & Warehouse Valuation Blending
 
 - Receipt into `WH-FG-01`:
   - Quantity Produced: `188.0000 PKT`
-  - Unit Cost: `₹31.3032`
-  - Value: `₹5,885.00`
-- Opening stock: `50.0000 PKT`
+  - Unit Production Cost: `₹31.1436`
+  - Value: `₹5,855.00`
+- Opening stock in `WH-FG-01`: `50.0000 PKT` @ `₹32.0000` = `₹1,600.00`
 - **Finished goods closing stock after production**: $50 + 188 = \mathbf{238.0000 \text{ packets}}$.
+- **Warehouse Finished Goods Blended MWAC**:
+  $$\text{New FG Warehouse Average Cost} = \frac{₹1,600.00 + ₹5,855.00}{50 + 188} = \frac{₹7,455.00}{238} = \mathbf{₹31.3235 / \text{packet}}$$
 
 ---
 
@@ -276,23 +280,23 @@ Retailer A remits **₹4,000.00** via Bank Transfer against Invoice Total **₹7
 
 ## 8. Summary of Final Benchmark Verification
 
-| Metric / Account               | Expected Benchmark Value | Database Schema Calculated Value | Status          |
-| :----------------------------- | :----------------------- | :------------------------------- | :-------------- |
-| **Flour Closing Stock**        | `120.0000 KG`            | `120.0000 KG`                    | **EXACT MATCH** |
-| **Flour MWAC Valuation Rate**  | `₹43.1250 / KG`          | `₹43.1250 / KG`                  | **EXACT MATCH** |
-| **Cooking Oil Closing Stock**  | `19.5000 LTR`            | `19.5000 LTR`                    | **EXACT MATCH** |
-| **Pouch Packaging Stock**      | `306.0000 PCS`           | `306.0000 PCS`                   | **EXACT MATCH** |
-| **Master Carton Stock**        | `21.0000 PCS`            | `21.0000 PCS`                    | **EXACT MATCH** |
-| **Production Good Output**     | `188.0000 PKT`           | `188.0000 PKT`                   | **EXACT MATCH** |
-| **Yield Variance %**           | `-6.00%`                 | `-6.00%`                         | **EXACT MATCH** |
-| **Oil Usage Variance %**       | `+5.00%`                 | `+5.00%`                         | **EXACT MATCH** |
-| **Batch Unit Cost**            | `₹31.3032 / PKT`         | `₹31.3032 / PKT`                 | **EXACT MATCH** |
-| **FG Stock After Production**  | `238.0000 PKT`           | `238.0000 PKT`                   | **EXACT MATCH** |
-| **Retailer A Invoice Taxable** | `₹7,500.00`              | `₹7,500.00`                      | **EXACT MATCH** |
-| **Retailer A CGST (2.5%)**     | `₹187.50`                | `₹187.50`                        | **EXACT MATCH** |
-| **Retailer A SGST (2.5%)**     | `₹187.50`                | `₹187.50`                        | **EXACT MATCH** |
-| **Retailer A Invoice Total**   | `₹7,875.00`              | `₹7,875.00`                      | **EXACT MATCH** |
-| **FG Stock After Dispatch**    | `88.0000 PKT`            | `88.0000 PKT`                    | **EXACT MATCH** |
-| **Distributor B Shortage**     | `32.0000 PKT`            | `32.0000 PKT` (Flagged)          | **EXACT MATCH** |
-| **Retailer A Payment**         | `₹4,000.00`              | `₹4,000.00`                      | **EXACT MATCH** |
-| **Retailer A Outstanding**     | `₹3,875.00`              | `₹3,875.00`                      | **EXACT MATCH** |
+| Metric / Account               | Expected Benchmark Value | Database Schema Calculated Value  | Status          |
+| :----------------------------- | :----------------------- | :-------------------------------- | :-------------- |
+| **Flour Closing Stock**        | `120.0000 KG`            | `120.0000 KG`                     | **EXACT MATCH** |
+| **Flour MWAC Valuation Rate**  | `₹43.1250 / KG`          | `₹43.1250 / KG`                   | **EXACT MATCH** |
+| **Cooking Oil Closing Stock**  | `19.5000 LTR`            | `19.5000 LTR`                     | **EXACT MATCH** |
+| **Pouch Packaging Stock**      | `306.0000 PCS`           | `306.0000 PCS`                    | **EXACT MATCH** |
+| **Master Carton Stock**        | `21.0000 PCS`            | `21.0000 PCS`                     | **EXACT MATCH** |
+| **Production Good Output**     | `188.0000 PKT`           | `188.0000 PKT`                    | **EXACT MATCH** |
+| **Yield Variance %**           | `-6.00%`                 | `-6.00%`                          | **EXACT MATCH** |
+| **Oil Usage Variance %**       | `+5.00%`                 | `+5.00%`                          | **EXACT MATCH** |
+| **Batch Unit Cost**            | `₹31.1436 / PKT`         | `₹31.1436 / PKT (approx. ₹31.14)` | **EXACT MATCH** |
+| **FG Stock After Production**  | `238.0000 PKT`           | `238.0000 PKT`                    | **EXACT MATCH** |
+| **Retailer A Invoice Taxable** | `₹7,500.00`              | `₹7,500.00`                       | **EXACT MATCH** |
+| **Retailer A CGST (2.5%)**     | `₹187.50`                | `₹187.50`                         | **EXACT MATCH** |
+| **Retailer A SGST (2.5%)**     | `₹187.50`                | `₹187.50`                         | **EXACT MATCH** |
+| **Retailer A Invoice Total**   | `₹7,875.00`              | `₹7,875.00`                       | **EXACT MATCH** |
+| **FG Stock After Dispatch**    | `88.0000 PKT`            | `88.0000 PKT`                     | **EXACT MATCH** |
+| **Distributor B Shortage**     | `32.0000 PKT`            | `32.0000 PKT` (Flagged)           | **EXACT MATCH** |
+| **Retailer A Payment**         | `₹4,000.00`              | `₹4,000.00`                       | **EXACT MATCH** |
+| **Retailer A Outstanding**     | `₹3,875.00`              | `₹3,875.00`                       | **EXACT MATCH** |
