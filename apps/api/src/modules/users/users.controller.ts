@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { UsersService } from './users.service';
+import { UsersService, ActorContext } from './users.service';
 import {
   assignRolesSchema,
   createUserSchema,
@@ -7,6 +7,15 @@ import {
   updateUserSchema,
 } from './users.types';
 import { sendSuccess } from '../../utils/response';
+
+const getActorContext = (req: Request): ActorContext | undefined => {
+  if (!req.user) return undefined;
+  return {
+    userId: req.user.userId,
+    username: req.user.username,
+    roles: req.user.roles || [],
+  };
+};
 
 export class UsersController {
   /**
@@ -41,8 +50,9 @@ export class UsersController {
       const validated = createUserSchema.parse(req.body);
       const ipAddress = req.ip || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
+      const actor = getActorContext(req);
 
-      const user = await UsersService.createUser(validated, req.user?.userId, ipAddress, userAgent);
+      const user = await UsersService.createUser(validated, actor, ipAddress, userAgent);
       sendSuccess(res, 'User created successfully', user, 201);
     } catch (error) {
       next(error);
@@ -57,11 +67,12 @@ export class UsersController {
       const validated = updateUserSchema.parse(req.body);
       const ipAddress = req.ip || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
+      const actor = getActorContext(req);
 
       const user = await UsersService.updateUser(
         String(req.params.id),
         validated,
-        req.user?.userId,
+        actor,
         ipAddress,
         userAgent,
       );
@@ -79,11 +90,12 @@ export class UsersController {
       const validated = assignRolesSchema.parse(req.body);
       const ipAddress = req.ip || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
+      const actor = getActorContext(req);
 
       const result = await UsersService.assignRoles(
         String(req.params.id),
         validated,
-        req.user?.userId,
+        actor,
         ipAddress,
         userAgent,
       );
@@ -101,11 +113,12 @@ export class UsersController {
       const validated = updateStatusSchema.parse(req.body);
       const ipAddress = req.ip || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
+      const actor = getActorContext(req);
 
       const user = await UsersService.setUserStatus(
         String(req.params.id),
         validated,
-        req.user?.userId,
+        actor,
         ipAddress,
         userAgent,
       );
@@ -122,10 +135,11 @@ export class UsersController {
     try {
       const ipAddress = req.ip || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
+      const actor = getActorContext(req);
 
       const result = await UsersService.revokeUserSessions(
         String(req.params.id),
-        req.user?.userId,
+        actor,
         ipAddress,
         userAgent,
       );

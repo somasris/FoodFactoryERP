@@ -1,13 +1,18 @@
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
 import { hashPassword, validatePasswordPolicy } from '../../utils/password';
-import { AuditService } from '../../services/audit.service';
 import {
   AssignRolesInput,
   CreateUserInput,
   UpdateStatusInput,
   UpdateUserInput,
 } from './users.types';
+
+export interface ActorContext {
+  userId: string;
+  username: string;
+  roles: string[];
+}
 
 export class UsersService {
   /**
@@ -157,10 +162,12 @@ export class UsersService {
 
   /**
    * Create a new user (administrative provisioning).
+   * SECURITY RULE: Only an authenticated OWNER can create a user with the OWNER role.
+   * ADMIN cannot create a user with the OWNER role.
    */
   static async createUser(
     input: CreateUserInput,
-    actorId?: string,
+    actor?: ActorContext,
     ipAddress?: string,
     userAgent?: string,
   ) {
@@ -170,7 +177,18 @@ export class UsersService {
       throw new AppError(`Password policy violation: ${policyResult.reason}`, 400);
     }
 
-    // 2. Uniqueness verification
+    // 2. OWNER privilege escalation guard
+    const isAssigningOwner = input.roleCodes.includes('OWNER');
+    const isActorOwner = actor?.roles?.includes('OWNER') ?? false;
+
+    if (isAssigningOwner && !isActorOwner) {
+      throw new AppError(
+        'Forbidden: Only an authenticated OWNER can create an account with the OWNER role.',
+        403,
+      );
+    }
+
+    // 3. Uniqueness verification
     const existing = await prisma.user.findFirst({
       where: {
         OR: [
@@ -187,7 +205,7 @@ export class UsersService {
       throw new AppError('Username is already taken.', 409);
     }
 
-    // 3. Resolve role entities
+    // 4. Resolve role entities
     const roles = await prisma.role.findMany({
       where: { code: { in: input.roleCodes } },
     });
@@ -198,10 +216,10 @@ export class UsersService {
       throw new AppError(`Invalid role code(s): [${missing.join(', ')}]`, 400);
     }
 
-    // 4. Hash password with Argon2id
+    // 5. Hash password with Argon2id
     const passwordHash = await hashPassword(input.password);
 
-    // 5. Execute atomic user creation
+    // 6. Execute atomic user creation and mandatory audit log in transaction
     const createdUser = await prisma.$transaction(async tx => {
       const user = await tx.user.create({
         data: {
@@ -231,25 +249,27 @@ export class UsersService {
         },
       });
 
-      return user;
-    });
+      // Write mandatory audit log inside transaction
+      await tx.auditLog.create({
+        data: {
+          userId: actor?.userId || null,
+          action: 'CREATE',
+          entityType: 'User',
+          entityId: user.id,
+          newState: {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            fullName: user.fullName,
+            roles: input.roleCodes,
+          },
+          remarks: `User provisioned with roles: [${input.roleCodes.join(', ')}] by actor: ${actor?.username || 'system'}`,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+        },
+      });
 
-    // 6. Record audit log
-    await AuditService.log({
-      userId: actorId,
-      action: 'CREATE',
-      entityType: 'User',
-      entityId: createdUser.id,
-      newState: {
-        id: createdUser.id,
-        email: createdUser.email,
-        username: createdUser.username,
-        fullName: createdUser.fullName,
-        roles: input.roleCodes,
-      },
-      remarks: `User created and assigned roles: [${input.roleCodes.join(', ')}]`,
-      ipAddress,
-      userAgent,
+      return user;
     });
 
     return {
@@ -266,17 +286,32 @@ export class UsersService {
 
   /**
    * Update basic user information.
+   * SECURITY RULE: ADMIN cannot modify an OWNER's account details.
    */
   static async updateUser(
     userId: string,
     input: UpdateUserInput,
-    actorId?: string,
+    actor?: ActorContext,
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const existing = await prisma.user.findUnique({ where: { id: userId } });
+    const existing = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        userRoles: { include: { role: true } },
+      },
+    });
+
     if (!existing) {
       throw new AppError('User not found', 404);
+    }
+
+    const isTargetOwner = existing.userRoles.some(ur => ur.role.code === 'OWNER');
+    const isActorOwner = actor?.roles?.includes('OWNER') ?? false;
+
+    // ADMIN cannot modify an OWNER's account unless actor is modifying their own profile
+    if (isTargetOwner && !isActorOwner && actor?.userId !== userId) {
+      throw new AppError("Forbidden: ADMIN cannot modify an OWNER's account details.", 403);
     }
 
     if (input.email && input.email.toLowerCase() !== existing.email.toLowerCase()) {
@@ -288,38 +323,44 @@ export class UsersService {
       }
     }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        fullName: input.fullName,
-        phone: input.phone,
-        email: input.email ? input.email.toLowerCase() : undefined,
-      },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        fullName: true,
-        phone: true,
-        isActive: true,
-        updatedAt: true,
-      },
-    });
+    const updated = await prisma.$transaction(async tx => {
+      const res = await tx.user.update({
+        where: { id: userId },
+        data: {
+          fullName: input.fullName,
+          phone: input.phone,
+          email: input.email ? input.email.toLowerCase() : undefined,
+        },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          phone: true,
+          isActive: true,
+          updatedAt: true,
+        },
+      });
 
-    await AuditService.log({
-      userId: actorId,
-      action: 'UPDATE',
-      entityType: 'User',
-      entityId: userId,
-      previousState: {
-        email: existing.email,
-        fullName: existing.fullName,
-        phone: existing.phone,
-      },
-      newState: updated,
-      remarks: 'Updated basic user information',
-      ipAddress,
-      userAgent,
+      await tx.auditLog.create({
+        data: {
+          userId: actor?.userId || null,
+          action: 'UPDATE',
+          entityType: 'User',
+          entityId: userId,
+          previousState: {
+            email: existing.email,
+            fullName: existing.fullName,
+            phone: existing.phone,
+          },
+          newState: res,
+          remarks: 'Updated basic user information',
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+        },
+      });
+
+      return res;
     });
 
     return updated;
@@ -327,12 +368,17 @@ export class UsersService {
 
   /**
    * Assign roles to a user.
-   * STRICT SECURITY INVARIANT: Protects against removing the OWNER role from the last active owner!
+   * SECURITY RULES:
+   * 1. Only an authenticated OWNER can assign the OWNER role.
+   * 2. Only an authenticated OWNER can remove the OWNER role from another user.
+   * 3. ADMIN cannot modify the role assignments of an OWNER.
+   * 4. Prevent self-escalation (non-owners cannot give themselves OWNER).
+   * 5. Preserve last-active-OWNER protection.
    */
   static async assignRoles(
     userId: string,
     input: AssignRolesInput,
-    actorId?: string,
+    actor?: ActorContext,
     ipAddress?: string,
     userAgent?: string,
   ) {
@@ -348,11 +394,32 @@ export class UsersService {
     }
 
     const currentRoles = user.userRoles.map(ur => ur.role.code);
-    const isCurrentlyOwner = currentRoles.includes('OWNER');
+    const isTargetOwner = currentRoles.includes('OWNER');
     const willBeOwner = input.roleCodes.includes('OWNER');
+    const isActorOwner = actor?.roles?.includes('OWNER') ?? false;
 
-    // LAST OWNER PROTECTION
-    if (isCurrentlyOwner && !willBeOwner) {
+    // RULE: ADMIN cannot modify the role assignments of an OWNER
+    if (isTargetOwner && !isActorOwner) {
+      throw new AppError("Forbidden: ADMIN cannot modify an OWNER's role assignments.", 403);
+    }
+
+    // RULE: Only an authenticated OWNER can assign the OWNER role
+    if (!isTargetOwner && willBeOwner && !isActorOwner) {
+      throw new AppError('Forbidden: Only an authenticated OWNER can assign the OWNER role.', 403);
+    }
+
+    // RULE: Only an authenticated OWNER can remove the OWNER role from another user
+    if (isTargetOwner && !willBeOwner && !isActorOwner) {
+      throw new AppError('Forbidden: Only an authenticated OWNER can remove the OWNER role.', 403);
+    }
+
+    // RULE: Prevent self-escalation
+    if (userId === actor?.userId && !isActorOwner && willBeOwner) {
+      throw new AppError('Forbidden: You cannot escalate your own account to the OWNER role.', 403);
+    }
+
+    // RULE: LAST ACTIVE OWNER PROTECTION
+    if (isTargetOwner && !willBeOwner) {
       const activeOwnerCount = await prisma.userRole.count({
         where: {
           role: { code: 'OWNER' },
@@ -390,18 +457,21 @@ export class UsersService {
           roleId: r.id,
         })),
       });
-    });
 
-    await AuditService.log({
-      userId: actorId,
-      action: 'UPDATE',
-      entityType: 'UserRole',
-      entityId: userId,
-      previousState: { roles: currentRoles },
-      newState: { roles: input.roleCodes },
-      remarks: `Updated roles from [${currentRoles.join(', ')}] to [${input.roleCodes.join(', ')}]`,
-      ipAddress,
-      userAgent,
+      // Write mandatory audit log
+      await tx.auditLog.create({
+        data: {
+          userId: actor?.userId || null,
+          action: 'UPDATE',
+          entityType: 'UserRole',
+          entityId: userId,
+          previousState: { roles: currentRoles },
+          newState: { roles: input.roleCodes },
+          remarks: `Role assignment modified from [${currentRoles.join(', ')}] to [${input.roleCodes.join(', ')}] by actor: ${actor?.username || 'system'}`,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+        },
+      });
     });
 
     return {
@@ -412,12 +482,14 @@ export class UsersService {
 
   /**
    * Enable or disable a user account.
-   * STRICT SECURITY INVARIANT: Protects against disabling the last active OWNER account!
+   * SECURITY RULES:
+   * 1. ADMIN cannot deactivate an OWNER.
+   * 2. Cannot deactivate the last active OWNER account.
    */
   static async setUserStatus(
     userId: string,
     input: UpdateStatusInput,
-    actorId?: string,
+    actor?: ActorContext,
     ipAddress?: string,
     userAgent?: string,
   ) {
@@ -432,56 +504,69 @@ export class UsersService {
       throw new AppError('User not found', 404);
     }
 
-    // LAST OWNER PROTECTION
-    if (!input.isActive) {
-      const isOwner = user.userRoles.some(ur => ur.role.code === 'OWNER');
-      if (isOwner) {
-        const activeOwnerCount = await prisma.userRole.count({
-          where: {
-            role: { code: 'OWNER' },
-            user: { isActive: true },
-          },
-        });
+    const isTargetOwner = user.userRoles.some(ur => ur.role.code === 'OWNER');
+    const isActorOwner = actor?.roles?.includes('OWNER') ?? false;
 
-        if (activeOwnerCount <= 1) {
-          throw new AppError(
-            'Security constraint violation: Cannot deactivate the last active Owner account.',
-            400,
-          );
-        }
+    // RULE: ADMIN cannot deactivate an OWNER
+    if (isTargetOwner && !isActorOwner && !input.isActive) {
+      throw new AppError('Forbidden: ADMIN cannot deactivate an OWNER.', 403);
+    }
+
+    // RULE: LAST ACTIVE OWNER PROTECTION
+    if (isTargetOwner && !input.isActive) {
+      const activeOwnerCount = await prisma.userRole.count({
+        where: {
+          role: { code: 'OWNER' },
+          user: { isActive: true },
+        },
+      });
+
+      if (activeOwnerCount <= 1) {
+        throw new AppError(
+          'Security constraint violation: Cannot deactivate the last active Owner account.',
+          400,
+        );
       }
     }
 
-    const updated = await prisma.user.update({
-      where: { id: userId },
-      data: { isActive: input.isActive },
-      select: {
-        id: true,
-        email: true,
-        username: true,
-        fullName: true,
-        isActive: true,
-      },
-    });
-
-    // If disabled, revoke all active sessions immediately
-    if (!input.isActive) {
-      await prisma.refreshToken.updateMany({
-        where: { userId, isRevoked: false },
-        data: { isRevoked: true },
+    const updated = await prisma.$transaction(async tx => {
+      const res = await tx.user.update({
+        where: { id: userId },
+        data: { isActive: input.isActive },
+        select: {
+          id: true,
+          email: true,
+          username: true,
+          fullName: true,
+          isActive: true,
+        },
       });
-    }
 
-    await AuditService.log({
-      userId: actorId,
-      action: 'UPDATE',
-      entityType: 'User',
-      entityId: userId,
-      previousState: { isActive: user.isActive },
-      newState: { isActive: input.isActive },
-      remarks: input.isActive ? 'Account enabled' : 'Account disabled & all sessions revoked',
-      ipAddress,
-      userAgent,
+      // If disabled, revoke all active sessions immediately
+      if (!input.isActive) {
+        await tx.refreshToken.updateMany({
+          where: { userId, isRevoked: false },
+          data: { isRevoked: true },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor?.userId || null,
+          action: 'UPDATE',
+          entityType: 'User',
+          entityId: userId,
+          previousState: { isActive: user.isActive },
+          newState: { isActive: input.isActive },
+          remarks: input.isActive
+            ? `Account enabled by ${actor?.username || 'system'}`
+            : `Account deactivated & sessions terminated by ${actor?.username || 'system'}`,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+        },
+      });
+
+      return res;
     });
 
     return updated;
@@ -489,26 +574,50 @@ export class UsersService {
 
   /**
    * Revoke all active sessions for a user.
+   * SECURITY RULE: ADMIN cannot revoke sessions for an OWNER account.
    */
   static async revokeUserSessions(
     userId: string,
-    actorId?: string,
+    actor?: ActorContext,
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const result = await prisma.refreshToken.updateMany({
-      where: { userId, isRevoked: false },
-      data: { isRevoked: true },
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { userRoles: { include: { role: true } } },
     });
 
-    await AuditService.log({
-      userId: actorId,
-      action: 'CANCEL',
-      entityType: 'UserSession',
-      entityId: userId,
-      remarks: `Administrator revoked all sessions (${result.count} revoked)`,
-      ipAddress,
-      userAgent,
+    if (!targetUser) {
+      throw new AppError('User not found', 404);
+    }
+
+    const isTargetOwner = targetUser.userRoles.some(ur => ur.role.code === 'OWNER');
+    const isActorOwner = actor?.roles?.includes('OWNER') ?? false;
+
+    // RULE: ADMIN cannot revoke sessions for an OWNER account (unless revoking self)
+    if (isTargetOwner && !isActorOwner && actor?.userId !== userId) {
+      throw new AppError("Forbidden: ADMIN cannot revoke sessions for an OWNER account.", 403);
+    }
+
+    const result = await prisma.$transaction(async tx => {
+      const revoked = await tx.refreshToken.updateMany({
+        where: { userId, isRevoked: false },
+        data: { isRevoked: true },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor?.userId || null,
+          action: 'CANCEL',
+          entityType: 'UserSession',
+          entityId: userId,
+          remarks: `Administrator (${actor?.username || 'system'}) revoked all active sessions (${revoked.count} revoked)`,
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+        },
+      });
+
+      return revoked;
     });
 
     return {

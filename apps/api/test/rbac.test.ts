@@ -220,7 +220,7 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
     expect(res.status).toBe(403);
   });
 
-  it('7. ADMIN cannot disable the last active OWNER account', async () => {
+  it('7. ADMIN cannot disable an OWNER account and last OWNER cannot be deactivated', async () => {
     // Lookup owner user
     const owner = await prisma.user.findFirst({
       where: { userRoles: { some: { role: { code: 'OWNER' } } }, isActive: true },
@@ -228,14 +228,23 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
 
     expect(owner).toBeDefined();
 
-    const res = await request(app)
+    // 1. ADMIN attempt is rejected with 403 (ADMIN cannot modify/deactivate an OWNER)
+    const adminAttemptRes = await request(app)
       .patch(`/api/v1/users/${owner!.id}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ isActive: false });
 
-    // Must be rejected by last owner protection!
-    expect(res.status).toBe(400);
-    expect(res.body.message).toContain('Cannot deactivate the last active Owner account');
+    expect(adminAttemptRes.status).toBe(403);
+    expect(adminAttemptRes.body.message).toContain('Only an OWNER can deactivate an OWNER account');
+
+    // 2. OWNER attempt on the last active OWNER is rejected with 400 (last owner invariant)
+    const ownerAttemptRes = await request(app)
+      .patch(`/api/v1/users/${owner!.id}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({ isActive: false });
+
+    expect(ownerAttemptRes.status).toBe(400);
+    expect(ownerAttemptRes.body.message).toContain('Cannot deactivate the last active Owner account');
   });
 
   it('8. OWNER authorized operation is accepted globally', async () => {

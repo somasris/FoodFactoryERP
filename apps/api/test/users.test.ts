@@ -7,9 +7,12 @@ import { generateAccessToken } from '../src/utils/token';
 
 const app = createApp();
 
-describe('Phase 1.3 User Management Suite', () => {
+describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
   let adminToken: string;
+  let ownerToken: string;
   let testCreatedUserId: string;
+  let primaryOwnerId: string;
+  let secondaryOwnerId: string;
 
   beforeAll(async () => {
     const pw = await hashPassword('AdminPass2026!');
@@ -17,14 +20,46 @@ describe('Phase 1.3 User Management Suite', () => {
       where: { code: 'ADMIN' },
       include: { permissions: { include: { permission: true } } },
     });
+    const ownerRole = await prisma.role.findUnique({
+      where: { code: 'OWNER' },
+      include: { permissions: { include: { permission: true } } },
+    });
 
     // Cleanup previous test users
     await prisma.user.deleteMany({
       where: {
-        username: { in: ['usermgmt_admin', 'created_employee_test'] },
+        username: {
+          in: [
+            'usermgmt_admin',
+            'created_employee_test',
+            'primary_test_owner',
+            'secondary_test_owner',
+            'attempted_owner_target',
+          ],
+        },
       },
     });
 
+    // Create primary OWNER
+    const primaryOwner = await prisma.user.create({
+      data: {
+        email: 'primary_test_owner@foodfactory.com',
+        username: 'primary_test_owner',
+        passwordHash: pw,
+        fullName: 'Primary Test Owner',
+        userRoles: { create: { roleId: ownerRole!.id } },
+      },
+    });
+    primaryOwnerId = primaryOwner.id;
+    ownerToken = generateAccessToken({
+      userId: primaryOwner.id,
+      username: primaryOwner.username,
+      email: primaryOwner.email,
+      roles: ['OWNER'],
+      permissions: ownerRole!.permissions.map(p => p.permission.code),
+    });
+
+    // Create ADMIN
     const adminUser = await prisma.user.create({
       data: {
         email: 'usermgmt_admin@foodfactory.com',
@@ -47,7 +82,15 @@ describe('Phase 1.3 User Management Suite', () => {
   afterAll(async () => {
     await prisma.user.deleteMany({
       where: {
-        username: { in: ['usermgmt_admin', 'created_employee_test'] },
+        username: {
+          in: [
+            'usermgmt_admin',
+            'created_employee_test',
+            'primary_test_owner',
+            'secondary_test_owner',
+            'attempted_owner_target',
+          ],
+        },
       },
     });
     await prisma.$disconnect();
@@ -141,44 +184,121 @@ describe('Phase 1.3 User Management Suite', () => {
     expect(res.body.data.revokedCount).toBeDefined();
   });
 
-  it('5. Last OWNER protection prevents removing OWNER role or disabling last owner', async () => {
-    const activeOwnerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
-    const ownerUser = await prisma.user.findFirst({
-      where: { userRoles: { some: { roleId: activeOwnerRole!.id } }, isActive: true },
-    });
+  // ============================================================================
+  // OWNER PRIVILEGE ESCALATION PREVENTION TESTS (NEGATIVE)
+  // ============================================================================
 
-    expect(ownerUser).toBeDefined();
-
-    // Ensure only this single owner is active for the "last owner" constraint test
-    await prisma.user.deleteMany({
-      where: {
-        id: { not: ownerUser!.id },
-        userRoles: { some: { role: { code: 'OWNER' } } },
-      },
-    });
-
-    // 1. Attempt to remove OWNER role from last active owner
-    const roleRemovalRes = await request(app)
-      .put(`/api/v1/users/${ownerUser!.id}/roles`)
+  it('5. NEGATIVE: ADMIN cannot create a user with the OWNER role', async () => {
+    const res = await request(app)
+      .post('/api/v1/users')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        roleCodes: ['ADMIN'], // Omits OWNER
+        email: 'attempted_owner_target@foodfactory.com',
+        username: 'attempted_owner_target',
+        password: 'ValidPassword2026!',
+        fullName: 'Attempted Escalated Owner',
+        roleCodes: ['OWNER'],
       });
 
-    expect(roleRemovalRes.status).toBe(400);
-    expect(roleRemovalRes.body.message).toContain(
-      'Cannot remove OWNER role from the last active Owner account',
-    );
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('Only an authenticated OWNER can create an account with the OWNER role');
+  });
 
-    // 2. Attempt to deactivate last active owner
-    const disableRes = await request(app)
-      .patch(`/api/v1/users/${ownerUser!.id}/status`)
+  it('6. NEGATIVE: ADMIN cannot assign OWNER role to an existing user', async () => {
+    const res = await request(app)
+      .put(`/api/v1/users/${testCreatedUserId}/roles`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        roleCodes: ['OWNER', 'SALESMAN'],
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('Only an authenticated OWNER can assign the OWNER role');
+  });
+
+  it('7. NEGATIVE: ADMIN cannot modify an OWNER role assignments or remove OWNER', async () => {
+    const res = await request(app)
+      .put(`/api/v1/users/${primaryOwnerId}/roles`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        roleCodes: ['ADMIN'], // Tries to strip OWNER
+      });
+
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain("ADMIN cannot modify an OWNER's role assignments");
+  });
+
+  it('8. NEGATIVE: ADMIN cannot deactivate an OWNER account', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/users/${primaryOwnerId}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         isActive: false,
       });
 
-    expect(disableRes.status).toBe(400);
-    expect(disableRes.body.message).toContain('Cannot deactivate the last active Owner account');
+    expect(res.status).toBe(403);
+    expect(res.body.message).toContain('ADMIN cannot deactivate an OWNER');
+  });
+
+  // ============================================================================
+  // OWNER AUTHORIZATION & LAST-OWNER PROTECTION TESTS (POSITIVE & INVARIANT)
+  // ============================================================================
+
+  it('9. POSITIVE: An authorized OWNER can create a second OWNER account', async () => {
+    const res = await request(app)
+      .post('/api/v1/users')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        email: 'secondary_test_owner@foodfactory.com',
+        username: 'secondary_test_owner',
+        password: 'SecondaryOwnerPass2026!',
+        fullName: 'Secondary Owner Co-Director',
+        roleCodes: ['OWNER'],
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.roles).toContain('OWNER');
+    secondaryOwnerId = res.body.data.id;
+  });
+
+  it('10. POSITIVE: An authorized OWNER can modify/remove OWNER role when another active owner exists', async () => {
+    // There are now 2 active owners: primary and secondary
+    // Primary owner demotes secondary owner to ADMIN
+    const demoteRes = await request(app)
+      .put(`/api/v1/users/${secondaryOwnerId}/roles`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        roleCodes: ['ADMIN'],
+      });
+
+    expect(demoteRes.status).toBe(200);
+    expect(demoteRes.body.success).toBe(true);
+    expect(demoteRes.body.data.roles).toEqual(['ADMIN']);
+  });
+
+  it('11. INVARIANT: Last active OWNER protection prevents stripping OWNER role from sole active owner', async () => {
+    // Only primaryOwnerId remains as active OWNER
+    const res = await request(app)
+      .put(`/api/v1/users/${primaryOwnerId}/roles`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        roleCodes: ['ADMIN'], // Attempts to strip last owner
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain('Cannot remove OWNER role from the last active Owner account');
+  });
+
+  it('12. INVARIANT: Last active OWNER protection prevents deactivating the sole active owner', async () => {
+    const res = await request(app)
+      .patch(`/api/v1/users/${primaryOwnerId}/status`)
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        isActive: false,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain('Cannot deactivate the last active Owner account');
   });
 });

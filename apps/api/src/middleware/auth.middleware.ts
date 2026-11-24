@@ -13,6 +13,23 @@ declare global {
 }
 
 /**
+ * Explicit set of permitted read-only permissions.
+ * AUDITOR role is strictly prohibited from executing any permission outside this explicit set.
+ */
+export const READ_ONLY_PERMISSIONS = new Set([
+  'users.read',
+  'customers.read',
+  'sales.orders.read',
+  'inventory.read',
+  'production.read',
+  'purchases.read',
+  'invoices.read',
+  'payments.read',
+  'reports.read',
+  'audit.read',
+]);
+
+/**
  * Authentication Middleware:
  * Validates JWT Bearer token in the Authorization header.
  */
@@ -56,7 +73,10 @@ export const requireRoles = (...allowedRoles: string[]) => {
     const hasAllowedRole = isOwner || allowedRoles.some(role => userRoles.includes(role));
 
     if (!hasAllowedRole) {
-      throw new AppError(`Access denied. Requires one of roles: [${allowedRoles.join(', ')}]`, 403);
+      throw new AppError(
+        `Access denied. Requires one of roles: [${allowedRoles.join(', ')}]`,
+        403,
+      );
     }
 
     next();
@@ -66,7 +86,7 @@ export const requireRoles = (...allowedRoles: string[]) => {
 /**
  * Permission-Based Access Control Middleware:
  * Requires user to have all specified permissions.
- * AUDITOR role is strictly enforced read-only.
+ * AUDITOR role is strictly enforced read-only via explicit permission set.
  * OWNER role possesses universal permissions.
  */
 export const requirePermissions = (...requiredPermissions: string[]) => {
@@ -83,12 +103,12 @@ export const requirePermissions = (...requiredPermissions: string[]) => {
       return next();
     }
 
-    // AUDITOR role is strictly read-only: deny any mutation permission
+    // AUDITOR role is strictly read-only: deny any mutation permission by explicit classification
     if (userRoles.includes('AUDITOR')) {
-      const isMutationRequested = requiredPermissions.some(
-        perm => !perm.endsWith('.read') && !perm.endsWith('.export'),
+      const hasMutationPermission = requiredPermissions.some(
+        perm => !READ_ONLY_PERMISSIONS.has(perm),
       );
-      if (isMutationRequested) {
+      if (hasMutationPermission) {
         throw new AppError(
           'Access denied. AUDITOR role is restricted to read-only operations.',
           403,
@@ -113,7 +133,7 @@ export const requirePermissions = (...requiredPermissions: string[]) => {
 /**
  * Physical Facility Scoping Middleware:
  * Restricts operations to warehouses the user is specifically assigned to.
- * ADMIN and OWNER have enterprise-wide facility access.
+ * ADMIN and OWNER have enterprise-wide facility access per approved business policy.
  */
 export const requireWarehouseAccess = (
   paramName = 'warehouseId',
@@ -125,9 +145,7 @@ export const requireWarehouseAccess = (
         throw new AppError('Unauthenticated request', 401);
       }
 
-      const warehouseId = (req.params[paramName] ||
-        req.body[paramName] ||
-        req.query[paramName]) as string;
+      const warehouseId = (req.params[paramName] || req.body[paramName] || req.query[paramName]) as string;
 
       if (!warehouseId) {
         throw new AppError(`Missing required warehouse identifier '${paramName}'.`, 400);
@@ -151,10 +169,7 @@ export const requireWarehouseAccess = (
       });
 
       if (!access) {
-        throw new AppError(
-          'Access denied: You are not authorized for this warehouse facility.',
-          403,
-        );
+        throw new AppError('Access denied: You are not authorized for this warehouse facility.', 403);
       }
 
       if (requiredLevel === 'READ_WRITE' && access.accessLevel === 'READ') {

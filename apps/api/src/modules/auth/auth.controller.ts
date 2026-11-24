@@ -17,6 +17,16 @@ const getCookieOptions = () => {
   };
 };
 
+const getClearCookieOptions = () => {
+  const isProduction = env.NODE_ENV === 'production' || env.COOKIE_SECURE === true;
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: env.COOKIE_SAME_SITE as 'lax' | 'strict' | 'none',
+    path: '/api/v1/auth',
+  };
+};
+
 export class AuthController {
   /**
    * POST /api/v1/auth/login
@@ -76,8 +86,8 @@ export class AuthController {
         200,
       );
     } catch (error) {
-      // Clear invalid cookie on failure
-      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/v1/auth' });
+      // Clear invalid cookie on failure using matching attributes
+      res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions());
       next(error);
     }
   }
@@ -93,7 +103,7 @@ export class AuthController {
 
       await AuthService.logout(rawRefreshToken, req.user?.userId, ipAddress, userAgent);
 
-      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/v1/auth' });
+      res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions());
       sendSuccess(res, 'Logged out successfully', null, 200);
     } catch (error) {
       next(error);
@@ -115,7 +125,7 @@ export class AuthController {
 
       await AuthService.logoutAll(req.user.userId, ipAddress, userAgent);
 
-      res.clearCookie(REFRESH_COOKIE_NAME, { path: '/api/v1/auth' });
+      res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions());
       sendSuccess(res, 'All active sessions have been terminated', null, 200);
     } catch (error) {
       next(error);
