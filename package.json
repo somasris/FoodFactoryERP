@@ -1,0 +1,27 @@
+{
+  "name": "foodfactory-erp-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo for FoodFactory ERP - Small-scale packaged food manufacturing ERP",
+  "scripts": {
+    "dev": "concurrently -n \"api,web\" -c \"blue,green\" \"pnpm --filter @foodfactory/api dev\" \"pnpm --filter @foodfactory/web dev\"",
+    "dev:api": "pnpm --filter @foodfactory/api dev",
+    "dev:web": "pnpm --filter @foodfactory/web dev",
+    "build": "pnpm --filter @foodfactory/api build && pnpm --filter @foodfactory/web build",
+    "lint": "pnpm --filter @foodfactory/api lint && pnpm --filter @foodfactory/web lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css}\"",
+    "typecheck": "pnpm --filter @foodfactory/api typecheck && pnpm --filter @foodfactory/web typecheck",
+    "db:generate": "pnpm --filter @foodfactory/api db:generate",
+    "db:migrate": "pnpm --filter @foodfactory/api db:migrate",
+    "db:studio": "pnpm --filter @foodfactory/api db:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "prettier": "^3.5.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

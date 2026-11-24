@@ -1,0 +1,26 @@
+// Prisma schema for FoodFactory ERP
+// Phase 1.1 - Foundation Schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Minimal initial foundation model for system metadata & health verification.
+// NOTE: Complete business domain models (Sales, Customers, Raw Materials,
+// Packaging, BOM, Production, Accounting) will be introduced in subsequent
+// domain-specific database design phases.
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}

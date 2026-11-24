@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production builds
+dist/
+build/
+.cache/
+
+# Local Environment Variables
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local PostgreSQL Data Directory (Windows standalone dev)
+.pgdata/
+*.log
+
+# Editor & OS files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+Thumbs.db
+
+# Testing & Coverage
+coverage/
+*.lcov
