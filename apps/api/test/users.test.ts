@@ -40,6 +40,14 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
       },
     });
 
+    // Demote or deactivate any external active owners during this test to ensure exact isolation
+    await prisma.userRole.deleteMany({
+      where: {
+        role: { code: 'OWNER' },
+        user: { username: { notIn: ['primary_test_owner', 'secondary_test_owner'] } },
+      },
+    });
+
     // Create primary OWNER
     const primaryOwner = await prisma.user.create({
       data: {
@@ -93,6 +101,19 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
         },
       },
     });
+
+    // Ensure initial seeded owner retains OWNER role
+    const seedOwner = await prisma.user.findFirst({ where: { username: 'owner' } });
+    const ownerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
+    if (seedOwner && ownerRole) {
+      await prisma.user.update({ where: { id: seedOwner.id }, data: { isActive: true } });
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: seedOwner.id, roleId: ownerRole.id } },
+        update: {},
+        create: { userId: seedOwner.id, roleId: ownerRole.id },
+      });
+    }
+
     await prisma.$disconnect();
   });
 
@@ -278,7 +299,15 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
   });
 
   it('11. INVARIANT: Last active OWNER protection prevents stripping OWNER role from sole active owner', async () => {
-    // Only primaryOwnerId remains as active OWNER
+    // Only primaryOwnerId remains as active OWNER in this test scenario
+    // Ensure any other background active owner (such as initial seed) does not defeat the last-owner count
+    await prisma.userRole.deleteMany({
+      where: {
+        role: { code: 'OWNER' },
+        user: { username: { not: 'primary_test_owner' } },
+      },
+    });
+
     const res = await request(app)
       .put(`/api/v1/users/${primaryOwnerId}/roles`)
       .set('Authorization', `Bearer ${ownerToken}`)
@@ -291,6 +320,14 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
   });
 
   it('12. INVARIANT: Last active OWNER protection prevents deactivating the sole active owner', async () => {
+    // Ensure primary_test_owner is the sole active OWNER
+    await prisma.userRole.deleteMany({
+      where: {
+        role: { code: 'OWNER' },
+        user: { username: { not: 'primary_test_owner' } },
+      },
+    });
+
     const res = await request(app)
       .patch(`/api/v1/users/${primaryOwnerId}/status`)
       .set('Authorization', `Bearer ${ownerToken}`)

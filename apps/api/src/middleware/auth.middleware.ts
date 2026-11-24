@@ -19,6 +19,10 @@ declare global {
 export const READ_ONLY_PERMISSIONS = new Set([
   'users.read',
   'customers.read',
+  'master_data.read',
+  'suppliers.read',
+  'warehouses.read',
+  'bom.read',
   'sales.orders.read',
   'inventory.read',
   'production.read',

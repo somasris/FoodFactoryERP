@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { LoginPage } from './LoginPage';
@@ -6,6 +6,18 @@ import { UnauthorizedPage } from './UnauthorizedPage';
 import { DashboardPlaceholder } from './DashboardPlaceholder';
 import { ModulePlaceholder } from './ModulePlaceholder';
 import { NotFoundPage } from './NotFoundPage';
+import { MasterDataLayout } from '../components/master-data/MasterDataLayout';
+import { ProductsPage } from './master-data/ProductsPage';
+import { ProductVariantsPage } from './master-data/ProductVariantsPage';
+import { CategoryMasterPage } from './master-data/CategoryMasterPage';
+import { RawMaterialsPage } from './master-data/RawMaterialsPage';
+import { SuppliersPage } from './master-data/SuppliersPage';
+import { CustomersPage } from './master-data/CustomersPage';
+import { UomsPage } from './master-data/UomsPage';
+import { UnitConversionsPage } from './master-data/UnitConversionsPage';
+import { TaxPage } from './master-data/TaxPage';
+import { WarehousesPage } from './master-data/WarehousesPage';
+import { BomsPage } from './master-data/BomsPage';
 
 export const router = createBrowserRouter([
   {
@@ -27,6 +39,25 @@ export const router = createBrowserRouter([
       {
         index: true,
         element: <DashboardPlaceholder />,
+      },
+      {
+        path: 'master-data',
+        element: <MasterDataLayout />,
+        children: [
+          { index: true, element: <Navigate to="/master-data/products" replace /> },
+          { path: 'products', element: <ProductsPage /> },
+          { path: 'product-variants', element: <ProductVariantsPage /> },
+          { path: 'product-categories', element: <CategoryMasterPage kind="product" /> },
+          { path: 'raw-materials', element: <RawMaterialsPage /> },
+          { path: 'raw-material-categories', element: <CategoryMasterPage kind="rawMaterial" /> },
+          { path: 'suppliers', element: <SuppliersPage /> },
+          { path: 'customers', element: <CustomersPage /> },
+          { path: 'uoms', element: <UomsPage /> },
+          { path: 'unit-conversions', element: <UnitConversionsPage /> },
+          { path: 'tax', element: <TaxPage /> },
+          { path: 'warehouses', element: <WarehousesPage /> },
+          { path: 'boms', element: <BomsPage /> },
+        ],
       },
       {
         path: 'sales',

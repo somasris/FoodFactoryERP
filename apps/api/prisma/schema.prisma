@@ -22,6 +22,51 @@ enum WarehouseType {
   SCRAP_DAMAGED
 }
 
+enum ItemType {
+  RAW_MATERIAL
+  PACKAGING
+  FINISHED_GOODS
+}
+
+enum ValuationMethod {
+  MWAC
+  BATCH_ACTUAL
+  STANDARD
+}
+
+enum MaterialType {
+  RAW_INGREDIENT
+  PACKAGING_PRIMARY
+  PACKAGING_SECONDARY
+}
+
+enum CustomerType {
+  RETAILER
+  DISTRIBUTOR
+  WHOLESALER
+  DIRECT
+}
+
+enum AddressType {
+  BILLING
+  SHIPPING
+  OFFICE
+  DISPATCH
+}
+
+enum BOMVersionStatus {
+  DRAFT
+  ACTIVE
+  OBSOLETE
+}
+
+enum OverheadCostType {
+  LABOUR
+  UTILITY
+  MACHINE_DEPRECIATION
+  DIRECT_OVERHEAD
+}
+
 enum AuditAction {
   CREATE
   UPDATE
@@ -249,4 +294,362 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// ------------------------------------------------------------------------------
+// 5. MASTER DATA MANAGEMENT (PHASE 1.4)
+// ------------------------------------------------------------------------------
+
+model UnitOfMeasure {
+  id            String   @id @default(uuid())
+  code          String   @unique @db.VarChar(10)
+  name          String   @db.VarChar(50)
+  symbol        String   @db.VarChar(10)
+  category      String   @default("GENERAL") @db.VarChar(30)
+  isBaseUnit    Boolean  @default(false) @map("is_base_unit")
+  decimalPlaces Int      @default(2) @map("decimal_places")
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  conversionsFrom UnitConversion[] @relation("FromUOM")
+  conversionsTo   UnitConversion[] @relation("ToUOM")
+  rawMaterials    RawMaterial[]
+  products        Product[]
+  productVariants ProductVariant[]
+  inventoryItems  InventoryItem[]
+  boms            BOM[]
+  bomVersions     BOMVersion[]
+  bomItems        BOMItem[]
+
+  @@map("units_of_measure")
+}
+
+model UnitConversion {
+  id         String   @id @default(uuid())
+  fromUomId  String   @map("from_uom_id")
+  toUomId    String   @map("to_uom_id")
+  multiplier Decimal  @db.Decimal(18, 6)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  fromUom UnitOfMeasure @relation("FromUOM", fields: [fromUomId], references: [id])
+  toUom   UnitOfMeasure @relation("ToUOM", fields: [toUomId], references: [id])
+
+  @@unique([fromUomId, toUomId])
+  @@map("unit_conversions")
+}
+
+model TaxRate {
+  id             String   @id @default(uuid())
+  code           String   @unique @db.VarChar(20)
+  name           String   @db.VarChar(50)
+  ratePercentage Decimal  @map("rate_percentage") @db.Decimal(5, 2)
+  cgstPercentage Decimal  @map("cgst_percentage") @db.Decimal(5, 2)
+  sgstPercentage Decimal  @map("sgst_percentage") @db.Decimal(5, 2)
+  igstPercentage Decimal  @map("igst_percentage") @db.Decimal(5, 2)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  rawMaterials   RawMaterial[]
+  products       Product[]
+  configurations TaxConfiguration[]
+
+  @@map("tax_rates")
+}
+
+model TaxConfiguration {
+  id            String    @id @default(uuid())
+  hsnCode       String    @map("hsn_code") @db.VarChar(10)
+  description   String?   @db.VarChar(255)
+  taxRateId     String    @map("tax_rate_id")
+  effectiveFrom DateTime  @default(now()) @map("effective_from") @db.Date
+  effectiveTo   DateTime? @map("effective_to") @db.Date
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  taxRate TaxRate @relation(fields: [taxRateId], references: [id])
+
+  @@index([hsnCode])
+  @@index([taxRateId])
+  @@map("tax_configurations")
+}
+
+model RawMaterialCategory {
+  id          String   @id @default(uuid())
+  code        String   @unique @db.VarChar(20)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  materials RawMaterial[]
+
+  @@map("raw_material_categories")
+}
+
+model RawMaterial {
+  id              String       @id @default(uuid())
+  categoryId      String       @map("category_id")
+  code            String       @unique @db.VarChar(30)
+  name            String       @db.VarChar(100)
+  description     String?      @db.Text
+  materialType    MaterialType @map("material_type")
+  uomId           String       @map("uom_id")
+  hsnCode         String       @map("hsn_code") @db.VarChar(10)
+  taxRateId       String       @map("tax_rate_id")
+  minStockAlert   Decimal      @default(0) @map("min_stock_alert") @db.Decimal(14, 4)
+  reorderQuantity Decimal?     @map("reorder_quantity") @db.Decimal(14, 4)
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  category      RawMaterialCategory @relation(fields: [categoryId], references: [id])
+  uom           UnitOfMeasure       @relation(fields: [uomId], references: [id])
+  taxRate       TaxRate             @relation(fields: [taxRateId], references: [id])
+  inventoryItem InventoryItem?
+
+  @@index([categoryId])
+  @@index([uomId])
+  @@index([taxRateId])
+  @@map("raw_materials")
+}
+
+model ProductCategory {
+  id          String   @id @default(uuid())
+  code        String   @unique @db.VarChar(20)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  categoryId  String   @map("category_id")
+  code        String   @unique @db.VarChar(30)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  baseUomId   String   @map("base_uom_id")
+  hsnCode     String   @map("hsn_code") @db.VarChar(10)
+  taxRateId   String   @map("tax_rate_id")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  category ProductCategory  @relation(fields: [categoryId], references: [id])
+  baseUom  UnitOfMeasure    @relation(fields: [baseUomId], references: [id])
+  taxRate  TaxRate          @relation(fields: [taxRateId], references: [id])
+  variants ProductVariant[]
+
+  @@index([categoryId])
+  @@index([baseUomId])
+  @@index([taxRateId])
+  @@map("products")
+}
+
+model ProductVariant {
+  id                  String   @id @default(uuid())
+  productId           String   @map("product_id")
+  sku                 String   @unique @db.VarChar(30)
+  name                String   @db.VarChar(100)
+  netWeightGrams      Decimal  @map("net_weight_grams") @db.Decimal(10, 2)
+  uomId               String   @map("uom_id")
+  defaultSellingPrice Decimal  @map("default_selling_price") @db.Decimal(12, 2)
+  barcode             String?  @unique @db.VarChar(50)
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  product       Product        @relation(fields: [productId], references: [id])
+  uom           UnitOfMeasure  @relation(fields: [uomId], references: [id])
+  inventoryItem InventoryItem?
+  boms          BOM[]
+
+  @@index([productId])
+  @@index([uomId])
+  @@map("product_variants")
+}
+
+model InventoryItem {
+  id                String          @id @default(uuid())
+  itemType          ItemType        @map("item_type")
+  rawMaterialId     String?         @unique @map("raw_material_id")
+  productVariantId  String?         @unique @map("product_variant_id")
+  code              String          @unique @db.VarChar(30)
+  name              String          @db.VarChar(100)
+  uomId             String          @map("uom_id")
+  valuationMethod   ValuationMethod @default(MWAC) @map("valuation_method")
+  movingAverageCost Decimal         @default(0) @map("moving_average_cost") @db.Decimal(18, 4)
+  isActive          Boolean         @default(true) @map("is_active")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  rawMaterial    RawMaterial?    @relation(fields: [rawMaterialId], references: [id])
+  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
+  uom            UnitOfMeasure   @relation(fields: [uomId], references: [id])
+  bomItems       BOMItem[]
+
+  @@map("inventory_items")
+}
+
+model Supplier {
+  id               String   @id @default(uuid())
+  code             String   @unique @db.VarChar(20)
+  legalName        String   @map("legal_name") @db.VarChar(150)
+  tradeName        String?  @map("trade_name") @db.VarChar(150)
+  contactName      String?  @map("contact_name") @db.VarChar(100)
+  email            String?  @db.VarChar(100)
+  phone            String?  @db.VarChar(20)
+  gstin            String?  @unique @db.VarChar(15)
+  pan              String?  @db.VarChar(10)
+  paymentTermsDays Int      @default(30) @map("payment_terms_days")
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  addresses SupplierAddress[]
+
+  @@map("suppliers")
+}
+
+model SupplierAddress {
+  id           String      @id @default(uuid())
+  supplierId   String      @map("supplier_id")
+  addressType  AddressType @default(OFFICE) @map("address_type")
+  addressLine1 String      @map("address_line1") @db.VarChar(255)
+  city         String      @db.VarChar(50)
+  state        String      @db.VarChar(50)
+  stateCode    String      @map("state_code") @db.VarChar(2)
+  pincode      String      @db.VarChar(10)
+  isDefault    Boolean     @default(true) @map("is_default")
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([supplierId])
+  @@map("supplier_addresses")
+}
+
+model Customer {
+  id               String       @id @default(uuid())
+  code             String       @unique @db.VarChar(20)
+  legalName        String       @map("legal_name") @db.VarChar(150)
+  tradeName        String?      @map("trade_name") @db.VarChar(150)
+  customerType     CustomerType @map("customer_type")
+  contactName      String?      @map("contact_name") @db.VarChar(100)
+  email            String?      @db.VarChar(100)
+  phone            String?      @db.VarChar(20)
+  gstin            String?      @unique @db.VarChar(15)
+  pan              String?      @db.VarChar(10)
+  creditPeriodDays Int          @default(15) @map("credit_period_days")
+  creditLimit      Decimal      @default(0) @map("credit_limit") @db.Decimal(14, 2)
+  isActive         Boolean      @default(true) @map("is_active")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+
+  addresses CustomerAddress[]
+
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id           String      @id @default(uuid())
+  customerId   String      @map("customer_id")
+  addressType  AddressType @default(SHIPPING) @map("address_type")
+  addressLine1 String      @map("address_line1") @db.VarChar(255)
+  city         String      @db.VarChar(50)
+  state        String      @db.VarChar(50)
+  stateCode    String      @map("state_code") @db.VarChar(2)
+  pincode      String      @db.VarChar(10)
+  isDefault    Boolean     @default(true) @map("is_default")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_addresses")
+}
+
+model BOM {
+  id                 String   @id @default(uuid())
+  productVariantId   String   @map("product_variant_id")
+  code               String   @unique @db.VarChar(30)
+  name               String   @db.VarChar(100)
+  baseOutputQuantity Decimal  @map("base_output_quantity") @db.Decimal(14, 4)
+  outputUomId        String   @map("output_uom_id")
+  isActive           Boolean  @default(true) @map("is_active")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  outputUom      UnitOfMeasure  @relation(fields: [outputUomId], references: [id])
+  versions       BOMVersion[]
+
+  @@index([productVariantId])
+  @@map("boms")
+}
+
+model BOMVersion {
+  id                 String           @id @default(uuid())
+  bomId              String           @map("bom_id")
+  versionNumber      Int              @map("version_number")
+  status             BOMVersionStatus @default(DRAFT)
+  effectiveFrom      DateTime         @default(now()) @map("effective_from") @db.Date
+  effectiveTo        DateTime?        @map("effective_to") @db.Date
+  expectedGoodOutput Decimal          @map("expected_good_output") @db.Decimal(14, 4)
+  outputUomId        String           @map("output_uom_id")
+  approvedById       String?          @map("approved_by_id")
+  approvedAt         DateTime?        @map("approved_at")
+  remarks            String?          @db.Text
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  bom       BOM           @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  outputUom UnitOfMeasure @relation(fields: [outputUomId], references: [id])
+  items     BOMItem[]
+  overheads BOMOverhead[]
+
+  @@unique([bomId, versionNumber])
+  @@map("bom_versions")
+}
+
+model BOMItem {
+  id                    String   @id @default(uuid())
+  bomVersionId          String   @map("bom_version_id")
+  inventoryItemId       String   @map("inventory_item_id")
+  itemType              ItemType @map("item_type")
+  standardQuantity      Decimal  @map("standard_quantity") @db.Decimal(14, 4)
+  uomId                 String   @map("uom_id")
+  scrapTolerancePercent Decimal  @default(0) @map("scrap_tolerance_percent") @db.Decimal(5, 2)
+
+  bomVersion    BOMVersion    @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem @relation(fields: [inventoryItemId], references: [id])
+  uom           UnitOfMeasure @relation(fields: [uomId], references: [id])
+
+  @@index([bomVersionId])
+  @@index([inventoryItemId])
+  @@map("bom_items")
+}
+
+model BOMOverhead {
+  id             String           @id @default(uuid())
+  bomVersionId   String           @map("bom_version_id")
+  costType       OverheadCostType @map("cost_type")
+  description    String           @db.VarChar(150)
+  standardAmount Decimal          @map("standard_amount") @db.Decimal(12, 2)
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  bomVersion BOMVersion @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
+
+  @@index([bomVersionId])
+  @@map("bom_overheads")
 }

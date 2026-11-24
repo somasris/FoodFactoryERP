@@ -251,10 +251,14 @@ describe('Phase 1.3 Authentication, CSRF & Concurrency Suite', () => {
     expect(rotateRes.status).toBe(200);
     const tokenB = rotateRes.body.data.refreshToken;
 
-    // 3. Simulate passage of time past the concurrency grace window (5000ms) by updating updatedAt in DB
+    // 3. Update updatedAt in DB using UTC timestamp to simulate passage of time past grace window
     const hashA = hashRefreshToken(tokenA);
-    const pastDate = new Date(Date.now() - 15000); // 15 seconds ago
-    await prisma.$executeRaw`UPDATE refresh_tokens SET updated_at = ${pastDate} WHERE token_hash = ${hashA}`;
+    const count = await prisma.$executeRaw`
+      UPDATE refresh_tokens
+      SET updated_at = (clock_timestamp() AT TIME ZONE 'UTC') - interval '15 seconds'
+      WHERE token_hash = ${hashA}
+    `;
+    expect(count).toBe(1);
 
     // 4. Adversary replays tokenA past the grace window!
     const adversaryRes = await request(app)
@@ -273,7 +277,7 @@ describe('Phase 1.3 Authentication, CSRF & Concurrency Suite', () => {
 
     expect(victimRes.status).toBe(401);
     expect(victimRes.body.message).toContain('Token reuse detected');
-  });
+  }, 20000);
 
   it('11. Refresh after logout is rejected', async () => {
     const loginRes = await request(app).post('/api/v1/auth/login').send({
@@ -288,11 +292,6 @@ describe('Phase 1.3 Authentication, CSRF & Concurrency Suite', () => {
       .set('X-Requested-With', 'XMLHttpRequest')
       .send({ refreshToken });
     expect(logoutRes.status).toBe(200);
-
-    // Make sure updatedAt is past grace window
-    const hash = hashRefreshToken(refreshToken);
-    const pastDate = new Date(Date.now() - 10000);
-    await prisma.$executeRaw`UPDATE refresh_tokens SET updated_at = ${pastDate} WHERE token_hash = ${hash}`;
 
     // Refresh attempt must fail
     const refreshRes = await request(app)
@@ -314,9 +313,6 @@ describe('Phase 1.3 Authentication, CSRF & Concurrency Suite', () => {
     await request(app)
       .post('/api/v1/auth/logout-all')
       .set('Authorization', `Bearer ${accessToken}`);
-
-    const hash = hashRefreshToken(refreshToken);
-    await prisma.$executeRaw`UPDATE refresh_tokens SET updated_at = ${pastDate} WHERE token_hash = ${hash}`;
 
     const refreshRes = await request(app)
       .post('/api/v1/auth/refresh')

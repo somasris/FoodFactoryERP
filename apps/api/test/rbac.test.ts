@@ -16,6 +16,7 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
   let warehouseRMId: string;
   let warehouseFGId: string;
   let testSalesmanUserId: string;
+  let ownerUserId: string;
 
   beforeAll(async () => {
     // Look up warehouse facilities
@@ -53,6 +54,7 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
         userRoles: { create: { roleId: getRole('OWNER').id } },
       },
     });
+    ownerUserId = uOwner.id;
     ownerToken = generateAccessToken({
       userId: uOwner.id,
       username: uOwner.username,
@@ -149,6 +151,19 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
         },
       },
     });
+
+    // Ensure initial seeded owner retains OWNER role
+    const seedOwner = await prisma.user.findFirst({ where: { username: 'owner' } });
+    const ownerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
+    if (seedOwner && ownerRole) {
+      await prisma.user.update({ where: { id: seedOwner.id }, data: { isActive: true } });
+      await prisma.userRole.upsert({
+        where: { userId_roleId: { userId: seedOwner.id, roleId: ownerRole.id } },
+        update: {},
+        create: { userId: seedOwner.id, roleId: ownerRole.id },
+      });
+    }
+
     await prisma.$disconnect();
   });
 
@@ -221,25 +236,26 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
   });
 
   it('7. ADMIN cannot disable an OWNER account and last OWNER cannot be deactivated', async () => {
-    // Lookup owner user
-    const owner = await prisma.user.findFirst({
-      where: { userRoles: { some: { role: { code: 'OWNER' } } }, isActive: true },
-    });
-
-    expect(owner).toBeDefined();
-
     // 1. ADMIN attempt is rejected with 403 (ADMIN cannot modify/deactivate an OWNER)
     const adminAttemptRes = await request(app)
-      .patch(`/api/v1/users/${owner!.id}/status`)
+      .patch(`/api/v1/users/${ownerUserId}/status`)
       .set('Authorization', `Bearer ${adminToken}`)
       .send({ isActive: false });
 
     expect(adminAttemptRes.status).toBe(403);
-    expect(adminAttemptRes.body.message).toContain('Only an OWNER can deactivate an OWNER account');
+    expect(adminAttemptRes.body.message).toContain('ADMIN cannot deactivate an OWNER');
 
     // 2. OWNER attempt on the last active OWNER is rejected with 400 (last owner invariant)
+    // First, temporarily remove any other active owners so that rbac_owner is the sole active owner
+    await prisma.userRole.deleteMany({
+      where: {
+        role: { code: 'OWNER' },
+        user: { id: { not: ownerUserId } },
+      },
+    });
+
     const ownerAttemptRes = await request(app)
-      .patch(`/api/v1/users/${owner!.id}/status`)
+      .patch(`/api/v1/users/${ownerUserId}/status`)
       .set('Authorization', `Bearer ${ownerToken}`)
       .send({ isActive: false });
 

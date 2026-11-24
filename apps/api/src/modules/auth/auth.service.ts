@@ -195,6 +195,7 @@ export class AuthService {
 
     return await prisma.$transaction(async tx => {
       // 1. Acquire exclusive lock on the refresh token row (FOR UPDATE)
+      // Extract age in milliseconds using UTC timezone to match Prisma's timestamp without time zone storage
       const rows = await tx.$queryRaw<
         Array<{
           id: string;
@@ -205,9 +206,11 @@ export class AuthService {
           expires_at: Date;
           created_at: Date;
           updated_at: Date;
+          elapsed_ms: number;
         }>
       >`
-        SELECT id, token_hash, user_id, family, is_revoked, expires_at, created_at, updated_at
+        SELECT id, token_hash, user_id, family, is_revoked, expires_at, created_at, updated_at,
+               ROUND(EXTRACT(EPOCH FROM ((clock_timestamp() AT TIME ZONE 'UTC') - updated_at)) * 1000)::bigint AS elapsed_ms
         FROM refresh_tokens
         WHERE token_hash = ${tokenHash}
         FOR UPDATE
@@ -221,7 +224,10 @@ export class AuthService {
 
       // 2. REUSE AND CONCURRENCY DETECTION
       if (storedToken.is_revoked) {
-        const elapsedMs = Date.now() - new Date(storedToken.updated_at).getTime();
+        const rawElapsed = (storedToken as Record<string, unknown>)['elapsed_ms'] ?? (storedToken as Record<string, unknown>)['elapsedms'];
+        const elapsedMs = rawElapsed !== undefined && rawElapsed !== null
+          ? Number(rawElapsed)
+          : Math.max(0, Date.now() - new Date(storedToken.updated_at).getTime());
 
         // Check if there is still an active token in this family (normal rotation in progress)
         const activeTokensInFamily = await tx.refreshToken.count({
@@ -244,9 +250,10 @@ export class AuthService {
           data: { isRevoked: true },
         });
 
+        const tokenUserId = (storedToken as Record<string, unknown>)['user_id'] ?? (storedToken as Record<string, unknown>)['userId'];
         await prisma.auditLog.create({
           data: {
-            userId: storedToken.user_id,
+            userId: (tokenUserId as string) || null,
             action: 'SECURITY_ALERT',
             entityType: 'RefreshTokenFamily',
             entityId: storedToken.family,

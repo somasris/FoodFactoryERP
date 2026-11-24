@@ -191,6 +191,86 @@ const PERMISSIONS = [
     action: 'READ',
     description: 'Inspect immutable system security and activity logs',
   },
+
+  // Phase 1.4 Master Data Management
+  {
+    code: 'master_data.read',
+    module: 'master_data',
+    action: 'READ',
+    description: 'View products, raw materials, units of measure, and tax configurations',
+  },
+  {
+    code: 'master_data.create',
+    module: 'master_data',
+    action: 'CREATE',
+    description: 'Create products, raw materials, units of measure, and tax configurations',
+  },
+  {
+    code: 'master_data.update',
+    module: 'master_data',
+    action: 'UPDATE',
+    description: 'Update or toggle status of master data entities',
+  },
+  {
+    code: 'suppliers.read',
+    module: 'suppliers',
+    action: 'READ',
+    description: 'View supplier directory and addresses',
+  },
+  {
+    code: 'suppliers.create',
+    module: 'suppliers',
+    action: 'CREATE',
+    description: 'Register new supplier accounts',
+  },
+  {
+    code: 'suppliers.update',
+    module: 'suppliers',
+    action: 'UPDATE',
+    description: 'Update supplier details, addresses, and status',
+  },
+  {
+    code: 'warehouses.read',
+    module: 'warehouses',
+    action: 'READ',
+    description: 'View warehouse facilities within authorized scope',
+  },
+  {
+    code: 'warehouses.create',
+    module: 'warehouses',
+    action: 'CREATE',
+    description: 'Create new warehouse facilities',
+  },
+  {
+    code: 'warehouses.update',
+    module: 'warehouses',
+    action: 'UPDATE',
+    description: 'Update warehouse details and status',
+  },
+  {
+    code: 'bom.read',
+    module: 'bom',
+    action: 'READ',
+    description: 'View bills of materials, versions, and overheads',
+  },
+  {
+    code: 'bom.create',
+    module: 'bom',
+    action: 'CREATE',
+    description: 'Create bills of materials and new BOM versions',
+  },
+  {
+    code: 'bom.update',
+    module: 'bom',
+    action: 'UPDATE',
+    description: 'Update draft BOM versions and BOM headers',
+  },
+  {
+    code: 'bom.approve',
+    module: 'bom',
+    action: 'APPROVE',
+    description: 'Activate or obsolete BOM versions',
+  },
 ];
 
 // Five Core ERP Roles
@@ -254,6 +334,19 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'payments.record',
     'reports.read',
     'audit.read',
+    'master_data.read',
+    'master_data.create',
+    'master_data.update',
+    'suppliers.read',
+    'suppliers.create',
+    'suppliers.update',
+    'warehouses.read',
+    'warehouses.create',
+    'warehouses.update',
+    'bom.read',
+    'bom.create',
+    'bom.update',
+    'bom.approve',
   ],
   PRODUCTION: [
     'production.read',
@@ -261,6 +354,11 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.complete',
     'inventory.read',
     'inventory.transfer',
+    'master_data.read',
+    'warehouses.read',
+    'bom.read',
+    'bom.create',
+    'bom.update',
   ],
   SALESMAN: [
     'customers.read',
@@ -269,6 +367,8 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'sales.orders.read',
     'sales.orders.create',
     'inventory.read',
+    'master_data.read',
+    'warehouses.read',
   ],
   AUDITOR: [
     // Strictly read-only
@@ -282,6 +382,10 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'payments.read',
     'reports.read',
     'audit.read',
+    'master_data.read',
+    'suppliers.read',
+    'warehouses.read',
+    'bom.read',
   ],
 };
 
@@ -533,6 +637,69 @@ async function main() {
   }
 
   console.info('✅ Phase 1.3 database seed completed successfully!');
+
+  // 6. Seed Baseline Master Data (Units of Measure & Standard GST Tax Rates)
+  const defaultUoms = [
+    { code: 'KG', name: 'Kilogram', symbol: 'kg', category: 'WEIGHT', isBaseUnit: true, decimalPlaces: 3 },
+    { code: 'G', name: 'Gram', symbol: 'g', category: 'WEIGHT', isBaseUnit: false, decimalPlaces: 2 },
+    { code: 'L', name: 'Litre', symbol: 'L', category: 'VOLUME', isBaseUnit: true, decimalPlaces: 3 },
+    { code: 'ML', name: 'Millilitre', symbol: 'mL', category: 'VOLUME', isBaseUnit: false, decimalPlaces: 2 },
+    { code: 'PCS', name: 'Pieces', symbol: 'pcs', category: 'COUNT', isBaseUnit: true, decimalPlaces: 0 },
+    { code: 'BOX', name: 'Box', symbol: 'box', category: 'COUNT', isBaseUnit: false, decimalPlaces: 0 },
+  ];
+
+  for (const uom of defaultUoms) {
+    await prisma.unitOfMeasure.upsert({
+      where: { code: uom.code },
+      update: {},
+      create: uom,
+    });
+  }
+
+  const defaultTaxRates = [
+    {
+      code: 'GST_0',
+      name: 'GST 0% (Exempt)',
+      ratePercentage: '0.00',
+      cgstPercentage: '0.00',
+      sgstPercentage: '0.00',
+      igstPercentage: '0.00',
+    },
+    {
+      code: 'GST_5',
+      name: 'GST 5%',
+      ratePercentage: '5.00',
+      cgstPercentage: '2.50',
+      sgstPercentage: '2.50',
+      igstPercentage: '5.00',
+    },
+    {
+      code: 'GST_12',
+      name: 'GST 12%',
+      ratePercentage: '12.00',
+      cgstPercentage: '6.00',
+      sgstPercentage: '6.00',
+      igstPercentage: '12.00',
+    },
+    {
+      code: 'GST_18',
+      name: 'GST 18%',
+      ratePercentage: '18.00',
+      cgstPercentage: '9.00',
+      sgstPercentage: '9.00',
+      igstPercentage: '18.00',
+    },
+  ];
+
+  for (const tax of defaultTaxRates) {
+    await prisma.taxRate.upsert({
+      where: { code: tax.code },
+      update: {},
+      create: tax,
+    });
+  }
+
+  console.info('✅ Phase 1.4 baseline master data seed completed successfully!');
 }
 
 main()

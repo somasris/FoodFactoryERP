@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
+  Database,
   ShoppingCart,
   Boxes,
   Cpu,
@@ -25,6 +26,13 @@ const navItems = [
     path: '/',
     icon: LayoutDashboard,
     badge: 'Active',
+    badgeVariant: 'teal' as const,
+  },
+  {
+    name: 'Master Data',
+    path: '/master-data',
+    icon: Database,
+    badge: 'Phase 1.4',
     badgeVariant: 'teal' as const,
   },
   {

@@ -87,7 +87,7 @@ describe('Phase 1.3 Frontend Authentication & Session Suite', () => {
       return Promise.reject(new Error(`Unhandled URL: ${url}`));
     });
 
-    global.fetch = mockFetch;
+    globalThis.fetch = mockFetch;
     setAccessToken('jwt.initial.expired_token');
 
     const result = await apiClient<{ secured: string }>('/protected-data');
