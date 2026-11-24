@@ -14,7 +14,22 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z
     .string()
     .min(16)
-    .default('foodfactory_erp_jwt_secret_foundation_fallback_key'),
+    .default('foodfactory_erp_jwt_secret_foundation_fallback_key_2026'),
+  JWT_REFRESH_SECRET: z
+    .string()
+    .min(16)
+    .default('foodfactory_erp_refresh_pepper_foundation_secret_key_2026'),
+  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_REFRESH_EXPIRY_DAYS: z.coerce.number().default(7),
+  COOKIE_SAME_SITE: z.enum(['lax', 'strict', 'none']).default('lax'),
+  COOKIE_SECURE: z
+    .string()
+    .transform(v => v === 'true')
+    .optional(),
+  INITIAL_OWNER_EMAIL: z.string().email().optional(),
+  INITIAL_OWNER_USERNAME: z.string().min(3).optional(),
+  INITIAL_OWNER_PASSWORD: z.string().min(8).optional(),
+  INITIAL_OWNER_FULLNAME: z.string().optional(),
 });
 
 const parseEnv = () => {

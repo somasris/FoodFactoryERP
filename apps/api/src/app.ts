@@ -1,5 +1,6 @@
 import express, { Express } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { requestLogger } from './middleware/logger.middleware';
 import { notFoundHandler } from './middleware/not-found.middleware';
@@ -16,10 +17,11 @@ export const createApp = (): Express => {
       origin: env.FRONTEND_URL,
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     }),
   );
 
+  app.use(cookieParser());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(requestLogger);
@@ -29,7 +31,7 @@ export const createApp = (): Express => {
     sendSuccess(res, 'FoodFactory ERP API Server Root', {
       application: 'FoodFactory ERP API',
       version: '1.0.0',
-      phase: '1.1 Foundation',
+      phase: '1.3 Authentication & RBAC',
       documentation: '/api/v1/health',
     });
   });

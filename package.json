@@ -12,6 +12,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,css}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,css}\"",
     "typecheck": "pnpm --filter @foodfactory/api typecheck && pnpm --filter @foodfactory/web typecheck",
+    "test": "pnpm --filter @foodfactory/api test && pnpm --filter @foodfactory/web test",
     "db:generate": "pnpm --filter @foodfactory/api db:generate",
     "db:migrate": "pnpm --filter @foodfactory/api db:migrate",
     "db:studio": "pnpm --filter @foodfactory/api db:studio"
@@ -23,5 +24,14 @@
   "engines": {
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "argon2",
+      "esbuild",
+      "prisma"
+    ]
   }
 }
