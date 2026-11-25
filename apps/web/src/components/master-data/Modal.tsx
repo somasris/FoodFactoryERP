@@ -20,19 +20,19 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#103B28]/45 p-4 backdrop-blur-[1px]">
       <div
-        className={`flex max-h-[90vh] w-full ${maxWidth} flex-col rounded-lg border border-slate-200 bg-white shadow-xl`}
+        className={`flex max-h-[90vh] w-full ${maxWidth} flex-col rounded-lg border border-[#E1E7DD] bg-white shadow-xl`}
         role="dialog"
         aria-modal="true"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-brand-navy">{title}</h2>
+        <div className="flex items-center justify-between border-b border-[#E1E7DD] px-6 py-4">
+          <h2 className="text-base font-semibold text-[#24352A]">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            className="rounded-md p-1 text-[#8A958C] hover:bg-[#EAF1E8] hover:text-[#24352A]"
           >
             <X className="h-5 w-5" />
           </button>
@@ -68,10 +68,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={title} maxWidth="max-w-md">
       <div className="space-y-4">
         <div className="flex items-start gap-3">
-          <div className="rounded-full bg-amber-100 p-2 text-amber-600">
+          <div className="rounded-full bg-[#C58A25]/15 p-2 text-[#C58A25]">
             <AlertTriangle className="h-5 w-5" />
           </div>
-          <p className="text-sm text-slate-600">{message}</p>
+          <p className="text-sm text-[#66756A]">{message}</p>
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
@@ -93,13 +93,13 @@ export const FormField: React.FC<{
   children: React.ReactNode;
 }> = ({ label, required, error, children }) => (
   <div className="space-y-1">
-    <label className="block text-xs font-medium text-slate-700">
-      {label} {required && <span className="text-red-500">*</span>}
+    <label className="block text-xs font-medium text-[#24352A]">
+      {label} {required && <span className="text-[#C74440]">*</span>}
     </label>
     {children}
-    {error && <p className="text-xs text-red-600">{error}</p>}
+    {error && <p className="text-xs text-[#C74440]">{error}</p>}
   </div>
 );
 
 export const inputClassName =
-  'w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue disabled:bg-slate-100';
+  'w-full rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-1.5 text-sm text-[#24352A] placeholder:text-[#8A958C] focus:border-[#245C3A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#245C3A] disabled:bg-[#F4F0E4]/60';

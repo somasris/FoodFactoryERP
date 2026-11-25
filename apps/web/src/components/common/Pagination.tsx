@@ -18,12 +18,12 @@ export const Pagination: React.FC<PaginationProps> = ({
   if (totalPages <= 1 && !total) return null;
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-600 rounded-b-lg">
+    <div className="flex items-center justify-between border-t border-[#E1E7DD] bg-white px-4 py-2.5 text-xs text-[#66756A] rounded-b-lg">
       <div className="tabular-nums">
-        Page <span className="font-semibold text-slate-900">{page}</span> of{' '}
-        <span className="font-semibold text-slate-900">{Math.max(1, totalPages)}</span>
+        Page <span className="font-semibold text-[#24352A]">{page}</span> of{' '}
+        <span className="font-semibold text-[#24352A]">{Math.max(1, totalPages)}</span>
         {total !== undefined && (
-          <span className="ml-2 text-slate-400">({total} total records)</span>
+          <span className="ml-2 text-[#8A958C]">({total} total records)</span>
         )}
       </div>
       <div className="flex items-center gap-1.5">

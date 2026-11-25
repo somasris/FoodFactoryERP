@@ -51,7 +51,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
   };
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[#E1E7DD] bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
         <select
           aria-label="Report period"
@@ -63,7 +63,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
               page: 1,
             })
           }
-          className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs"
+          className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1.5 text-xs text-[#24352A] focus:border-[#245C3A] focus:bg-white focus:outline-none"
         >
           <option value="today">Today</option>
           <option value="week">This Week</option>
@@ -81,7 +81,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
               onChange={e =>
                 onChange({ ...query, period: 'custom', fromDate: e.target.value, page: 1 })
               }
-              className="rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+              className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2 py-1.5 text-xs text-[#24352A] focus:border-[#245C3A] focus:bg-white focus:outline-none"
             />
             <input
               aria-label="To date"
@@ -90,7 +90,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
               onChange={e =>
                 onChange({ ...query, period: 'custom', toDate: e.target.value, page: 1 })
               }
-              className="rounded-md border border-slate-200 px-2 py-1.5 text-xs"
+              className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2 py-1.5 text-xs text-[#24352A] focus:border-[#245C3A] focus:bg-white focus:outline-none"
             />
           </>
         )}
@@ -102,7 +102,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
             onChange={e =>
               onChange({ ...query, status: e.target.value || undefined, page: 1 })
             }
-            className="rounded-md border border-slate-200 px-2.5 py-1.5 text-xs"
+            className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1.5 text-xs text-[#24352A] focus:border-[#245C3A] focus:bg-white focus:outline-none"
           >
             <option value="">All Statuses</option>
             {statusOptions.map(st => (
@@ -115,7 +115,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
 
         {showSearch && (
           <div className="relative">
-            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-[#8A958C]" />
             <input
               type="text"
               placeholder="Search..."
@@ -123,7 +123,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
               onChange={e =>
                 onChange({ ...query, search: e.target.value || undefined, page: 1 })
               }
-              className="rounded-md border border-slate-200 py-1.5 pl-8 pr-3 text-xs"
+              className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] py-1.5 pl-8 pr-3 text-xs text-[#24352A] placeholder:text-[#8A958C] focus:border-[#245C3A] focus:bg-white focus:outline-none"
             />
           </div>
         )}

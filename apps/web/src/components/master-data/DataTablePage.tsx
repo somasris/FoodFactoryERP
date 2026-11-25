@@ -69,7 +69,7 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>{title}</CardTitle>
-            {subtitle && <p className="mt-1 text-xs text-slate-500">{subtitle}</p>}
+            {subtitle && <p className="mt-1 text-xs text-[#66756A]">{subtitle}</p>}
           </div>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onRefresh}>
@@ -88,13 +88,13 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
         {/* Search & Filters */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#8A958C]" />
             <input
               type="text"
               value={search}
               onChange={e => onSearchChange(e.target.value)}
               placeholder="Search..."
-              className="w-full rounded-md border border-slate-300 bg-white pl-8 pr-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+              className="w-full rounded-md border border-[#E1E7DD] bg-[#FAFBF8] pl-8 pr-3 py-1.5 text-sm text-[#24352A] placeholder:text-[#8A958C] focus:border-[#245C3A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
             />
           </div>
 
@@ -103,7 +103,7 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
               aria-label="Filter by status"
               value={statusFilter ?? ''}
               onChange={e => onStatusFilterChange(e.target.value)}
-              className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm focus:border-brand-blue focus:outline-none focus:ring-1 focus:ring-brand-blue"
+              className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-1.5 text-sm text-[#24352A] focus:border-[#245C3A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
             >
               <option value="">All Statuses</option>
               <option value="true">Active</option>
@@ -142,11 +142,11 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
                   <th className="px-3 py-2.5 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#E1E7DD]">
                 {items.map(row => (
-                  <tr key={row.id} className="hover:bg-slate-50/70">
+                  <tr key={row.id} className="hover:bg-[#EAF1E8]/35">
                     {columns.map((col, idx) => (
-                      <td key={idx} className={`px-3 py-2.5 text-slate-700 ${col.className || ''}`}>
+                      <td key={idx} className={`px-3 py-2.5 text-[#24352A] ${col.className || ''}`}>
                         {col.render(row)}
                       </td>
                     ))}
@@ -158,7 +158,8 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
                             type="button"
                             onClick={() => onView(row)}
                             title="View details"
-                            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-navy"
+                            aria-label="View details"
+                            className="rounded p-1.5 text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C]"
                           >
                             <Eye className="h-4 w-4" />
                           </button>
@@ -168,7 +169,8 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
                             type="button"
                             onClick={() => onEdit(row)}
                             title="Edit"
-                            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-brand-blue"
+                            aria-label="Edit"
+                            className="rounded p-1.5 text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#245C3A]"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -178,7 +180,8 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
                             type="button"
                             onClick={() => onToggleStatus(row)}
                             title={row.isActive ? 'Deactivate' : 'Activate'}
-                            className="rounded p-1.5 text-slate-500 hover:bg-slate-100 hover:text-amber-600"
+                            aria-label={row.isActive ? 'Deactivate' : 'Activate'}
+                            className="rounded p-1.5 text-[#66756A] hover:bg-[#F4F0E4] hover:text-[#C58A25]"
                           >
                             <Power className="h-4 w-4" />
                           </button>
