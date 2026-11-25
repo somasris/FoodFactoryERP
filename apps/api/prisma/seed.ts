@@ -470,6 +470,24 @@ const PERMISSIONS = [
     action: 'POST',
     description: 'Finalize batch costing and apply finished goods valuation adjustments',
   },
+  {
+    code: 'production.reports.read',
+    module: 'production',
+    action: 'READ',
+    description: 'View operational production analytics and reports',
+  },
+  {
+    code: 'production.reports.costing.read',
+    module: 'production',
+    action: 'READ',
+    description: 'View sensitive production cost and variance analytics reports',
+  },
+  {
+    code: 'production.reports.export',
+    module: 'production',
+    action: 'READ',
+    description: 'Export production reports in CSV, Excel, and PDF formats',
+  },
 
   // Procurement Management
   {
@@ -728,6 +746,9 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.costing.entry',
     'production.costing.review',
     'production.costing.finalize',
+    'production.reports.read',
+    'production.reports.costing.read',
+    'production.reports.export',
     'purchases.read',
     'purchases.create',
     'purchases.approve',
@@ -781,6 +802,8 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.quality.inspect',
     'production.costing.read',
     'production.costing.entry',
+    'production.reports.read',
+    'production.reports.export',
     'sales.orders.read',
     'sales.orders.fulfill',
     'sales.dashboard.read',
@@ -831,6 +854,9 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.batches.read',
     'production.quality.read',
     'production.costing.read',
+    'production.reports.read',
+    'production.reports.costing.read',
+    'production.reports.export',
     'purchases.read',
     'invoices.read',
     'payments.read',

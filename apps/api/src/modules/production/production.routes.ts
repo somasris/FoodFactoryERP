@@ -6,6 +6,7 @@ import { WorkOrderController } from './work-order.controller';
 import { ProductionBatchController } from './production-batch.controller';
 import { MaterialFgController } from './material-fg.controller';
 import { ProductionCostingController } from './production-costing.controller';
+import { ProductionReportsController } from './production-reports.controller';
 
 export const productionRouter: Router = Router();
 
@@ -312,4 +313,51 @@ productionRouter.post(
   '/costing/batches/:batchId/post-finalization-note',
   requirePermissions('production.costing.finalize'),
   ProductionCostingController.addPostFinalizationNote,
+);
+
+// Phase 3.7: Production Reports & Analytics (strictly read-only)
+productionRouter.get(
+  '/reports/dashboard',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getDashboard,
+);
+productionRouter.get(
+  '/reports/plan-vs-actual',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getPlanVsActual,
+);
+productionRouter.get(
+  '/reports/work-order-performance',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getWorkOrderPerformance,
+);
+productionRouter.get(
+  '/reports/batch-yield',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getBatchYield,
+);
+productionRouter.get(
+  '/reports/material-consumption',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getMaterialConsumption,
+);
+productionRouter.get(
+  '/reports/quality',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getQuality,
+);
+productionRouter.get(
+  '/reports/costing',
+  requirePermissions('production.reports.costing.read'),
+  ProductionReportsController.getCosting,
+);
+productionRouter.get(
+  '/reports/trends',
+  requirePermissions('production.reports.read'),
+  ProductionReportsController.getTrends,
+);
+productionRouter.get(
+  '/reports/export/:reportType',
+  requirePermissions('production.reports.export'),
+  ProductionReportsController.exportReport,
 );
