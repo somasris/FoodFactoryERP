@@ -38,7 +38,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **Phase 1** | Foundation, Security, Master Data & Inventory | `TESTED` | None | 1.1–1.4 implemented & tested; 1.5 implemented with automated tests passing, pending manual E2E UI verification |
 | **Phase 2** | Sales & Order Management | `IN_PROGRESS` | Phase 1 | Active agent implementation (`sales` module + `InventoryReservationService`); invoicing (`2.6`) not in current Phase 2 scope |
 | **Phase 3** | BOM, Production & Costing | `TESTED` | Phase 1, Phase 2 | All 7 subphases (3.1–3.7) implemented, audited, and passing API E2E + Web tests (`PHASE_3_INTEGRATION_AUDIT_REPORT.md`); manual browser UI verification pending |
-| **Phase 4** | System Administration, Reporting & Compliance | `PLANNED` | All Core Modules | User/RBAC APIs & `AuditService` exist from 1.3; Admin UI, GST compliance, BI reports & operations pending |
+| **Phase 4** | System Administration, Reporting & Compliance | `TESTED` | All Core Modules | All 5 subphases (4.1–4.5) implemented, migrated, and passing API + Web test suites (`PHASE_4_INTEGRATION_VERIFICATION_REPORT.md`); manual browser UI verification pending |
 
 ---
 
@@ -69,7 +69,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **4.2** | Financial & Compliance Management | `TESTED` | Yes (`apps/api/src/modules/compliance/*`, `StockAudit`, `ComplianceDocument`, `/reports/compliance`, `/reports/stock-audit`) | 5 API (`compliance-phase4-2.test.ts`) + 3 Web (`compliance.test.tsx`) | Pending manual browser UI verification |
 | **4.3** | Business Intelligence & Reports | `TESTED` | Yes (`apps/api/src/modules/reports/*`, `ExecutiveDashboardPage`, `BusinessIntelligencePage`) | 4 API (`reports-phase4-3.test.ts`) + 2 Web (`reports.test.tsx`) | Pending manual browser UI verification |
 | **4.4** | Audit & Governance | `TESTED` | Yes (`apps/api/src/modules/governance/*`, `AuditGovernancePage`) | 4 API (`governance-phase4-4.test.ts`) + 1 Web (`governance.test.tsx`) | Pending manual browser UI verification |
-| **4.5** | System Reliability & Operations | `PLANNED` | Partial (Health checks exist; backups/ops runbooks pending) | None | Not started |
+| **4.5** | System Reliability & Operations | `TESTED` | Yes (`apps/api/src/modules/operations/*`, `BackupRecord`, `RestoreRequest`, `SystemHealthPage`, `BackupRecoveryPage`, `MaintenancePage`) | 4 API (`operations-phase4-5.test.ts`) + 3 Web (`operations.test.tsx`) | Pending manual browser UI verification |
 
 > **Historical Milestone Naming Note:**  
 > In the original repository history, **Phase 1.1** combined monorepo initialization, PostgreSQL setup, core infrastructure, and health checks, while **Phase 1.2** was *Database Architecture & ER Design* (`docs/database/*` — 67-model draft schema). In this master roadmap, **1.1 Project Foundation** and **1.2 Core Infrastructure** are provisional functional classifications used to organize implemented capabilities without erasing the original milestone history.
@@ -411,7 +411,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Docker Compose / host infrastructure.
 - **Testing Requirements:** Backup/restore drill, graceful shutdown verification, and load/concurrency smoke checks.
 - **Completion Criteria:** Documented operational runbooks and verified recovery procedures.
-- **Current Status:** `PLANNED`
+- **Current Status:** `TESTED` (Implemented with migration `20261125131455_operations_reliability_phase_4_5`, `/api/v1/operations/*`, `TelemetryStore`, `maintenanceMiddleware`, `DISASTER_RECOVERY_RUNBOOK.md`, 3 UI pages, 4 API tests, and 3 frontend tests passing; manual browser UI verification pending; see [PHASE_4_5_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_4_5_VERIFICATION_REPORT.md)).
 
 ---
 
