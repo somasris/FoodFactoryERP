@@ -56,6 +56,13 @@ import { BatchTraceabilityPage } from './production/BatchTraceabilityPage';
 import { ProductionCostingDashboardPage } from './production/ProductionCostingDashboardPage';
 import { BatchCostingDetailPage } from './production/BatchCostingDetailPage';
 import { CostVarianceReportPage } from './production/CostVarianceReportPage';
+import { ProductionAnalyticsDashboardPage } from './production/ProductionAnalyticsDashboardPage';
+import { ProductionPlanVsActualPage } from './production/ProductionPlanVsActualPage';
+import { WorkOrderPerformanceReportPage } from './production/WorkOrderPerformanceReportPage';
+import { BatchYieldReportPage } from './production/BatchYieldReportPage';
+import { MaterialConsumptionReportPage } from './production/MaterialConsumptionReportPage';
+import { ProductionQualityReportPage } from './production/ProductionQualityReportPage';
+import { ProductionCostAnalyticsPage } from './production/ProductionCostAnalyticsPage';
 
 export const router = createBrowserRouter([
   {
@@ -165,6 +172,13 @@ export const router = createBrowserRouter([
           { path: 'costing', element: <ProductionCostingDashboardPage /> },
           { path: 'costing/batches/:batchId', element: <BatchCostingDetailPage /> },
           { path: 'costing/variance-report', element: <CostVarianceReportPage /> },
+          { path: 'reports', element: <ProductionAnalyticsDashboardPage /> },
+          { path: 'reports/plan-vs-actual', element: <ProductionPlanVsActualPage /> },
+          { path: 'reports/work-order-performance', element: <WorkOrderPerformanceReportPage /> },
+          { path: 'reports/batch-yield', element: <BatchYieldReportPage /> },
+          { path: 'reports/material-consumption', element: <MaterialConsumptionReportPage /> },
+          { path: 'reports/quality', element: <ProductionQualityReportPage /> },
+          { path: 'reports/costing', element: <ProductionCostAnalyticsPage /> },
           { path: 'boms', element: <BomsPage /> },
         ],
       },

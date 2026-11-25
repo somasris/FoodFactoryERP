@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, CalendarRange, TrendingUp, Factory, BarChart3, PlayCircle, Layers, Scale, ShieldCheck, GitBranch, Calculator } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, CalendarRange, TrendingUp, Factory, BarChart3, PlayCircle, Layers, Scale, ShieldCheck, GitBranch, Calculator, FileSpreadsheet } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
@@ -73,6 +73,12 @@ export const ProductionLayout: React.FC = () => {
       to: '/production/costing',
       icon: Calculator,
       permission: 'production.costing.read',
+    },
+    {
+      label: 'Analytics & Reports',
+      to: '/production/reports',
+      icon: FileSpreadsheet,
+      permission: 'production.reports.read',
     },
     {
       label: 'BOM & Recipes',
