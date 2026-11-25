@@ -78,6 +78,8 @@ import { FinancialCompliancePage } from './compliance/FinancialCompliancePage';
 import { StockAuditPage } from './compliance/StockAuditPage';
 import { ExecutiveDashboardPage } from './reports/ExecutiveDashboardPage';
 import { BusinessIntelligencePage } from './reports/BusinessIntelligencePage';
+import { NotificationsPage } from './notifications/NotificationsPage';
+import { NotificationPreferencesPage } from './notifications/NotificationPreferencesPage';
 
 export const router = createBrowserRouter([
   {
@@ -763,6 +765,14 @@ export const router = createBrowserRouter([
             ),
           },
         ],
+      },
+      {
+        path: 'notifications',
+        element: <NotificationsPage />,
+      },
+      {
+        path: 'notifications/preferences',
+        element: <NotificationPreferencesPage />,
       },
       {
         path: '*',

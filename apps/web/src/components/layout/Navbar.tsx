@@ -12,6 +12,7 @@ import {
 import { useApiHealth, useDatabaseHealth } from '../../hooks/useHealth';
 import { useAuth } from '../../hooks/useAuth';
 import { getDefaultDashboardPath, NAV_GROUPS } from '../../config/navigation';
+import { NotificationBell } from './NotificationBell';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -109,6 +110,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
             {isSystemHealthy ? 'Systems Operational' : isSystemError ? 'Service Degraded' : 'Connecting'}
           </span>
         </div>
+
+        {user && <NotificationBell />}
 
         {user && (
           <div className="relative" ref={menuRef}>
