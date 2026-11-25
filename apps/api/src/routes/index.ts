@@ -11,6 +11,7 @@ import { complianceRouter } from '../modules/compliance/compliance.routes';
 import { reportsRouter } from '../modules/reports/reports.routes';
 import { governanceRouter } from '../modules/governance/governance.routes';
 import { operationsRouter } from '../modules/operations/operations.routes';
+import { notificationRouter } from '../modules/notifications/notification.routes';
 
 export const apiRouter: Router = Router();
 
@@ -49,3 +50,6 @@ apiRouter.use('/governance', governanceRouter);
 
 // Mount Phase 4.5 System Reliability & Operations routes under /api/v1/operations
 apiRouter.use('/operations', operationsRouter);
+
+// Mount Enterprise Notification System routes under /api/v1/notifications
+apiRouter.use('/notifications', notificationRouter);

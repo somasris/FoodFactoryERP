@@ -2,6 +2,7 @@ import { createApp } from './app';
 import { env } from './config/env';
 import { logger } from './utils/logger';
 import { prisma } from './services/prisma.service';
+import { NotificationSseService } from './modules/notifications/notification-sse.service';
 
 const app = createApp();
 
@@ -15,6 +16,7 @@ const server = app.listen(env.PORT, () => {
 
 const gracefulShutdown = async (signal: string) => {
   logger.info(`🛑 Received ${signal}. Initiating graceful shutdown...`);
+  NotificationSseService.closeAll();
 
   server.close(async () => {
     logger.info('HTTP server closed.');
