@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, CalendarRange, TrendingUp, Factory, BarChart3, PlayCircle, Layers, Scale, ShieldCheck, GitBranch } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, CalendarRange, TrendingUp, Factory, BarChart3, PlayCircle, Layers, Scale, ShieldCheck, GitBranch, Calculator } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
@@ -67,6 +67,12 @@ export const ProductionLayout: React.FC = () => {
       to: '/production/traceability',
       icon: GitBranch,
       permission: 'production.quality.read',
+    },
+    {
+      label: 'Costing',
+      to: '/production/costing',
+      icon: Calculator,
+      permission: 'production.costing.read',
     },
     {
       label: 'BOM & Recipes',

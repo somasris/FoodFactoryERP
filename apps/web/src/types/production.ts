@@ -592,3 +592,183 @@ export interface RecallLookupResponse {
   query: string;
   matches: RecallLookupMatch[];
 }
+
+export type ProductionCostingStatus = 'DRAFT' | 'CALCULATED' | 'REVIEWED' | 'FINALIZED';
+export type ProductionCostEntryType = 'DIRECT_LABOUR' | 'MACHINE_COST' | 'OTHER_DIRECT_EXPENSE';
+export type CostEntryApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+export type OverheadAllocationMethod =
+  | 'PER_BATCH'
+  | 'PER_UNIT'
+  | 'PERCENT_OF_MATERIAL'
+  | 'PER_LABOUR_HOUR';
+
+export interface ProductionCostEntryItem {
+  id: string;
+  productionBatchCostingId: string;
+  productionBatchId: string;
+  entryType: ProductionCostEntryType;
+  description: string;
+  quantityOrHours: string;
+  rate: string;
+  totalAmount: string;
+  reference?: string | null;
+  approvalStatus: CostEntryApprovalStatus;
+  notes?: string | null;
+  recordedAt: string;
+  recordedBy?: { id: string; fullName: string; username: string };
+  approvedBy?: { id: string; fullName: string; username: string } | null;
+  approvedAt?: string | null;
+}
+
+export interface ProductionOverheadAllocationItem {
+  id: string;
+  productionBatchCostingId: string;
+  productionBatchId: string;
+  bomOverheadId?: string | null;
+  costType: string;
+  description: string;
+  allocationMethod: OverheadAllocationMethod;
+  basisValue: string;
+  rateOrAmount: string;
+  allocatedAmount: string;
+  isFromBom: boolean;
+  createdAt: string;
+  recordedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface ProductionCostingHistoryItem {
+  id: string;
+  fromStatus?: ProductionCostingStatus | null;
+  toStatus: ProductionCostingStatus;
+  action: string;
+  notes?: string | null;
+  createdAt: string;
+  changedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface ProductionBatchCosting {
+  id: string;
+  productionBatchId: string;
+  status: ProductionCostingStatus;
+  plannedQuantity: string;
+  actualGoodQuantity: string;
+  acceptedQuantity: string;
+  rejectedQuantity: string;
+  wastageQuantity: string;
+  standardMaterialCost: string;
+  standardLabourCost: string;
+  standardOverheadCost: string;
+  standardTotalCost: string;
+  grossMaterialCost: string;
+  materialReturnCost: string;
+  netMaterialCost: string;
+  rawMaterialCost: string;
+  packagingMaterialCost: string;
+  actualLabourCost: string;
+  actualMachineCost: string;
+  otherDirectCost: string;
+  actualOverheadCost: string;
+  wastageAndRejectionCost: string;
+  totalActualCost: string;
+  goodOutputCost: string;
+  costPerAcceptedUnit: string;
+  materialVarianceAmount: string;
+  materialVariancePercent: string;
+  labourVarianceAmount: string;
+  labourVariancePercent: string;
+  overheadVarianceAmount: string;
+  overheadVariancePercent: string;
+  totalVarianceAmount: string;
+  totalVariancePercent: string;
+  fgValuationApplied: boolean;
+  fgValuationUnitCost?: string | null;
+  fgValuationAdjustmentTxId?: string | null;
+  fgValuationAppliedAt?: string | null;
+  postFinalizationAdjustmentNote?: string | null;
+  calculatedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewNotes?: string | null;
+  finalizedAt?: string | null;
+  calculatedBy?: { id: string; fullName: string; username: string } | null;
+  reviewedBy?: { id: string; fullName: string; username: string } | null;
+  finalizedBy?: { id: string; fullName: string; username: string } | null;
+  costEntries?: ProductionCostEntryItem[];
+  overheadAllocations?: ProductionOverheadAllocationItem[];
+  history?: ProductionCostingHistoryItem[];
+  productionBatch?: {
+    id: string;
+    batchNumber: string;
+    status: ProductionBatchStatus;
+    completedAt?: string | null;
+    productVariant?: { id: string; sku: string; name: string };
+    uom?: { symbol: string };
+  };
+}
+
+export interface MaterialCostLineSummary {
+  inventoryItemId: string;
+  itemCode: string;
+  itemName: string;
+  itemType: string;
+  baseUomSymbol: string;
+  consumedQuantity: string;
+  returnedQuantity: string;
+  netQuantity: string;
+  grossCost: string;
+  returnCost: string;
+  netCost: string;
+  costSource: string;
+  batches: Array<{
+    batchId: string | null;
+    batchNumber: string | null;
+    consumedQty: string;
+    returnedQty: string;
+    unitCost: string;
+    netCost: string;
+    inventoryIssueId: string | null;
+    inventoryTransactionId: string | null;
+  }>;
+}
+
+export interface BatchCostingDetailResponse {
+  batch: ProductionBatch;
+  costing: ProductionBatchCosting | null;
+  materialBreakdown: {
+    grossMaterialCost: string;
+    materialReturnCost: string;
+    netMaterialCost: string;
+    rawMaterialCost: string;
+    packagingMaterialCost: string;
+    ledgerIssueTotal: string;
+    ledgerReturnTotal: string;
+    isLedgerReconciled: boolean;
+    lines: MaterialCostLineSummary[];
+  };
+}
+
+export interface CostingDashboardSummary {
+  totalBatches: number;
+  costedBatchesCount: number;
+  pendingCostEntryApprovals: number;
+  statusCounts: Record<string, number>;
+  totalStandardCost: string;
+  totalActualCost: string;
+  totalVarianceAmount: string;
+  totalVariancePercent: string;
+  totalWastageCost: string;
+  recentCostings: ProductionBatchCosting[];
+}
+
+export interface CostVarianceReportResponse {
+  summary: {
+    batchCount: number;
+    standardTotalCost: string;
+    actualTotalCost: string;
+    materialVarianceAmount: string;
+    labourVarianceAmount: string;
+    overheadVarianceAmount: string;
+    totalVarianceAmount: string;
+    totalVariancePercent: string;
+  };
+  rows: ProductionBatchCosting[];
+}

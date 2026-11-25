@@ -53,6 +53,9 @@ import { ProductionBatchDetailPage } from './production/ProductionBatchDetailPag
 import { MaterialReconciliationPage } from './production/MaterialReconciliationPage';
 import { QualityInspectionsPage } from './production/QualityInspectionsPage';
 import { BatchTraceabilityPage } from './production/BatchTraceabilityPage';
+import { ProductionCostingDashboardPage } from './production/ProductionCostingDashboardPage';
+import { BatchCostingDetailPage } from './production/BatchCostingDetailPage';
+import { CostVarianceReportPage } from './production/CostVarianceReportPage';
 
 export const router = createBrowserRouter([
   {
@@ -159,6 +162,9 @@ export const router = createBrowserRouter([
           { path: 'reconciliation', element: <MaterialReconciliationPage /> },
           { path: 'quality', element: <QualityInspectionsPage /> },
           { path: 'traceability', element: <BatchTraceabilityPage /> },
+          { path: 'costing', element: <ProductionCostingDashboardPage /> },
+          { path: 'costing/batches/:batchId', element: <BatchCostingDetailPage /> },
+          { path: 'costing/variance-report', element: <CostVarianceReportPage /> },
           { path: 'boms', element: <BomsPage /> },
         ],
       },

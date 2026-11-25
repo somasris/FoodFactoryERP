@@ -1,12 +1,18 @@
 import { apiClient } from './api-client';
 import { PaginatedResponse } from '../types/master-data';
 import {
+  BatchCostingDetailResponse,
   BatchReconciliation,
   BatchVarianceApproval,
+  CostingDashboardSummary,
+  CostVarianceReportResponse,
   MaterialAvailabilityDetail,
   ProductionBatch,
+  ProductionBatchCosting,
+  ProductionCostEntryItem,
   ProductionDemandResponse,
   ProductionExecutionDashboard,
+  ProductionOverheadAllocationItem,
   ProductionPlan,
   ProductionPlanningDashboard,
   QualityInspectionItem,
@@ -217,6 +223,68 @@ export const productionService = {
     recall: (batchNumber: string) =>
       apiClient<RecallLookupResponse>(
         `/production/traceability/recall${buildQuery({ batchNumber })}`,
+      ),
+  },
+  costing: {
+    dashboard: () => apiClient<CostingDashboardSummary>('/production/costing/dashboard'),
+    listBatches: (params: { page?: number; limit?: number; search?: string; status?: string } = {}) =>
+      apiClient<PaginatedResponse<ProductionBatch & { costing?: ProductionBatchCosting | null }>>(
+        `/production/costing/batches${buildQuery(params)}`,
+      ),
+    getBatchDetail: (batchId: string) =>
+      apiClient<BatchCostingDetailResponse>(`/production/costing/batches/${batchId}`),
+    calculate: (batchId: string, payload: { includeBomOverheads?: boolean; notes?: string } = {}) =>
+      apiClient<ProductionBatchCosting>(`/production/costing/batches/${batchId}/calculate`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    addEntry: (batchId: string, payload: Record<string, unknown>) =>
+      apiClient<ProductionCostEntryItem>(`/production/costing/batches/${batchId}/entries`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    reviewEntry: (entryId: string, decision: 'APPROVED' | 'REJECTED', notes?: string) =>
+      apiClient<ProductionCostEntryItem>(`/production/costing/entries/${entryId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ decision, notes }),
+      }),
+    deleteEntry: (entryId: string) =>
+      apiClient<{ deleted: boolean }>(`/production/costing/entries/${entryId}`, {
+        method: 'DELETE',
+      }),
+    addOverhead: (batchId: string, payload: Record<string, unknown>) =>
+      apiClient<ProductionOverheadAllocationItem>(
+        `/production/costing/batches/${batchId}/overheads`,
+        {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        },
+      ),
+    deleteOverhead: (allocationId: string) =>
+      apiClient<{ deleted: boolean }>(`/production/costing/overheads/${allocationId}`, {
+        method: 'DELETE',
+      }),
+    review: (batchId: string, notes?: string) =>
+      apiClient<ProductionBatchCosting>(`/production/costing/batches/${batchId}/review`, {
+        method: 'POST',
+        body: JSON.stringify({ notes }),
+      }),
+    finalize: (batchId: string, payload: { idempotencyKey?: string; notes?: string } = {}) =>
+      apiClient<ProductionBatchCosting>(`/production/costing/batches/${batchId}/finalize`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    addPostFinalizationNote: (batchId: string, note: string) =>
+      apiClient<ProductionBatchCosting>(
+        `/production/costing/batches/${batchId}/post-finalization-note`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ note }),
+        },
+      ),
+    varianceReport: (params: { status?: string; fromDate?: string; toDate?: string } = {}) =>
+      apiClient<CostVarianceReportResponse>(
+        `/production/costing/variance-report${buildQuery(params)}`,
       ),
   },
 };
