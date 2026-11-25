@@ -66,7 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
 
         <Link to={homePath} className="flex items-center gap-2.5 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-brand-navy text-white">
-            <Factory className="h-4 w-4 text-teal-300" />
+            <Factory className="h-4 w-4 text-white" />
           </div>
           <span className="text-sm font-bold tracking-tight text-brand-navy sm:text-base">
             FoodFactory ERP
