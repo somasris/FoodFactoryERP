@@ -44,6 +44,13 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'payments.read',
   'reports.read',
   'audit.read',
+  // Phase 4.1 System Administration (Read-Only)
+  'administration.organization.read',
+  'administration.factories.read',
+  'administration.users.read',
+  'administration.roles.read',
+  'administration.warehouse_access.read',
+  'administration.settings.read',
 ]);
 
 /**

@@ -557,6 +557,80 @@ const PERMISSIONS = [
     description: 'Inspect immutable system security and activity logs',
   },
 
+  // Phase 4.1 System Administration
+  {
+    code: 'administration.organization.read',
+    module: 'administration',
+    action: 'READ',
+    description: 'View organization profile, GSTIN, and configuration history',
+  },
+  {
+    code: 'administration.organization.update',
+    module: 'administration',
+    action: 'UPDATE',
+    description: 'Update organization profile, tax registration, and preferences',
+  },
+  {
+    code: 'administration.factories.read',
+    module: 'administration',
+    action: 'READ',
+    description: 'View factory locations and associated warehouses',
+  },
+  {
+    code: 'administration.factories.manage',
+    module: 'administration',
+    action: 'UPDATE',
+    description: 'Create, update, and manage factory locations',
+  },
+  {
+    code: 'administration.users.read',
+    module: 'administration',
+    action: 'READ',
+    description: 'View user administration directory and activity history',
+  },
+  {
+    code: 'administration.users.manage',
+    module: 'administration',
+    action: 'UPDATE',
+    description: 'Manage user accounts, password resets, and security status',
+  },
+  {
+    code: 'administration.roles.read',
+    module: 'administration',
+    action: 'READ',
+    description: 'View roles, permissions, and role assignment history',
+  },
+  {
+    code: 'administration.roles.manage',
+    module: 'administration',
+    action: 'UPDATE',
+    description: 'Create custom roles and manage role permissions',
+  },
+  {
+    code: 'administration.warehouse_access.read',
+    module: 'administration',
+    action: 'READ',
+    description: 'View user-to-warehouse access mappings and history',
+  },
+  {
+    code: 'administration.warehouse_access.manage',
+    module: 'administration',
+    action: 'UPDATE',
+    description: 'Assign and revoke user warehouse access permissions',
+  },
+  {
+    code: 'administration.settings.read',
+    module: 'administration',
+    action: 'READ',
+    description: 'View centralized system settings and change history',
+  },
+  {
+    code: 'administration.settings.update',
+    module: 'administration',
+    action: 'UPDATE',
+    description: 'Update validated system configuration settings',
+  },
+
   // Phase 1.4 Master Data Management
   {
     code: 'master_data.read',
@@ -772,6 +846,19 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'bom.create',
     'bom.update',
     'bom.approve',
+    // Phase 4.1 System Administration
+    'administration.organization.read',
+    'administration.organization.update',
+    'administration.factories.read',
+    'administration.factories.manage',
+    'administration.users.read',
+    'administration.users.manage',
+    'administration.roles.read',
+    'administration.roles.manage',
+    'administration.warehouse_access.read',
+    'administration.warehouse_access.manage',
+    'administration.settings.read',
+    'administration.settings.update',
   ],
   PRODUCTION: [
     'production.read',
@@ -866,6 +953,13 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'suppliers.read',
     'warehouses.read',
     'bom.read',
+    // Phase 4.1 System Administration (Read-Only)
+    'administration.organization.read',
+    'administration.factories.read',
+    'administration.users.read',
+    'administration.roles.read',
+    'administration.warehouse_access.read',
+    'administration.settings.read',
   ],
 };
 

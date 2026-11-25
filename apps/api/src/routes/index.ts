@@ -6,6 +6,7 @@ import { masterDataRouter } from '../modules/master-data/master-data.routes';
 import { inventoryRouter } from '../modules/inventory/inventory.routes';
 import { salesRouter } from '../modules/sales/sales.routes';
 import { productionRouter } from '../modules/production/production.routes';
+import { adminRouter } from '../modules/admin/admin.routes';
 
 export const apiRouter: Router = Router();
 
@@ -29,3 +30,6 @@ apiRouter.use('/sales', salesRouter);
 
 // Mount Phase 3 Production routes (BOMs & Planning) under /api/v1/production
 apiRouter.use('/production', productionRouter);
+
+// Mount Phase 4.1 System Administration routes under /api/v1/admin
+apiRouter.use('/admin', adminRouter);

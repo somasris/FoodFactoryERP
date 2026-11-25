@@ -104,11 +104,12 @@ export class AuthService {
       throw new AppError('Your account has been deactivated. Please contact an administrator.', 403);
     }
 
-    // Collect roles and deduplicated permissions
-    const roles = user.userRoles.map(ur => ur.role.code);
+    // Collect active roles and deduplicated permissions
+    const activeUserRoles = user.userRoles.filter(ur => ur.role.isActive);
+    const roles = activeUserRoles.map(ur => ur.role.code);
     const permissions = Array.from(
       new Set(
-        user.userRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code)),
+        activeUserRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code)),
       ),
     );
 
@@ -130,6 +131,11 @@ export class AuthService {
 
     // Save refresh token securely hashed within an atomic transaction
     await prisma.$transaction(async tx => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
+
       await tx.refreshToken.create({
         data: {
           userId: user.id,

@@ -507,6 +507,11 @@ export class UsersService {
     const isTargetOwner = user.userRoles.some(ur => ur.role.code === 'OWNER');
     const isActorOwner = actor?.roles?.includes('OWNER') ?? false;
 
+    // RULE: Prevent accidental self-lockout
+    if (actor?.userId === userId && !input.isActive) {
+      throw new AppError('Security constraint violation: You cannot deactivate your own account.', 400);
+    }
+
     // RULE: ADMIN cannot deactivate an OWNER
     if (isTargetOwner && !isActorOwner && !input.isActive) {
       throw new AppError('Forbidden: ADMIN cannot deactivate an OWNER.', 403);
