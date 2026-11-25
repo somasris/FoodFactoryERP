@@ -1,12 +1,16 @@
 import { apiClient } from './api-client';
 import { PaginatedResponse } from '../types/master-data';
 import {
+  BatchReconciliation,
+  BatchVarianceApproval,
   MaterialAvailabilityDetail,
   ProductionBatch,
   ProductionDemandResponse,
   ProductionExecutionDashboard,
   ProductionPlan,
   ProductionPlanningDashboard,
+  QualityInspectionItem,
+  RecallLookupResponse,
   WorkOrder,
   WorkOrderDashboardSummary,
   WorkOrderMaterialRequirement,
@@ -167,5 +171,52 @@ export const productionService = {
         method: 'POST',
         body: JSON.stringify({ reason }),
       }),
+  },
+  reconciliation: {
+    dashboard: () => apiClient<BatchReconciliation[]>('/production/reconciliation'),
+    getByBatchId: (batchId: string) =>
+      apiClient<BatchReconciliation>(`/production/batches/${batchId}/reconciliation`),
+    returnMaterials: (batchId: string, payload: Record<string, unknown>) =>
+      apiClient<BatchReconciliation>(`/production/batches/${batchId}/return-materials`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    releaseReservation: (batchId: string, warehouseId?: string) =>
+      apiClient<BatchReconciliation>(`/production/batches/${batchId}/release-reservation`, {
+        method: 'POST',
+        body: JSON.stringify(warehouseId ? { warehouseId } : {}),
+      }),
+    approveVariance: (batchId: string, payload: Record<string, unknown>) =>
+      apiClient<BatchVarianceApproval>(`/production/batches/${batchId}/variance-approval`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+  },
+  quality: {
+    list: (params: { page?: number; limit?: number; search?: string; decision?: string } = {}) =>
+      apiClient<PaginatedResponse<QualityInspectionItem>>(
+        `/production/quality-inspections${buildQuery(params)}`,
+      ),
+    inspect: (id: string, payload: Record<string, unknown>) =>
+      apiClient<QualityInspectionItem>(`/production/quality-inspections/${id}/inspect`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    release: (id: string, releaseNotes: string) =>
+      apiClient<QualityInspectionItem>(`/production/quality-inspections/${id}/release`, {
+        method: 'POST',
+        body: JSON.stringify({ releaseNotes }),
+      }),
+    disposition: (id: string, releaseNotes: string) =>
+      apiClient<QualityInspectionItem>(`/production/quality-inspections/${id}/disposition`, {
+        method: 'POST',
+        body: JSON.stringify({ releaseNotes }),
+      }),
+  },
+  traceability: {
+    recall: (batchNumber: string) =>
+      apiClient<RecallLookupResponse>(
+        `/production/traceability/recall${buildQuery({ batchNumber })}`,
+      ),
   },
 };

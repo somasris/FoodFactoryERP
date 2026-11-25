@@ -437,3 +437,158 @@ export interface ProductionExecutionDashboard {
   releasedWorkOrdersCount: number;
   recentBatches: ProductionBatch[];
 }
+
+export type QualityStatus = 'PENDING_INSPECTION' | 'ACCEPTED' | 'QUARANTINED' | 'REJECTED';
+export type InspectionDecision = 'PENDING' | 'ACCEPTED' | 'PARTIALLY_ACCEPTED' | 'QUARANTINED' | 'REJECTED';
+export type VarianceApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface BatchVarianceApproval {
+  id: string;
+  inventoryItemId: string;
+  expectedQuantity: string;
+  actualQuantity: string;
+  varianceQuantity: string;
+  variancePercent: string;
+  thresholdPercent: string;
+  status: VarianceApprovalStatus;
+  reason: string;
+  approvedAt?: string | null;
+  approvedBy?: { id: string; fullName: string; username: string } | null;
+}
+
+export interface BatchReconciliationLine {
+  inventoryItemId: string;
+  itemCode: string;
+  itemName: string;
+  uomId: string;
+  uomSymbol: string;
+  bomStandardQuantity: string;
+  expectedWastage: string;
+  expectedTotalQuantity: string;
+  actualConsumedQuantity: string;
+  returnedQuantity: string;
+  netConsumedQuantity: string;
+  quantityVariance: string;
+  variancePercent: string;
+  thresholdPercent: string;
+  exceedsThreshold: boolean;
+  approval?: BatchVarianceApproval | null;
+}
+
+export interface BatchReturnItem {
+  id: string;
+  inventoryItemId: string;
+  warehouseId: string;
+  batchId?: string | null;
+  uomId: string;
+  returnedQuantity: string;
+  baseQuantity: string;
+  reason: string;
+  returnedAt: string;
+  warehouse?: { id: string; code: string; name: string };
+  batch?: { id: string; batchNumber: string } | null;
+  returnedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface BatchReconciliation {
+  batchId: string;
+  batchNumber: string;
+  status: ProductionBatchStatus;
+  workOrder?: { id: string; workOrderNumber: string };
+  productVariant?: { id: string; sku: string; name: string };
+  uom?: { id: string; code: string; symbol: string };
+  plannedQuantity: string;
+  actualGoodQuantity: string;
+  expectedOutputWastage: string;
+  actualOutputWastage: string;
+  thresholdPercent: string;
+  lines: BatchReconciliationLine[];
+  returns: BatchReturnItem[];
+}
+
+export interface QualityInspectionItem {
+  id: string;
+  inspectionNumber: string;
+  productionBatchId: string;
+  inventoryBatchId: string;
+  warehouseId: string;
+  inspectedQuantity: string;
+  goodQuantity: string;
+  rejectedQuantity: string;
+  decision: InspectionDecision;
+  defectCategory?: string | null;
+  notes?: string | null;
+  evidenceRef?: string | null;
+  inspectedAt?: string | null;
+  releasedAt?: string | null;
+  releaseNotes?: string | null;
+  productionBatch?: {
+    id: string;
+    batchNumber: string;
+    productVariant?: { id: string; sku: string; name: string };
+    uom?: { id: string; code: string; symbol: string };
+  };
+  inventoryBatch?: {
+    id: string;
+    batchNumber: string;
+    qualityStatus: QualityStatus;
+    manufacturingDate?: string | null;
+    expiryDate?: string | null;
+  };
+  warehouse?: { id: string; code: string; name: string };
+  inspector?: { id: string; fullName: string; username: string } | null;
+  releasedBy?: { id: string; fullName: string; username: string } | null;
+}
+
+export interface RecallLookupMatch {
+  id: string;
+  batchNumber: string;
+  qualityStatus: QualityStatus;
+  manufacturingDate?: string | null;
+  expiryDate?: string | null;
+  inventoryItem?: { id: string; code: string; name: string; itemType: string };
+  producedFromBatches?: Array<{
+    id: string;
+    batchNumber: string;
+    workOrder?: { id: string; workOrderNumber: string };
+    qualityInspection?: QualityInspectionItem | null;
+    consumptions?: Array<{
+      id: string;
+      baseQuantity: string;
+      inventoryItem?: { id: string; code: string; name: string };
+      batch?: { id: string; batchNumber: string; expiryDate?: string | null } | null;
+    }>;
+  }>;
+  consumedInBatches?: Array<{
+    id: string;
+    baseQuantity: string;
+    productionBatch?: {
+      id: string;
+      batchNumber: string;
+      workOrder?: { id: string; workOrderNumber: string };
+      finishedGoodsBatch?: {
+        id: string;
+        batchNumber: string;
+        qualityStatus: QualityStatus;
+        manufacturingDate?: string | null;
+        expiryDate?: string | null;
+      } | null;
+    };
+  }>;
+  transactionLines?: Array<{
+    id: string;
+    quantity: string;
+    transaction?: {
+      id: string;
+      transactionNumber: string;
+      referenceId: string;
+      referenceNumber: string;
+      transactionDate: string;
+    };
+  }>;
+}
+
+export interface RecallLookupResponse {
+  query: string;
+  matches: RecallLookupMatch[];
+}

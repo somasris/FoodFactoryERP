@@ -7,6 +7,7 @@ import {
   Prisma,
   ProductionBatchStatus,
   ProductionExecutionEntryType,
+  QualityStatus,
   WorkOrderStatus,
 } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
@@ -69,7 +70,25 @@ const BATCH_INCLUDE = {
   uom: { select: { id: true, code: true, symbol: true } },
   operator: { select: { id: true, fullName: true, username: true } },
   finishedGoodsBatch: {
-    select: { id: true, batchNumber: true, manufacturingDate: true, expiryDate: true, unitCost: true },
+    select: {
+      id: true,
+      batchNumber: true,
+      manufacturingDate: true,
+      expiryDate: true,
+      unitCost: true,
+      qualityStatus: true,
+    },
+  },
+  qualityInspection: {
+    select: {
+      id: true,
+      inspectionNumber: true,
+      decision: true,
+      goodQuantity: true,
+      rejectedQuantity: true,
+      inspectedAt: true,
+      releasedAt: true,
+    },
   },
 };
 
@@ -1174,7 +1193,14 @@ export class ProductionBatchService {
       const mfgDate = input.manufacturingDate
         ? new Date(input.manufacturingDate)
         : batch.manufacturingDate || new Date();
-      const expDate = input.expiryDate ? new Date(input.expiryDate) : batch.expiryDate;
+      const variant = await tx.productVariant.findUnique({
+        where: { id: batch.productVariantId },
+        select: { shelfLifeDays: true },
+      });
+      let expDate = input.expiryDate ? new Date(input.expiryDate) : batch.expiryDate;
+      if (!expDate && variant?.shelfLifeDays && variant.shelfLifeDays > 0) {
+        expDate = new Date(mfgDate.getTime() + variant.shelfLifeDays * 24 * 60 * 60 * 1000);
+      }
       if (expDate && expDate <= mfgDate) {
         throw new AppError('expiryDate must be after manufacturingDate.', 400);
       }
@@ -1214,6 +1240,7 @@ export class ProductionBatchService {
           manufacturingDate: mfgDate,
           expiryDate: expDate,
           unitCost: unitCostInBase,
+          qualityStatus: QualityStatus.PENDING_INSPECTION,
         },
         create: {
           inventoryItemId: fgItem.id,
@@ -1222,8 +1249,23 @@ export class ProductionBatchService {
           expiryDate: expDate,
           receivedDate: now,
           unitCost: unitCostInBase,
+          qualityStatus: QualityStatus.PENDING_INSPECTION,
           supplierBatchRef: wo.workOrderNumber,
           notes: `Produced from Work Order ${wo.workOrderNumber}`,
+        },
+      });
+
+      const qiNumber = generateDocNumber('QI');
+      await tx.qualityInspection.create({
+        data: {
+          inspectionNumber: qiNumber,
+          productionBatchId: batch.id,
+          inventoryBatchId: fgBatch.id,
+          warehouseId: targetWhId,
+          inspectedQuantity: goodQty,
+          goodQuantity: ZERO,
+          rejectedQuantity: ZERO,
+          decision: 'PENDING',
         },
       });
 

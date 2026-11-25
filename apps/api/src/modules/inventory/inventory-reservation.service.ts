@@ -62,6 +62,7 @@ export class InventoryReservationService {
         WHERE b.warehouse_id = ${warehouseId}
           AND b.inventory_item_id = ${item.id}
           AND (b.quantity_on_hand - b.quantity_reserved) > 0
+          AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
         FOR UPDATE OF b
       `;
 
@@ -233,6 +234,7 @@ export class InventoryReservationService {
         WHERE b.warehouse_id = ${params.warehouseId}
           AND b.inventory_item_id = ${item.id}
           AND (b.quantity_on_hand - b.quantity_reserved) > 0
+          AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
         FOR UPDATE OF b
       `;
 

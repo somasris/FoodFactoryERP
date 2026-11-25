@@ -4,6 +4,7 @@ import { bomsRouter } from '../master-data/boms/boms.routes';
 import { ProductionPlanController } from './production-plan.controller';
 import { WorkOrderController } from './work-order.controller';
 import { ProductionBatchController } from './production-batch.controller';
+import { MaterialFgController } from './material-fg.controller';
 
 export const productionRouter: Router = Router();
 
@@ -191,4 +192,56 @@ productionRouter.post(
   '/batches/:id/cancel',
   requirePermissions('production.batches.cancel'),
   ProductionBatchController.cancelBatch,
+);
+
+// Phase 3.5: Material Reconciliation, Returns, Variance Approval, Quality Inspection & Traceability
+productionRouter.get(
+  '/reconciliation',
+  requirePermissions('production.batches.read'),
+  MaterialFgController.getReconciliationDashboard,
+);
+productionRouter.get(
+  '/batches/:id/reconciliation',
+  requirePermissions('production.batches.read'),
+  MaterialFgController.getBatchReconciliation,
+);
+productionRouter.post(
+  '/batches/:id/return-materials',
+  requirePermissions('production.batches.return'),
+  MaterialFgController.returnMaterials,
+);
+productionRouter.post(
+  '/batches/:id/release-reservation',
+  requirePermissions('production.batches.return'),
+  MaterialFgController.releaseReservation,
+);
+productionRouter.post(
+  '/batches/:id/variance-approval',
+  requirePermissions('production.variances.approve'),
+  MaterialFgController.approveVariance,
+);
+productionRouter.get(
+  '/quality-inspections',
+  requirePermissions('production.quality.read'),
+  MaterialFgController.listQualityInspections,
+);
+productionRouter.post(
+  '/quality-inspections/:id/inspect',
+  requirePermissions('production.quality.inspect'),
+  MaterialFgController.inspectQuality,
+);
+productionRouter.post(
+  '/quality-inspections/:id/release',
+  requirePermissions('production.quality.release'),
+  MaterialFgController.releaseQuarantined,
+);
+productionRouter.post(
+  '/quality-inspections/:id/disposition',
+  requirePermissions('production.quality.release'),
+  MaterialFgController.dispositionRejected,
+);
+productionRouter.get(
+  '/traceability/recall',
+  requirePermissions('production.quality.read'),
+  MaterialFgController.recallLookup,
 );

@@ -62,7 +62,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.2** | Production Planning | `TESTED` | Yes (`ProductionPlan`, demand MRP, shortages, `/production/planning`) | 3 API (`production-planning.test.ts`) + 4 Web (`production-planning.test.tsx`) | Pending manual browser UI verification |
 | **3.3** | Work Order Management | `TESTED` | Yes (`WorkOrder`, `WorkOrderStatusHistory`, `WorkOrderNumberSequence`, `/production/work-orders`) | 6 API (`work-orders.test.ts`) + 5 Web (`work-orders.test.tsx`) | Pending manual browser UI verification |
 | **3.4** | Batch Production Execution | `TESTED` | Yes (`ProductionBatch`, consumption/output/yield, FG receipt, `/production/execution`) | 5 API (`production-batches.test.ts`) + 4 Web (`production-batches.test.tsx`) | Pending manual browser UI verification |
-| **3.5** | Material Consumption & Finished Goods | `PLANNED` | No (`MaterialIssue`, `MaterialReturn`, `ProductionScrap` in draft) | None | Not started |
+| **3.5** | Material Consumption & Finished Goods | `TESTED` | Yes (`ProductionBatchReturn`, `VarianceApproval`, `QualityInspection`, `/production/reconciliation`, `/production/quality`, `/production/traceability`) | 3 API (`material-fg.test.ts`) + 4 Web (`material-fg.test.tsx`) | Pending manual browser UI verification |
 | **3.6** | Production Costing | `PLANNED` | No (`ProductionOverhead`, `ProductionVariance` in draft) | None | Not started |
 | **3.7** | Production Reports | `PLANNED` | No (`apps/api/src/modules/reports/.gitkeep` placeholder) | None | Not started |
 | **4.1** | System Administration | `PLANNED` | Partial (Backend `/api/v1/users` exists; `/admin` UI is placeholder) | User/RBAC tests in 1.3 | Admin UI not started |
@@ -314,16 +314,16 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Current Status:** `TESTED` (Implemented with `ProductionBatch` models, `PB/YYYY-YY/00001` numbering, idempotent material consumption & FG receipt, yield/wastage tracking, RBAC, frontend execution pages, 5 API tests, and 4 frontend tests passing; manual browser UI verification pending; see [PHASE_3_4_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_4_VERIFICATION_REPORT.md)).
 
 #### 3.5 Material Consumption & Finished Goods
-- **Purpose:** Issue raw materials and packaging from warehouses to production runs, handle unused returns, and receive finished goods into `WH-FG-01`.
-- **Functional Scope:** `MaterialIssue`, `MaterialReturn`, and `PRODUCTION_RECEIPT` inventory transactions.
-- **Key Features:** Transactional stock deduction via Phase 1.5 `InventoryIssue` / ledger engine; finished goods batch creation with expiry dates.
-- **Database Dependencies:** `MaterialIssue`, `MaterialIssueItem`, `MaterialReturn`, `MaterialReturnItem` (draft schema) + Phase 1.5 `InventoryTransaction`.
-- **Backend Dependencies:** `apps/api/src/modules/production/` integrating with `apps/api/src/modules/inventory/`.
-- **Frontend Components:** `/production` (placeholder).
-- **Integration Dependencies:** Phase 1.5 Inventory Engine (MWAC, `SELECT ... FOR UPDATE`, batch tracking).
-- **Testing Requirements:** Material issue/return ledger reconciliation and finished goods MWAC blending tests.
-- **Completion Criteria:** Every material consumption and finished goods receipt posts an immutable `InventoryTransaction`.
-- **Current Status:** `PLANNED`
+- **Purpose:** Reconcile planned vs actual material consumption, handle controlled material returns and excess variance approvals, enforce finished-goods quality inspection & quarantine release before saleable availability, and provide bidirectional batch genealogy/recall lookup.
+- **Functional Scope:** Material consumption reconciliation, `ProductionBatchReturn`, `ProductionBatchVarianceApproval`, `QualityInspection` (`PENDING`, `ACCEPTED`, `PARTIALLY_ACCEPTED`, `QUARANTINED`, `REJECTED`), `InventoryBatch.qualityStatus` gating on sales/issues, `ProductVariant.shelfLifeDays`, and recall lookup.
+- **Key Features:** Transactional, idempotent material returns (`InventoryReceipt` + `InventoryTransaction`), configurable variance thresholds (`PRODUCTION_VARIANCE_THRESHOLD_PERCENT`), sales/reservation exclusion of uninspected/quarantined/rejected batches, ledger-balanced partial acceptance split (`-REJ` batch).
+- **Database Dependencies:** `ProductionBatchReturn`, `ProductionBatchVarianceApproval`, `QualityInspection`, `InventoryBatch.qualityStatus`, `ProductVariant.shelfLifeDays`.
+- **Backend Dependencies:** `apps/api/src/modules/production/material-fg.{service,controller,types}.ts`, `InventoryReservationService`, `InventoryIssueService`.
+- **Frontend Components:** `/production/reconciliation`, `/production/quality`, `/production/traceability`.
+- **Integration Dependencies:** Phase 3.4 Batch Execution, Phase 1.5 Inventory Ledger, Phase 2 Sales Reservation.
+- **Testing Requirements:** Reconciliation math, partial/expired/idempotent returns, variance approval RBAC, quality inspection & quarantine exclusion from Sales Orders, partial acceptance split, and recall lookup tests.
+- **Completion Criteria:** Quarantined/pending/rejected finished goods cannot be sold; every return and quality split posts balanced `InventoryTransaction`s.
+- **Current Status:** `TESTED` (Implemented with reconciliation, returns, variance approvals, quality inspections, quarantine gating, shelf-life, recall lookup, RBAC, frontend pages, 3 API tests, and 4 frontend tests passing; manual browser UI verification pending; see [PHASE_3_5_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_5_VERIFICATION_REPORT.md)).
 
 #### 3.6 Production Costing
 - **Purpose:** Compute true batch production cost and unit cost per packet by combining net material cost and direct overheads.

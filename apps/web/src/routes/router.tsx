@@ -50,6 +50,9 @@ import { WorkOrderDetailPage } from './production/WorkOrderDetailPage';
 import { ProductionExecutionDashboardPage } from './production/ProductionExecutionDashboardPage';
 import { ProductionBatchesPage } from './production/ProductionBatchesPage';
 import { ProductionBatchDetailPage } from './production/ProductionBatchDetailPage';
+import { MaterialReconciliationPage } from './production/MaterialReconciliationPage';
+import { QualityInspectionsPage } from './production/QualityInspectionsPage';
+import { BatchTraceabilityPage } from './production/BatchTraceabilityPage';
 
 export const router = createBrowserRouter([
   {
@@ -153,6 +156,9 @@ export const router = createBrowserRouter([
           { path: 'execution', element: <ProductionExecutionDashboardPage /> },
           { path: 'batches', element: <ProductionBatchesPage /> },
           { path: 'batches/:id', element: <ProductionBatchDetailPage /> },
+          { path: 'reconciliation', element: <MaterialReconciliationPage /> },
+          { path: 'quality', element: <QualityInspectionsPage /> },
+          { path: 'traceability', element: <BatchTraceabilityPage /> },
           { path: 'boms', element: <BomsPage /> },
         ],
       },

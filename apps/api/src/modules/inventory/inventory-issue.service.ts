@@ -120,6 +120,12 @@ export class InventoryIssueService {
           if (isBatchExpired(batch.expiryDate)) {
             throw new AppError(`Line ${i + 1}: Batch ${batch.batchNumber} is expired and cannot be issued.`, 400);
           }
+          if (batch.qualityStatus !== 'ACCEPTED') {
+            throw new AppError(
+              `Line ${i + 1}: Batch ${batch.batchNumber} is ${batch.qualityStatus} and cannot be issued.`,
+              400,
+            );
+          }
         }
 
         const reqQty = new Prisma.Decimal(line.requestedQuantity);
@@ -351,6 +357,7 @@ export class InventoryIssueService {
               WHERE b.warehouse_id = ${issue.warehouseId}
                 AND b.inventory_item_id = ${item.id}
                 AND (b.quantity_on_hand - b.quantity_reserved) > 0
+                AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
               FOR UPDATE OF b
             `;
 

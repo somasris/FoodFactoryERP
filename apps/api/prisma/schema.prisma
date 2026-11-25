@@ -147,9 +147,33 @@ enum ProductionBatchStatus {
 enum ProductionExecutionEntryType {
   STATUS_CHANGE
   MATERIAL_CONSUMPTION
+  MATERIAL_RETURN
   OUTPUT_UPDATE
   MATERIAL_RESERVATION
+  VARIANCE_APPROVAL
+  QUALITY_INSPECTION
   NOTE
+}
+
+enum QualityStatus {
+  PENDING_INSPECTION
+  ACCEPTED
+  QUARANTINED
+  REJECTED
+}
+
+enum InspectionDecision {
+  PENDING
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  QUARANTINED
+  REJECTED
+}
+
+enum VarianceApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum InventoryDocumentStatus {
@@ -279,6 +303,8 @@ model Warehouse {
   workOrders           WorkOrder[]
   productionBatches    ProductionBatch[]
   batchConsumptions    ProductionBatchConsumption[]
+  batchReturns         ProductionBatchReturn[]
+  qualityInspections   QualityInspection[]
 
   @@map("warehouses")
 }
@@ -315,6 +341,10 @@ model User {
   batchStatusChanges          ProductionBatchStatusHistory[]
   batchExecutionEntries       ProductionExecutionEntry[]
   batchConsumptions           ProductionBatchConsumption[]
+  batchReturns                ProductionBatchReturn[]
+  varianceApprovals           ProductionBatchVarianceApproval[]
+  qualityInspections          QualityInspection[]           @relation("QualityInspector")
+  qualityReleases             QualityInspection[]           @relation("QualityReleaser")
 
   @@map("users")
 }
@@ -471,6 +501,7 @@ model UnitOfMeasure {
   workOrders          WorkOrder[]
   productionBatches   ProductionBatch[]
   batchConsumptions   ProductionBatchConsumption[]
+  batchReturns        ProductionBatchReturn[]
 
   @@map("units_of_measure")
 }
@@ -618,6 +649,7 @@ model ProductVariant {
   netWeightGrams      Decimal  @map("net_weight_grams") @db.Decimal(10, 2)
   uomId               String   @map("uom_id")
   defaultSellingPrice Decimal  @map("default_selling_price") @db.Decimal(12, 2)
+  shelfLifeDays       Int?     @map("shelf_life_days")
   barcode             String?  @unique @db.VarChar(50)
   isActive            Boolean  @default(true) @map("is_active")
   createdAt           DateTime @default(now()) @map("created_at")
@@ -670,6 +702,8 @@ model InventoryItem {
   workOrders                WorkOrder[]
   productionBatches         ProductionBatch[]
   batchConsumptions         ProductionBatchConsumption[]
+  batchReturns              ProductionBatchReturn[]
+  varianceApprovals         ProductionBatchVarianceApproval[]
 
   @@map("inventory_items")
 }
@@ -849,9 +883,10 @@ model InventoryBatch {
   batchNumber       String    @map("batch_number") @db.VarChar(60)
   manufacturingDate DateTime? @map("manufacturing_date") @db.Date
   expiryDate        DateTime? @map("expiry_date") @db.Date
-  receivedDate      DateTime  @default(now()) @map("received_date")
-  unitCost          Decimal   @default(0) @map("unit_cost") @db.Decimal(18, 4)
-  supplierBatchRef  String?   @map("supplier_batch_ref") @db.VarChar(60)
+  receivedDate      DateTime      @default(now()) @map("received_date")
+  unitCost          Decimal       @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  qualityStatus     QualityStatus @default(ACCEPTED) @map("quality_status")
+  supplierBatchRef  String?       @map("supplier_batch_ref") @db.VarChar(60)
   notes             String?   @db.Text
   isActive          Boolean   @default(true) @map("is_active")
   createdAt         DateTime  @default(now()) @map("created_at")
@@ -866,6 +901,8 @@ model InventoryBatch {
   adjustmentLines      InventoryAdjustmentLine[]
   producedFromBatches  ProductionBatch[]            @relation("FinishedGoodsBatch")
   consumedInBatches    ProductionBatchConsumption[]
+  returnedFromBatches  ProductionBatchReturn[]
+  qualityInspections   QualityInspection[]
 
   @@unique([inventoryItemId, batchNumber])
   @@index([inventoryItemId])
@@ -1726,6 +1763,9 @@ model ProductionBatch {
   operator           User                           @relation("BatchOperator", fields: [operatorId], references: [id])
   finishedGoodsBatch InventoryBatch?                @relation("FinishedGoodsBatch", fields: [finishedGoodsBatchId], references: [id])
   consumptions       ProductionBatchConsumption[]
+  returns            ProductionBatchReturn[]
+  varianceApprovals  ProductionBatchVarianceApproval[]
+  qualityInspection  QualityInspection?
   statusHistory      ProductionBatchStatusHistory[]
   executionEntries   ProductionExecutionEntry[]
 
@@ -1802,4 +1842,91 @@ model ProductionExecutionEntry {
 
   @@index([productionBatchId])
   @@map("production_execution_entries")
+}
+
+model ProductionBatchReturn {
+  id                     String   @id @default(uuid())
+  productionBatchId      String   @map("production_batch_id")
+  inventoryItemId        String   @map("inventory_item_id")
+  warehouseId            String   @map("warehouse_id")
+  batchId                String?  @map("batch_id")
+  uomId                  String   @map("uom_id")
+  returnedQuantity       Decimal  @map("returned_quantity") @db.Decimal(14, 4)
+  baseQuantity           Decimal  @map("base_quantity") @db.Decimal(14, 4)
+  unitCost               Decimal  @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalCost              Decimal  @default(0) @map("total_cost") @db.Decimal(18, 4)
+  inventoryReceiptId     String?  @map("inventory_receipt_id")
+  inventoryTransactionId String?  @map("inventory_transaction_id")
+  idempotencyKey         String?  @unique @map("idempotency_key") @db.VarChar(100)
+  reason                 String   @db.Text
+  returnedById           String   @map("returned_by_id")
+  returnedAt             DateTime @default(now()) @map("returned_at")
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  batch           InventoryBatch? @relation(fields: [batchId], references: [id])
+  uom             UnitOfMeasure   @relation(fields: [uomId], references: [id])
+  returnedBy      User            @relation(fields: [returnedById], references: [id])
+
+  @@index([productionBatchId])
+  @@index([inventoryItemId])
+  @@map("production_batch_returns")
+}
+
+model ProductionBatchVarianceApproval {
+  id                String                 @id @default(uuid())
+  productionBatchId String                 @map("production_batch_id")
+  inventoryItemId   String                 @map("inventory_item_id")
+  expectedQuantity  Decimal                @map("expected_quantity") @db.Decimal(14, 4)
+  actualQuantity    Decimal                @map("actual_quantity") @db.Decimal(14, 4)
+  varianceQuantity  Decimal                @map("variance_quantity") @db.Decimal(14, 4)
+  variancePercent   Decimal                @map("variance_percent") @db.Decimal(7, 2)
+  thresholdPercent  Decimal                @map("threshold_percent") @db.Decimal(7, 2)
+  status            VarianceApprovalStatus @default(PENDING)
+  reason            String                 @db.Text
+  approvedById      String?                @map("approved_by_id")
+  approvedAt        DateTime?              @map("approved_at")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  approvedBy      User?           @relation(fields: [approvedById], references: [id])
+
+  @@unique([productionBatchId, inventoryItemId])
+  @@index([productionBatchId])
+  @@map("production_batch_variance_approvals")
+}
+
+model QualityInspection {
+  id                String             @id @default(uuid())
+  inspectionNumber  String             @unique @map("inspection_number") @db.VarChar(40)
+  productionBatchId String             @unique @map("production_batch_id")
+  inventoryBatchId  String             @map("inventory_batch_id")
+  warehouseId       String             @map("warehouse_id")
+  inspectedQuantity Decimal            @map("inspected_quantity") @db.Decimal(14, 4)
+  goodQuantity      Decimal            @default(0) @map("good_quantity") @db.Decimal(14, 4)
+  rejectedQuantity  Decimal            @default(0) @map("rejected_quantity") @db.Decimal(14, 4)
+  decision          InspectionDecision @default(PENDING)
+  defectCategory    String?            @map("defect_category") @db.VarChar(80)
+  notes             String?            @db.Text
+  evidenceRef       String?            @map("evidence_ref") @db.VarChar(255)
+  inspectorId       String?            @map("inspector_id")
+  inspectedAt       DateTime?          @map("inspected_at")
+  releasedById      String?            @map("released_by_id")
+  releasedAt        DateTime?          @map("released_at")
+  releaseNotes      String?            @map("release_notes") @db.Text
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  inventoryBatch  InventoryBatch  @relation(fields: [inventoryBatchId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  inspector       User?           @relation("QualityInspector", fields: [inspectorId], references: [id])
+  releasedBy      User?           @relation("QualityReleaser", fields: [releasedById], references: [id])
+
+  @@index([decision])
+  @@index([inventoryBatchId])
+  @@map("quality_inspections")
 }
