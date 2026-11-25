@@ -14,13 +14,17 @@ export interface DemoAccountConfig {
 
 /**
  * Demo mode is strictly prohibited in production environments.
- * In development/test, it is enabled only when DEMO_MODE_ENABLED=true.
+ * In development, it defaults to enabled unless explicitly set to DEMO_MODE_ENABLED=false.
+ * In test, it is enabled only when DEMO_MODE_ENABLED=true.
  */
 export function isDemoModeEnabled(): boolean {
   if (env.NODE_ENV === 'production') {
     return false;
   }
-  return env.DEMO_MODE_ENABLED === true;
+  if (env.DEMO_MODE_ENABLED !== undefined) {
+    return env.DEMO_MODE_ENABLED === true;
+  }
+  return env.NODE_ENV === 'development';
 }
 
 /**

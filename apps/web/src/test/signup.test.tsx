@@ -257,4 +257,21 @@ describe('Public Sign Up UI Suite', () => {
       expect(screen.queryByText('Try Demo Accounts')).toBeNull();
     });
   });
+
+  it('8. Shows clear configuration warning when demo mode is enabled but accounts are missing', async () => {
+    vi.spyOn(authService, 'getDemoAccounts').mockResolvedValueOnce({
+      enabled: true,
+      accounts: [],
+      configError: true,
+    });
+
+    renderLoginPage('signin', makeUnauthenticatedAuth(vi.fn()));
+
+    await waitFor(() => {
+      expect(screen.getByText('Try Demo Accounts')).toBeTruthy();
+      expect(
+        screen.getByText(/Demo mode is enabled, but demo credentials are not configured/i),
+      ).toBeTruthy();
+    });
+  });
 });

@@ -55,6 +55,7 @@ export interface DemoAccountOption {
 export interface DemoAccountsConfig {
   enabled: boolean;
   accounts: DemoAccountOption[];
+  configError?: boolean;
 }
 
 export const authService = {
@@ -132,7 +133,11 @@ export const authService = {
       });
       return response.data ?? { enabled: false, accounts: [] };
     } catch {
-      return { enabled: false, accounts: [] };
+      return {
+        enabled: import.meta.env.VITE_DEMO_MODE === 'true' || import.meta.env.DEV,
+        accounts: [],
+        configError: true,
+      };
     }
   },
 };

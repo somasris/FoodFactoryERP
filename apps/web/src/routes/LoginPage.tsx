@@ -303,8 +303,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
       </div>
 
       {/* Right Authentication Form Panel */}
-      <div className="flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
-        <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8">
+        <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="border-b border-slate-200 bg-white px-6 py-5 lg:hidden">
             <div className="flex items-center gap-2.5">
               <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-navy text-white">
@@ -458,7 +458,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                 </p>
               </form>
 
-              {demoConfig.enabled && demoConfig.accounts.length > 0 && (
+              {demoConfig.enabled && (
                 <div className="border-t border-slate-200 pt-4 space-y-2.5">
                   <div>
                     <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
@@ -468,52 +468,73 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                       Demo accounts are provided for evaluation purposes.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {demoConfig.accounts.map(demo => {
-                      const Icon = DEMO_ROLE_ICONS[demo.role];
-                      const isSelected = selectedDemoRole === demo.role;
-                      return (
-                        <button
-                          key={demo.role}
-                          type="button"
-                          onClick={() => {
-                            setUsernameOrEmail(demo.email);
-                            setPassword(demo.password);
-                            setSelectedDemoRole(demo.role);
-                            setFieldErrors({});
-                            setServerError(null);
-                          }}
-                          aria-pressed={isSelected}
-                          className={`flex items-start gap-2.5 rounded-md border px-3 py-2 text-left transition-colors ${
-                            isSelected
-                              ? 'border-brand-navy bg-brand-navy/5 ring-1 ring-brand-navy'
-                              : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/70'
-                          }`}
-                        >
-                          <Icon
-                            className={`mt-0.5 h-4 w-4 shrink-0 ${
-                              isSelected ? 'text-brand-navy' : 'text-slate-500'
+                  {demoConfig.configError || demoConfig.accounts.length === 0 ? (
+                    <div
+                      role="status"
+                      className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                    >
+                      Demo mode is enabled, but demo credentials are not configured or the API is
+                      unavailable.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {demoConfig.accounts.map((demo, idx) => {
+                        const Icon = DEMO_ROLE_ICONS[demo.role];
+                        const isSelected = selectedDemoRole === demo.role;
+                        const isLastOdd =
+                          demoConfig.accounts.length % 2 === 1 &&
+                          idx === demoConfig.accounts.length - 1;
+                        return (
+                          <button
+                            key={demo.role}
+                            type="button"
+                            onClick={() => {
+                              if (!demo.email || !demo.password) {
+                                setServerError(
+                                  `Demo credentials for ${demo.role} are not configured.`,
+                                );
+                                return;
+                              }
+                              setUsernameOrEmail(demo.email);
+                              setPassword(demo.password);
+                              setSelectedDemoRole(demo.role);
+                              setFieldErrors({});
+                              setServerError(null);
+                            }}
+                            aria-pressed={isSelected}
+                            className={`flex items-start gap-2.5 rounded-md border px-3 py-2 text-left transition-colors ${
+                              isLastOdd ? 'sm:col-span-2' : ''
+                            } ${
+                              isSelected
+                                ? 'border-brand-navy bg-brand-navy/5 ring-1 ring-brand-navy'
+                                : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/70'
                             }`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-semibold text-slate-900">
-                                {demo.label}
-                              </span>
-                              {isSelected && (
-                                <span className="text-[10px] font-semibold text-brand-navy">
-                                  Selected
+                          >
+                            <Icon
+                              className={`mt-0.5 h-4 w-4 shrink-0 ${
+                                isSelected ? 'text-brand-navy' : 'text-slate-500'
+                              }`}
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-slate-900">
+                                  {demo.label}
                                 </span>
-                              )}
+                                {isSelected && (
+                                  <span className="text-[10px] font-semibold text-brand-navy">
+                                    Selected
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 line-clamp-2">
+                                {demo.description}
+                              </p>
                             </div>
-                            <p className="text-[11px] text-slate-500 truncate">
-                              {demo.description}
-                            </p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
