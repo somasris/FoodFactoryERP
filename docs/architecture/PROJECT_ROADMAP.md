@@ -459,19 +459,12 @@ Customer Order
 
 ## 7. Frontend Sidebar & Navigation Cross-Check
 
-Inspected from [Sidebar.tsx](file:///d:/somasri/projects/FoodFactoryERP/apps/web/src/components/layout/Sidebar.tsx) and [router.tsx](file:///d:/somasri/projects/FoodFactoryERP/apps/web/src/routes/router.tsx) (no files modified):
+Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 
-| Sidebar Label | Route | Sidebar Badge | Master Roadmap Mapping | Observed Discrepancies / Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| **Foundation Dashboard** | `/` | `Active` | Phase 1.1 / 1.2 | Renders `DashboardPlaceholder` |
-| **Master Data** | `/master-data` | `Phase 1.4` | Phase 1.4 | Aligned; 12 sub-routes active |
-| **Sales & Orders** | `/sales` | `Phase 2` | Phase 2 | Aligned; badge is `teal` while Phase 2 is still `IN_PROGRESS` |
-| **Inventory & Stock** | `/inventory` | `Phase 1.5` | Phase 1.5 | Aligned; 9 sub-routes active |
-| **BOM & Production** | `/production` | `Phase 3` | Phase 3 (3.1–3.5) | Aligned; renders `ModulePlaceholder` |
-| **Costing & Reports** | `/reports` | `Phase 3` | Phase 3 (3.6–3.7) & Phase 4 (4.2–4.3) | Sidebar groups Costing & Audit/GST Reports under `Phase 3`; master roadmap separates Production Costing/Reports (Phase 3) from Financial/BI Reports (Phase 4) |
-| **System Admin** | `/admin` | `Phase 4` | Phase 4 (4.1, 4.4) | Sidebar badge says `Phase 4`, but `router.tsx` placeholder text says `"Phase 1.3 Certified Foundation"` |
-
-> **Additional Sidebar Note:** The bottom banner in `Sidebar.tsx` (lines 174–175) still displays `"Phase 1.1 Foundation – Authentication & business logic deferred"`, which is outdated relative to Phases 1.3–2.0. Left untouched per audit-only constraints.
+- `NAV_GROUPS` in `apps/web/src/config/navigation.ts` and `router.tsx` are synchronized with backend `ROLE_PERMISSIONS_MAP`.
+- Legacy `DashboardPlaceholder.tsx` and `ModulePlaceholder.tsx` have been removed.
+- All module index routes use `ModuleIndexRedirect` (`getModuleIndexPath`), and all child routes enforce granular `ProtectedRoute` permission checks.
+- **Audit Status:** `TESTED` (21 web test files / 85 tests passing; `MANUAL_UI_VERIFIED` pending live browser walkthrough — see `PRODUCTION_READINESS_AUDIT_REPORT.md`).
 
 ---
 
