@@ -67,7 +67,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.7** | Production Reports | `TESTED` | Yes (`production-reports.*`, `production-reports-export.service.ts`) | 3 API (`production-reports.test.ts`) + 3 Web (`production-reports.test.tsx`) | `/production/reports/*` pages + CSV/Excel/PDF export; pending manual browser UI verification |
 | **4.1** | System Administration | `TESTED` | Yes (`apps/api/src/modules/admin/*`, `AdministrationLayout`, 6 `/admin/*` pages) | 7 API (`admin-phase4-1.test.ts`) + 4 Web (`admin.test.tsx`) | Pending manual browser UI verification |
 | **4.2** | Financial & Compliance Management | `TESTED` | Yes (`apps/api/src/modules/compliance/*`, `StockAudit`, `ComplianceDocument`, `/reports/compliance`, `/reports/stock-audit`) | 5 API (`compliance-phase4-2.test.ts`) + 3 Web (`compliance.test.tsx`) | Pending manual browser UI verification |
-| **4.3** | Business Intelligence & Reports | `PLANNED` | No (`/reports` UI is placeholder) | None | Not started |
+| **4.3** | Business Intelligence & Reports | `TESTED` | Yes (`apps/api/src/modules/reports/*`, `ExecutiveDashboardPage`, `BusinessIntelligencePage`) | 4 API (`reports-phase4-3.test.ts`) + 2 Web (`reports.test.tsx`) | Pending manual browser UI verification |
 | **4.4** | Audit & Governance | `PLANNED` | Partial (`AuditLog` + `AuditService` active; no Audit UI/viewer) | Audited via auth/RBAC tests | Audit viewer UI not started |
 | **4.5** | System Reliability & Operations | `PLANNED` | Partial (Health checks exist; backups/ops runbooks pending) | None | Not started |
 
@@ -387,7 +387,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Phase 1.5, Phase 2, Phase 3, Phase 4.2.
 - **Testing Requirements:** Query performance, RBAC (`OWNER`, `ADMIN`, `AUDITOR`), and calculation accuracy tests.
 - **Completion Criteria:** Executive KPIs reconcile with transactional tables.
-- **Current Status:** `PLANNED`
+- **Current Status:** `TESTED` (Implemented with `/api/v1/reports/*` executive dashboard, sales/inventory/production/profitability/factory analytics, CSV/Excel/PDF exports, 4 API tests, and 2 frontend tests passing; manual browser UI verification pending; see [PHASE_4_3_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_4_3_VERIFICATION_REPORT.md)).
 
 #### 4.4 Audit & Governance
 - **Purpose:** Expose immutable security and operational audit trails for compliance inspection by `ADMIN`, `OWNER`, and `AUDITOR`.
