@@ -3,6 +3,7 @@ import { healthRouter } from './health.routes';
 import { authRouter } from '../modules/auth/auth.routes';
 import { usersRouter } from '../modules/users/users.routes';
 import { masterDataRouter } from '../modules/master-data/master-data.routes';
+import { inventoryRouter } from '../modules/inventory/inventory.routes';
 
 export const apiRouter: Router = Router();
 
@@ -17,3 +18,6 @@ apiRouter.use('/users', usersRouter);
 
 // Mount Phase 1.4 Master Data Management routes under /api/v1/master-data
 apiRouter.use('/master-data', masterDataRouter);
+
+// Mount Phase 1.5 Stage 3 Inventory Management routes under /api/v1/inventory
+apiRouter.use('/inventory', inventoryRouter);

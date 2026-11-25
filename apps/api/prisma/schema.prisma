@@ -74,10 +74,54 @@ enum AuditAction {
   APPROVE
   POST
   CANCEL
+  DISPATCH
+  RECEIVE
+  REVERSE
   LOGIN
   LOGOUT
   LOGIN_FAILED
   SECURITY_ALERT
+}
+
+enum InventoryDocumentStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  POSTED
+  CANCELLED
+}
+
+enum TransferDocumentStatus {
+  DRAFT
+  APPROVED
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+enum InventoryTransactionType {
+  RECEIPT
+  ISSUE
+  TRANSFER_OUT
+  TRANSFER_IN
+  ADJUSTMENT_IN
+  ADJUSTMENT_OUT
+  REVERSAL
+}
+
+enum PickingStrategy {
+  FIFO
+  FEFO
+}
+
+enum AdjustmentReason {
+  PHYSICAL_COUNT
+  DAMAGE
+  SPOILAGE
+  EXPIRY
+  SHRINKAGE
+  OPENING_STOCK
+  OTHER
 }
 
 // ------------------------------------------------------------------------------
@@ -150,8 +194,15 @@ model Warehouse {
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  factory    Factory               @relation(fields: [factoryId], references: [id])
-  userAccess UserWarehouseAccess[]
+  factory              Factory                @relation(fields: [factoryId], references: [id])
+  userAccess           UserWarehouseAccess[]
+  inventoryBalances    InventoryBalance[]
+  inventoryTransactions InventoryTransaction[]
+  inventoryReceipts    InventoryReceipt[]
+  inventoryIssues      InventoryIssue[]
+  transfersFrom        InventoryTransfer[]    @relation("TransferSourceWarehouse")
+  transfersTo          InventoryTransfer[]    @relation("TransferDestWarehouse")
+  inventoryAdjustments InventoryAdjustment[]
 
   @@map("warehouses")
 }
@@ -177,6 +228,7 @@ model User {
   warehouseAccess UserWarehouseAccess[]
   refreshTokens   RefreshToken[]
   auditLogs       AuditLog[]
+  postedInventoryTransactions InventoryTransaction[] @relation("TxPostedBy")
 
   @@map("users")
 }
@@ -321,6 +373,12 @@ model UnitOfMeasure {
   boms            BOM[]
   bomVersions     BOMVersion[]
   bomItems        BOMItem[]
+  txLines         InventoryTransactionLine[] @relation("TxLineUom")
+  txBaseLines     InventoryTransactionLine[] @relation("TxLineBaseUom")
+  receiptLines    InventoryReceiptLine[]
+  issueLines      InventoryIssueLine[]
+  transferLines   InventoryTransferLine[]
+  adjustmentLines InventoryAdjustmentLine[]
 
   @@map("units_of_measure")
 }
@@ -494,10 +552,17 @@ model InventoryItem {
   createdAt         DateTime        @default(now()) @map("created_at")
   updatedAt         DateTime        @updatedAt @map("updated_at")
 
-  rawMaterial    RawMaterial?    @relation(fields: [rawMaterialId], references: [id])
-  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
-  uom            UnitOfMeasure   @relation(fields: [uomId], references: [id])
-  bomItems       BOMItem[]
+  rawMaterial      RawMaterial?               @relation(fields: [rawMaterialId], references: [id])
+  productVariant   ProductVariant?            @relation(fields: [productVariantId], references: [id])
+  uom              UnitOfMeasure              @relation(fields: [uomId], references: [id])
+  bomItems         BOMItem[]
+  batches          InventoryBatch[]
+  balances         InventoryBalance[]
+  transactionLines InventoryTransactionLine[]
+  receiptLines     InventoryReceiptLine[]
+  issueLines       InventoryIssueLine[]
+  transferLines    InventoryTransferLine[]
+  adjustmentLines  InventoryAdjustmentLine[]
 
   @@map("inventory_items")
 }
@@ -652,4 +717,334 @@ model BOMOverhead {
 
   @@index([bomVersionId])
   @@map("bom_overheads")
+}
+
+
+// ------------------------------------------------------------------------------
+// 6. INVENTORY MANAGEMENT (PHASE 1.5 - STAGE 3)
+// ------------------------------------------------------------------------------
+
+model InventoryBatch {
+  id                String    @id @default(uuid())
+  inventoryItemId   String    @map("inventory_item_id")
+  batchNumber       String    @map("batch_number") @db.VarChar(60)
+  manufacturingDate DateTime? @map("manufacturing_date") @db.Date
+  expiryDate        DateTime? @map("expiry_date") @db.Date
+  receivedDate      DateTime  @default(now()) @map("received_date")
+  unitCost          Decimal   @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  supplierBatchRef  String?   @map("supplier_batch_ref") @db.VarChar(60)
+  notes             String?   @db.Text
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  inventoryItem    InventoryItem              @relation(fields: [inventoryItemId], references: [id])
+  balances         InventoryBalance[]
+  transactionLines InventoryTransactionLine[]
+  receiptLines     InventoryReceiptLine[]
+  issueLines       InventoryIssueLine[]
+  transferLines    InventoryTransferLine[]
+  adjustmentLines  InventoryAdjustmentLine[]
+
+  @@unique([inventoryItemId, batchNumber])
+  @@index([inventoryItemId])
+  @@index([expiryDate])
+  @@map("inventory_batches")
+}
+
+model InventoryBalance {
+  id                String    @id @default(uuid())
+  warehouseId       String    @map("warehouse_id")
+  inventoryItemId   String    @map("inventory_item_id")
+  batchId           String?   @map("batch_id")
+  quantityOnHand    Decimal   @default(0) @map("quantity_on_hand") @db.Decimal(18, 4)
+  quantityReserved  Decimal   @default(0) @map("quantity_reserved") @db.Decimal(18, 4)
+  unitCost          Decimal   @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalValue        Decimal   @default(0) @map("total_value") @db.Decimal(18, 4)
+  lastTransactionAt DateTime? @map("last_transaction_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  warehouse     Warehouse       @relation(fields: [warehouseId], references: [id])
+  inventoryItem InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  batch         InventoryBatch? @relation(fields: [batchId], references: [id])
+
+  @@unique([warehouseId, inventoryItemId, batchId])
+  @@index([warehouseId])
+  @@index([inventoryItemId])
+  @@index([batchId])
+  @@map("inventory_balances")
+}
+
+model InventoryTransaction {
+  id                    String                   @id @default(uuid())
+  transactionNumber     String                   @unique @map("transaction_number") @db.VarChar(40)
+  transactionType       InventoryTransactionType @map("transaction_type")
+  referenceType         String                   @map("reference_type") @db.VarChar(40)
+  referenceId           String                   @map("reference_id") @db.VarChar(36)
+  referenceNumber       String                   @map("reference_number") @db.VarChar(40)
+  idempotencyKey        String                   @unique @map("idempotency_key") @db.VarChar(100)
+  warehouseId           String                   @map("warehouse_id")
+  reversedTransactionId String?                  @unique @map("reversed_transaction_id")
+  transactionDate       DateTime                 @default(now()) @map("transaction_date")
+  postedById            String                   @map("posted_by_id")
+  remarks               String?                  @db.Text
+  createdAt             DateTime                 @default(now()) @map("created_at")
+
+  warehouse           Warehouse                  @relation(fields: [warehouseId], references: [id])
+  postedBy            User                       @relation("TxPostedBy", fields: [postedById], references: [id])
+  reversedTransaction InventoryTransaction?      @relation("TxReversal", fields: [reversedTransactionId], references: [id])
+  reversalOf          InventoryTransaction?      @relation("TxReversal")
+  lines               InventoryTransactionLine[]
+
+  @@index([referenceType, referenceId])
+  @@index([warehouseId])
+  @@index([transactionDate])
+  @@map("inventory_transactions")
+}
+
+model InventoryTransactionLine {
+  id              String   @id @default(uuid())
+  transactionId   String   @map("transaction_id")
+  lineNumber      Int      @map("line_number")
+  inventoryItemId String   @map("inventory_item_id")
+  batchId         String?  @map("batch_id")
+  uomId           String   @map("uom_id")
+  quantity        Decimal  @db.Decimal(18, 4)
+  baseUomId       String   @map("base_uom_id")
+  baseQuantity    Decimal  @map("base_quantity") @db.Decimal(18, 4)
+  unitCost        Decimal  @map("unit_cost") @db.Decimal(18, 4)
+  totalCost       Decimal  @map("total_cost") @db.Decimal(18, 4)
+  balanceAfter    Decimal  @map("balance_after") @db.Decimal(18, 4)
+  mwacAfter       Decimal? @map("mwac_after") @db.Decimal(18, 4)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  transaction   InventoryTransaction @relation(fields: [transactionId], references: [id])
+  inventoryItem InventoryItem        @relation(fields: [inventoryItemId], references: [id])
+  batch         InventoryBatch?      @relation(fields: [batchId], references: [id])
+  uom           UnitOfMeasure        @relation("TxLineUom", fields: [uomId], references: [id])
+  baseUom       UnitOfMeasure        @relation("TxLineBaseUom", fields: [baseUomId], references: [id])
+
+  @@unique([transactionId, lineNumber])
+  @@index([inventoryItemId])
+  @@index([batchId])
+  @@map("inventory_transaction_lines")
+}
+
+model InventoryReceipt {
+  id             String                  @id @default(uuid())
+  receiptNumber  String                  @unique @map("receipt_number") @db.VarChar(40)
+  warehouseId    String                  @map("warehouse_id")
+  status         InventoryDocumentStatus @default(DRAFT)
+  receiptDate    DateTime                @default(now()) @map("receipt_date")
+  supplierRef    String?                 @map("supplier_ref") @db.VarChar(100)
+  notes          String?                 @db.Text
+  idempotencyKey String?                 @unique @map("idempotency_key") @db.VarChar(100)
+  createdById    String                  @map("created_by_id")
+  submittedById  String?                 @map("submitted_by_id")
+  submittedAt    DateTime?               @map("submitted_at")
+  approvedById   String?                 @map("approved_by_id")
+  approvedAt     DateTime?               @map("approved_at")
+  postedById     String?                 @map("posted_by_id")
+  postedAt       DateTime?               @map("posted_at")
+  cancelledById  String?                 @map("cancelled_by_id")
+  cancelledAt    DateTime?               @map("cancelled_at")
+  createdAt      DateTime                @default(now()) @map("created_at")
+  updatedAt      DateTime                @updatedAt @map("updated_at")
+
+  warehouse Warehouse              @relation(fields: [warehouseId], references: [id])
+  lines     InventoryReceiptLine[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@map("inventory_receipts")
+}
+
+model InventoryReceiptLine {
+  id                String    @id @default(uuid())
+  receiptId         String    @map("receipt_id")
+  lineNumber        Int       @map("line_number")
+  inventoryItemId   String    @map("inventory_item_id")
+  uomId             String    @map("uom_id")
+  quantity          Decimal   @db.Decimal(18, 4)
+  baseQuantity      Decimal   @map("base_quantity") @db.Decimal(18, 4)
+  unitCost          Decimal   @map("unit_cost") @db.Decimal(18, 4)
+  totalCost         Decimal   @map("total_cost") @db.Decimal(18, 4)
+  batchNumber       String?   @map("batch_number") @db.VarChar(60)
+  batchId           String?   @map("batch_id")
+  manufacturingDate DateTime? @map("manufacturing_date") @db.Date
+  expiryDate        DateTime? @map("expiry_date") @db.Date
+  notes             String?   @db.Text
+
+  receipt       InventoryReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem    @relation(fields: [inventoryItemId], references: [id])
+  uom           UnitOfMeasure    @relation(fields: [uomId], references: [id])
+  batch         InventoryBatch?  @relation(fields: [batchId], references: [id])
+
+  @@unique([receiptId, lineNumber])
+  @@index([inventoryItemId])
+  @@map("inventory_receipt_lines")
+}
+
+model InventoryIssue {
+  id              String                  @id @default(uuid())
+  issueNumber     String                  @unique @map("issue_number") @db.VarChar(40)
+  warehouseId     String                  @map("warehouse_id")
+  status          InventoryDocumentStatus @default(DRAFT)
+  pickingStrategy PickingStrategy         @default(FEFO) @map("picking_strategy")
+  issueDate       DateTime                @default(now()) @map("issue_date")
+  departmentRef   String?                 @map("department_ref") @db.VarChar(100)
+  purpose         String?                 @db.VarChar(150)
+  notes           String?                 @db.Text
+  idempotencyKey  String?                 @unique @map("idempotency_key") @db.VarChar(100)
+  createdById     String                  @map("created_by_id")
+  submittedById   String?                 @map("submitted_by_id")
+  submittedAt     DateTime?               @map("submitted_at")
+  approvedById    String?                 @map("approved_by_id")
+  approvedAt      DateTime?               @map("approved_at")
+  postedById      String?                 @map("posted_by_id")
+  postedAt        DateTime?               @map("posted_at")
+  cancelledById   String?                 @map("cancelled_by_id")
+  cancelledAt     DateTime?               @map("cancelled_at")
+  createdAt       DateTime                @default(now()) @map("created_at")
+  updatedAt       DateTime                @updatedAt @map("updated_at")
+
+  warehouse Warehouse            @relation(fields: [warehouseId], references: [id])
+  lines     InventoryIssueLine[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@map("inventory_issues")
+}
+
+model InventoryIssueLine {
+  id                String  @id @default(uuid())
+  issueId           String  @map("issue_id")
+  lineNumber        Int     @map("line_number")
+  inventoryItemId   String  @map("inventory_item_id")
+  uomId             String  @map("uom_id")
+  requestedQuantity Decimal @map("requested_quantity") @db.Decimal(18, 4)
+  baseQuantity      Decimal @map("base_quantity") @db.Decimal(18, 4)
+  batchId           String? @map("batch_id")
+  unitCost          Decimal @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalCost         Decimal @default(0) @map("total_cost") @db.Decimal(18, 4)
+  notes             String? @db.Text
+
+  issue         InventoryIssue  @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  uom           UnitOfMeasure   @relation(fields: [uomId], references: [id])
+  batch         InventoryBatch? @relation(fields: [batchId], references: [id])
+
+  @@unique([issueId, lineNumber])
+  @@index([inventoryItemId])
+  @@map("inventory_issue_lines")
+}
+
+model InventoryTransfer {
+  id                     String                 @id @default(uuid())
+  transferNumber         String                 @unique @map("transfer_number") @db.VarChar(40)
+  sourceWarehouseId      String                 @map("source_warehouse_id")
+  destinationWarehouseId String                 @map("destination_warehouse_id")
+  status                 TransferDocumentStatus @default(DRAFT)
+  transferDate           DateTime               @default(now()) @map("transfer_date")
+  notes                  String?                @db.Text
+  dispatchIdempotencyKey String?                @unique @map("dispatch_idempotency_key") @db.VarChar(100)
+  receiveIdempotencyKey  String?                @unique @map("receive_idempotency_key") @db.VarChar(100)
+  createdById            String                 @map("created_by_id")
+  approvedById           String?                @map("approved_by_id")
+  approvedAt             DateTime?              @map("approved_at")
+  dispatchedById         String?                @map("dispatched_by_id")
+  dispatchedAt           DateTime?              @map("dispatched_at")
+  receivedById           String?                @map("received_by_id")
+  receivedAt             DateTime?              @map("received_at")
+  cancelledById          String?                @map("cancelled_by_id")
+  cancelledAt            DateTime?              @map("cancelled_at")
+  createdAt              DateTime               @default(now()) @map("created_at")
+  updatedAt              DateTime               @updatedAt @map("updated_at")
+
+  sourceWarehouse      Warehouse               @relation("TransferSourceWarehouse", fields: [sourceWarehouseId], references: [id])
+  destinationWarehouse Warehouse               @relation("TransferDestWarehouse", fields: [destinationWarehouseId], references: [id])
+  lines                InventoryTransferLine[]
+
+  @@index([sourceWarehouseId])
+  @@index([destinationWarehouseId])
+  @@index([status])
+  @@map("inventory_transfers")
+}
+
+model InventoryTransferLine {
+  id                     String  @id @default(uuid())
+  transferId             String  @map("transfer_id")
+  lineNumber             Int     @map("line_number")
+  inventoryItemId        String  @map("inventory_item_id")
+  batchId                String? @map("batch_id")
+  uomId                  String  @map("uom_id")
+  quantity               Decimal @db.Decimal(18, 4)
+  baseQuantity           Decimal @map("base_quantity") @db.Decimal(18, 4)
+  dispatchedBaseQuantity Decimal @default(0) @map("dispatched_base_quantity") @db.Decimal(18, 4)
+  receivedBaseQuantity   Decimal @default(0) @map("received_base_quantity") @db.Decimal(18, 4)
+  unitCost               Decimal @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalCost              Decimal @default(0) @map("total_cost") @db.Decimal(18, 4)
+  notes                  String? @db.Text
+
+  transfer      InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem     @relation(fields: [inventoryItemId], references: [id])
+  batch         InventoryBatch?   @relation(fields: [batchId], references: [id])
+  uom           UnitOfMeasure     @relation(fields: [uomId], references: [id])
+
+  @@unique([transferId, lineNumber])
+  @@index([inventoryItemId])
+  @@map("inventory_transfer_lines")
+}
+
+model InventoryAdjustment {
+  id               String                  @id @default(uuid())
+  adjustmentNumber String                  @unique @map("adjustment_number") @db.VarChar(40)
+  warehouseId      String                  @map("warehouse_id")
+  status           InventoryDocumentStatus @default(DRAFT)
+  adjustmentDate   DateTime                @default(now()) @map("adjustment_date")
+  reason           AdjustmentReason
+  notes            String?                 @db.Text
+  idempotencyKey   String?                 @unique @map("idempotency_key") @db.VarChar(100)
+  createdById      String                  @map("created_by_id")
+  submittedById    String?                 @map("submitted_by_id")
+  submittedAt      DateTime?               @map("submitted_at")
+  approvedById     String?                 @map("approved_by_id")
+  approvedAt       DateTime?               @map("approved_at")
+  postedById       String?                 @map("posted_by_id")
+  postedAt         DateTime?               @map("posted_at")
+  cancelledById    String?                 @map("cancelled_by_id")
+  cancelledAt      DateTime?               @map("cancelled_at")
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  warehouse Warehouse                 @relation(fields: [warehouseId], references: [id])
+  lines     InventoryAdjustmentLine[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@map("inventory_adjustments")
+}
+
+model InventoryAdjustmentLine {
+  id                String  @id @default(uuid())
+  adjustmentId      String  @map("adjustment_id")
+  lineNumber        Int     @map("line_number")
+  inventoryItemId   String  @map("inventory_item_id")
+  batchId           String? @map("batch_id")
+  uomId             String  @map("uom_id")
+  quantityDelta     Decimal @map("quantity_delta") @db.Decimal(18, 4)
+  baseQuantityDelta Decimal @map("base_quantity_delta") @db.Decimal(18, 4)
+  unitCost          Decimal @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalCost         Decimal @default(0) @map("total_cost") @db.Decimal(18, 4)
+  reasonNote        String? @map("reason_note") @db.Text
+
+  adjustment    InventoryAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem       @relation(fields: [inventoryItemId], references: [id])
+  batch         InventoryBatch?     @relation(fields: [batchId], references: [id])
+  uom           UnitOfMeasure       @relation(fields: [uomId], references: [id])
+
+  @@unique([adjustmentId, lineNumber])
+  @@index([inventoryItemId])
+  @@map("inventory_adjustment_lines")
 }

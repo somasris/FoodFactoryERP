@@ -46,8 +46,8 @@ const navItems = [
     name: 'Inventory & Stock',
     path: '/inventory',
     icon: Boxes,
-    badge: 'Phase 2',
-    badgeVariant: 'outline' as const,
+    badge: 'Phase 1.5',
+    badgeVariant: 'teal' as const,
   },
   {
     name: 'BOM & Production',

@@ -18,6 +18,16 @@ import { UnitConversionsPage } from './master-data/UnitConversionsPage';
 import { TaxPage } from './master-data/TaxPage';
 import { WarehousesPage } from './master-data/WarehousesPage';
 import { BomsPage } from './master-data/BomsPage';
+import { InventoryLayout } from '../components/inventory/InventoryLayout';
+import { InventoryDashboardPage } from './inventory/InventoryDashboardPage';
+import { StockBalancesPage } from './inventory/StockBalancesPage';
+import { InventoryReceiptsPage } from './inventory/InventoryReceiptsPage';
+import { InventoryIssuesPage } from './inventory/InventoryIssuesPage';
+import { WarehouseTransfersPage } from './inventory/WarehouseTransfersPage';
+import { StockAdjustmentsPage } from './inventory/StockAdjustmentsPage';
+import { BatchExpiryPage } from './inventory/BatchExpiryPage';
+import { InventoryValuationPage } from './inventory/InventoryValuationPage';
+import { InventoryTransactionsPage } from './inventory/InventoryTransactionsPage';
 
 export const router = createBrowserRouter([
   {
@@ -80,20 +90,22 @@ export const router = createBrowserRouter([
       {
         path: 'inventory',
         element: (
-          <ProtectedRoute requiredRoles={['ADMIN', 'PRODUCTION', 'OWNER', 'AUDITOR']}>
-            <ModulePlaceholder
-              moduleName="Inventory & Procurement Management"
-              phase="Phase 2 Implementation"
-              summary="Manages raw food materials, specialized packaging films and cartons, purchase orders, and stock batch tracking."
-              scopePoints={[
-                'Raw material catalog with minimum safety stock and reorder levels',
-                'Packaging materials (pouches, jars, master cartons, labels)',
-                'Purchase orders (PO), Goods Receipt Notes (GRN), and supplier invoicing',
-                'Batch inventory tracking with manufacturing and expiry date monitoring',
-              ]}
-            />
+          <ProtectedRoute requiredRoles={['ADMIN', 'PRODUCTION', 'OWNER', 'AUDITOR', 'SALESMAN']}>
+            <InventoryLayout />
           </ProtectedRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/inventory/dashboard" replace /> },
+          { path: 'dashboard', element: <InventoryDashboardPage /> },
+          { path: 'balances', element: <StockBalancesPage /> },
+          { path: 'receipts', element: <InventoryReceiptsPage /> },
+          { path: 'issues', element: <InventoryIssuesPage /> },
+          { path: 'transfers', element: <WarehouseTransfersPage /> },
+          { path: 'adjustments', element: <StockAdjustmentsPage /> },
+          { path: 'batches', element: <BatchExpiryPage /> },
+          { path: 'valuation', element: <InventoryValuationPage /> },
+          { path: 'transactions', element: <InventoryTransactionsPage /> },
+        ],
       },
       {
         path: 'production',
