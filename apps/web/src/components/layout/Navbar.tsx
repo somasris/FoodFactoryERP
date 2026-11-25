@@ -44,6 +44,14 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         }
       }
     }
+    const matchedGroup = NAV_GROUPS.find(g => pathname.startsWith(`${g.basePath}/`) || pathname === g.basePath);
+    if (matchedGroup) {
+      const segment = pathname.split('/').filter(Boolean).pop() || matchedGroup.label;
+      const formatted = segment
+        .replace(/-/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+      return { group: matchedGroup.label, page: formatted };
+    }
     return { group: 'Operations', page: 'Workspace' };
   }, [location.pathname]);
 

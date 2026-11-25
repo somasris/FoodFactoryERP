@@ -179,7 +179,7 @@ export const NAV_GROUPS: NavGroupConfig[] = [
       {
         label: 'Inventory Valuation',
         path: '/inventory/valuation',
-        anyPermission: ['inventory.valuation.read', 'inventory.read'],
+        requiredPermissions: ['inventory.valuation.read'],
       },
       {
         label: 'Transaction Ledger',
@@ -398,24 +398,87 @@ export function canAccessPath(user: UserProfile | null, pathname: string): boole
   }
 
   // Prefix-based module fallback for nested detail/form routes not explicitly listed
+  if (cleanPath.startsWith('/sales/invoices')) {
+    return userHasPermission(user, 'sales.invoices.read');
+  }
   if (cleanPath.startsWith('/sales')) {
     return userHasPermission(user, 'sales.orders.read') || userHasPermission(user, 'sales.dashboard.read');
   }
+  if (cleanPath.startsWith('/production/costing')) {
+    return userHasPermission(user, 'production.costing.read');
+  }
+  if (cleanPath.startsWith('/production/reports')) {
+    return userHasPermission(user, 'production.reports.read');
+  }
+  if (cleanPath.startsWith('/production/boms')) {
+    return userHasPermission(user, 'bom.read');
+  }
   if (cleanPath.startsWith('/production')) {
-    return userHasPermission(user, 'production.read') || userHasPermission(user, 'production.batches.read');
+    return (
+      userHasPermission(user, 'production.read') ||
+      userHasPermission(user, 'production.batches.read') ||
+      userHasPermission(user, 'production.plans.read') ||
+      userHasPermission(user, 'production.work_orders.read')
+    );
+  }
+  if (cleanPath === '/inventory/valuation' || cleanPath.startsWith('/inventory/valuation/')) {
+    return userHasPermission(user, 'inventory.valuation.read');
   }
   if (cleanPath.startsWith('/inventory')) {
     return userHasPermission(user, 'inventory.read');
   }
+  if (cleanPath.startsWith('/master-data/product-categories') || cleanPath.startsWith('/master-data/raw-material-categories') || cleanPath.startsWith('/master-data/unit-conversions')) {
+    return userHasPermission(user, 'master_data.read');
+  }
   if (cleanPath.startsWith('/master-data')) {
     return userHasPermission(user, 'master_data.read') || userHasPermission(user, 'customers.read');
   }
+  if (cleanPath.startsWith('/reports/executive')) {
+    return userHasPermission(user, 'analytics.dashboard.read');
+  }
+  if (cleanPath.startsWith('/reports/bi')) {
+    return (
+      userHasPermission(user, 'analytics.sales.read') ||
+      userHasPermission(user, 'analytics.inventory.read') ||
+      userHasPermission(user, 'analytics.production.read') ||
+      userHasPermission(user, 'analytics.profitability.read') ||
+      userHasPermission(user, 'analytics.factory.read')
+    );
+  }
+  if (cleanPath.startsWith('/reports/stock-audit')) {
+    return userHasPermission(user, 'compliance.stock_audit.read');
+  }
   if (cleanPath.startsWith('/reports')) {
-    return userHasPermission(user, 'analytics.dashboard.read') || userHasPermission(user, 'compliance.tax.read');
+    return (
+      userHasPermission(user, 'compliance.tax.read') ||
+      userHasPermission(user, 'compliance.inventory.read') ||
+      userHasPermission(user, 'compliance.documents.read')
+    );
+  }
+  if (cleanPath.startsWith('/admin/maintenance')) {
+    return userHasPermission(user, 'operations.maintenance.manage');
   }
   if (cleanPath.startsWith('/admin')) {
     return userHasPermission(user, 'administration.organization.read') || userHasPermission(user, 'governance.audit.read');
   }
 
   return false;
+}
+
+/**
+ * Resolve the first authorized route within a module base path for index redirects.
+ */
+export function getModuleIndexPath(user: UserProfile | null, basePath: string): string {
+  if (!user) return '/login';
+
+  for (const group of NAV_GROUPS) {
+    if (group.basePath !== basePath) continue;
+    for (const item of group.items) {
+      if (item.path.startsWith(basePath) && canAccessNavItem(user, item)) {
+        return item.path;
+      }
+    }
+  }
+
+  return '/unauthorized';
 }

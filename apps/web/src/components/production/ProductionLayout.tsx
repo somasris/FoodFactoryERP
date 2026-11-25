@@ -30,7 +30,7 @@ export const ProductionLayout: React.FC = () => {
     { label: 'Batches', to: '/production/batches', icon: Layers, permission: 'production.batches.read' },
     { label: 'Reconciliation', to: '/production/reconciliation', icon: Scale, permission: 'production.batches.read' },
     { label: 'Quality', to: '/production/quality', icon: ShieldCheck, permission: 'production.quality.read' },
-    { label: 'Traceability', to: '/production/traceability', icon: GitBranch, permission: 'production.quality.read' },
+    { label: 'Traceability', to: '/production/traceability', icon: GitBranch, permission: 'production.batches.read' },
     { label: 'Costing', to: '/production/costing', icon: Calculator, permission: 'production.costing.read' },
     { label: 'Analytics & Reports', to: '/production/reports', icon: FileSpreadsheet, permission: 'production.reports.read' },
     { label: 'BOM & Recipes', to: '/production/boms', icon: ClipboardList, permission: 'bom.read' },

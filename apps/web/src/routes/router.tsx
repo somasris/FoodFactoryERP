@@ -1,7 +1,7 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
-import { RoleDashboardRedirect } from '../components/auth/RoleDashboardRedirect';
+import { RoleDashboardRedirect, ModuleIndexRedirect } from '../components/auth/RoleDashboardRedirect';
 import { LoginPage } from './LoginPage';
 import { UnauthorizedPage } from './UnauthorizedPage';
 import { NotFoundPage } from './NotFoundPage';
@@ -124,19 +124,103 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { index: true, element: <Navigate to="/master-data/products" replace /> },
-          { path: 'products', element: <ProductsPage /> },
-          { path: 'product-variants', element: <ProductVariantsPage /> },
-          { path: 'product-categories', element: <CategoryMasterPage kind="product" /> },
-          { path: 'raw-materials', element: <RawMaterialsPage /> },
-          { path: 'raw-material-categories', element: <CategoryMasterPage kind="rawMaterial" /> },
-          { path: 'suppliers', element: <SuppliersPage /> },
-          { path: 'customers', element: <CustomersPage /> },
-          { path: 'uoms', element: <UomsPage /> },
-          { path: 'unit-conversions', element: <UnitConversionsPage /> },
-          { path: 'tax', element: <TaxPage /> },
-          { path: 'warehouses', element: <WarehousesPage /> },
-          { path: 'boms', element: <BomsPage /> },
+          { index: true, element: <ModuleIndexRedirect basePath="/master-data" /> },
+          {
+            path: 'products',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <ProductsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'product-variants',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <ProductVariantsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'product-categories',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <CategoryMasterPage kind="product" />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'raw-materials',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <RawMaterialsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'raw-material-categories',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <CategoryMasterPage kind="rawMaterial" />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'suppliers',
+            element: (
+              <ProtectedRoute anyPermission={['suppliers.read', 'master_data.read']}>
+                <SuppliersPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'customers',
+            element: (
+              <ProtectedRoute requiredPermissions={['customers.read']}>
+                <CustomersPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'uoms',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <UomsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'unit-conversions',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <UnitConversionsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'tax',
+            element: (
+              <ProtectedRoute requiredPermissions={['master_data.read']}>
+                <TaxPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'warehouses',
+            element: (
+              <ProtectedRoute anyPermission={['warehouses.read', 'master_data.read']}>
+                <WarehousesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'boms',
+            element: (
+              <ProtectedRoute anyPermission={['bom.read', 'master_data.read']}>
+                <BomsPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -147,9 +231,23 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { index: true, element: <Navigate to="/sales/dashboard" replace /> },
-          { path: 'dashboard', element: <SalesDashboardPage /> },
-          { path: 'orders', element: <SalesOrdersPage /> },
+          { index: true, element: <ModuleIndexRedirect basePath="/sales" /> },
+          {
+            path: 'dashboard',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.dashboard.read']}>
+                <SalesDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'orders',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.orders.read']}>
+                <SalesOrdersPage />
+              </ProtectedRoute>
+            ),
+          },
           {
             path: 'orders/new',
             element: (
@@ -158,7 +256,14 @@ export const router = createBrowserRouter([
               </ProtectedRoute>
             ),
           },
-          { path: 'orders/:id', element: <SalesOrderDetailPage /> },
+          {
+            path: 'orders/:id',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.orders.read']}>
+                <SalesOrderDetailPage />
+              </ProtectedRoute>
+            ),
+          },
           {
             path: 'orders/:id/edit',
             element: (
@@ -183,10 +288,38 @@ export const router = createBrowserRouter([
               </ProtectedRoute>
             ),
           },
-          { path: 'invoices', element: <SalesInvoicesPage /> },
-          { path: 'invoices/:id', element: <SalesInvoiceDetailPage /> },
-          { path: 'invoices/:id/edit', element: <SalesInvoiceFormPage /> },
-          { path: 'orders/:orderId/invoices/new', element: <SalesInvoiceFormPage /> },
+          {
+            path: 'invoices',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.invoices.read']}>
+                <SalesInvoicesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'invoices/:id',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.invoices.read']}>
+                <SalesInvoiceDetailPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'invoices/:id/edit',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.invoices.update']}>
+                <SalesInvoiceFormPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'orders/:orderId/invoices/new',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.invoices.create']}>
+                <SalesInvoiceFormPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -197,16 +330,79 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { index: true, element: <Navigate to="/inventory/dashboard" replace /> },
-          { path: 'dashboard', element: <InventoryDashboardPage /> },
-          { path: 'balances', element: <StockBalancesPage /> },
-          { path: 'receipts', element: <InventoryReceiptsPage /> },
-          { path: 'issues', element: <InventoryIssuesPage /> },
-          { path: 'transfers', element: <WarehouseTransfersPage /> },
-          { path: 'adjustments', element: <StockAdjustmentsPage /> },
-          { path: 'batches', element: <BatchExpiryPage /> },
-          { path: 'valuation', element: <InventoryValuationPage /> },
-          { path: 'transactions', element: <InventoryTransactionsPage /> },
+          { index: true, element: <ModuleIndexRedirect basePath="/inventory" /> },
+          {
+            path: 'dashboard',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <InventoryDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'balances',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <StockBalancesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'receipts',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <InventoryReceiptsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'issues',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <InventoryIssuesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'transfers',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <WarehouseTransfersPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'adjustments',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <StockAdjustmentsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'batches',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <BatchExpiryPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'valuation',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.valuation.read']}>
+                <InventoryValuationPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'transactions',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <InventoryTransactionsPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -217,32 +413,207 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { index: true, element: <Navigate to="/production/planning" replace /> },
-          { path: 'planning', element: <ProductionPlanningDashboardPage /> },
-          { path: 'demand', element: <ProductionDemandPage /> },
-          { path: 'plans', element: <ProductionPlansPage /> },
-          { path: 'plans/:id', element: <ProductionPlanDetailPage /> },
-          { path: 'plans/:planId/work-orders/new', element: <WorkOrderFormPage /> },
-          { path: 'work-orders/dashboard', element: <WorkOrdersDashboardPage /> },
-          { path: 'work-orders', element: <WorkOrdersPage /> },
-          { path: 'work-orders/:id', element: <WorkOrderDetailPage /> },
-          { path: 'execution', element: <ProductionExecutionDashboardPage /> },
-          { path: 'batches', element: <ProductionBatchesPage /> },
-          { path: 'batches/:id', element: <ProductionBatchDetailPage /> },
-          { path: 'reconciliation', element: <MaterialReconciliationPage /> },
-          { path: 'quality', element: <QualityInspectionsPage /> },
-          { path: 'traceability', element: <BatchTraceabilityPage /> },
-          { path: 'costing', element: <ProductionCostingDashboardPage /> },
-          { path: 'costing/batches/:batchId', element: <BatchCostingDetailPage /> },
-          { path: 'costing/variance-report', element: <CostVarianceReportPage /> },
-          { path: 'reports', element: <ProductionAnalyticsDashboardPage /> },
-          { path: 'reports/plan-vs-actual', element: <ProductionPlanVsActualPage /> },
-          { path: 'reports/work-order-performance', element: <WorkOrderPerformanceReportPage /> },
-          { path: 'reports/batch-yield', element: <BatchYieldReportPage /> },
-          { path: 'reports/material-consumption', element: <MaterialConsumptionReportPage /> },
-          { path: 'reports/quality', element: <ProductionQualityReportPage /> },
-          { path: 'reports/costing', element: <ProductionCostAnalyticsPage /> },
-          { path: 'boms', element: <BomsPage /> },
+          { index: true, element: <ModuleIndexRedirect basePath="/production" /> },
+          {
+            path: 'planning',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.plans.read']}>
+                <ProductionPlanningDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'demand',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.demand.read']}>
+                <ProductionDemandPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'plans',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.plans.read']}>
+                <ProductionPlansPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'plans/:id',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.plans.read']}>
+                <ProductionPlanDetailPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'plans/:planId/work-orders/new',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.work_orders.create']}>
+                <WorkOrderFormPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'work-orders/dashboard',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.work_orders.read']}>
+                <WorkOrdersDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'work-orders',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.work_orders.read']}>
+                <WorkOrdersPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'work-orders/:id',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.work_orders.read']}>
+                <WorkOrderDetailPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'execution',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <ProductionExecutionDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'batches',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <ProductionBatchesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'batches/:id',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <ProductionBatchDetailPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reconciliation',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <MaterialReconciliationPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'quality',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.quality.read']}>
+                <QualityInspectionsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'traceability',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <BatchTraceabilityPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'costing',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.costing.read']}>
+                <ProductionCostingDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'costing/batches/:batchId',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.costing.read']}>
+                <BatchCostingDetailPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'costing/variance-report',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.costing.read']}>
+                <CostVarianceReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.read']}>
+                <ProductionAnalyticsDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports/plan-vs-actual',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.read']}>
+                <ProductionPlanVsActualPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports/work-order-performance',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.read']}>
+                <WorkOrderPerformanceReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports/batch-yield',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.read']}>
+                <BatchYieldReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports/material-consumption',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.read']}>
+                <MaterialConsumptionReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports/quality',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.read']}>
+                <ProductionQualityReportPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'reports/costing',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.reports.costing.read']}>
+                <ProductionCostAnalyticsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'boms',
+            element: (
+              <ProtectedRoute requiredPermissions={['bom.read']}>
+                <BomsPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -253,11 +624,53 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { index: true, element: <Navigate to="/reports/compliance" replace /> },
-          { path: 'executive', element: <ExecutiveDashboardPage /> },
-          { path: 'bi', element: <BusinessIntelligencePage /> },
-          { path: 'compliance', element: <FinancialCompliancePage /> },
-          { path: 'stock-audit', element: <StockAuditPage /> },
+          { index: true, element: <ModuleIndexRedirect basePath="/reports" /> },
+          {
+            path: 'executive',
+            element: (
+              <ProtectedRoute requiredPermissions={['analytics.dashboard.read']}>
+                <ExecutiveDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'bi',
+            element: (
+              <ProtectedRoute
+                anyPermission={[
+                  'analytics.sales.read',
+                  'analytics.inventory.read',
+                  'analytics.production.read',
+                  'analytics.profitability.read',
+                  'analytics.factory.read',
+                ]}
+              >
+                <BusinessIntelligencePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'compliance',
+            element: (
+              <ProtectedRoute
+                anyPermission={[
+                  'compliance.tax.read',
+                  'compliance.inventory.read',
+                  'compliance.documents.read',
+                ]}
+              >
+                <FinancialCompliancePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'stock-audit',
+            element: (
+              <ProtectedRoute requiredPermissions={['compliance.stock_audit.read']}>
+                <StockAuditPage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {
@@ -268,16 +681,79 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
         children: [
-          { index: true, element: <Navigate to="/admin/organization" replace /> },
-          { path: 'organization', element: <OrganizationPage /> },
-          { path: 'factories', element: <FactoriesPage /> },
-          { path: 'users', element: <UsersAdminPage /> },
-          { path: 'roles', element: <RolesPermissionsPage /> },
-          { path: 'warehouse-access', element: <WarehouseAccessPage /> },
-          { path: 'settings', element: <SystemSettingsPage /> },
-          { path: 'governance', element: <AuditGovernancePage /> },
-          { path: 'health', element: <SystemHealthPage /> },
-          { path: 'backups', element: <BackupRecoveryPage /> },
+          { index: true, element: <ModuleIndexRedirect basePath="/admin" /> },
+          {
+            path: 'organization',
+            element: (
+              <ProtectedRoute requiredPermissions={['administration.organization.read']}>
+                <OrganizationPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'factories',
+            element: (
+              <ProtectedRoute requiredPermissions={['administration.factories.read']}>
+                <FactoriesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'users',
+            element: (
+              <ProtectedRoute anyPermission={['administration.users.read', 'users.read']}>
+                <UsersAdminPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'roles',
+            element: (
+              <ProtectedRoute requiredPermissions={['administration.roles.read']}>
+                <RolesPermissionsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'warehouse-access',
+            element: (
+              <ProtectedRoute requiredPermissions={['administration.warehouse_access.read']}>
+                <WarehouseAccessPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'settings',
+            element: (
+              <ProtectedRoute requiredPermissions={['administration.settings.read']}>
+                <SystemSettingsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'governance',
+            element: (
+              <ProtectedRoute requiredPermissions={['governance.audit.read']}>
+                <AuditGovernancePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'health',
+            element: (
+              <ProtectedRoute requiredPermissions={['operations.health.read']}>
+                <SystemHealthPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'backups',
+            element: (
+              <ProtectedRoute requiredPermissions={['operations.backup.read']}>
+                <BackupRecoveryPage />
+              </ProtectedRoute>
+            ),
+          },
           {
             path: 'maintenance',
             element: (
