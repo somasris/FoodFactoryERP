@@ -63,6 +63,13 @@ import { BatchYieldReportPage } from './production/BatchYieldReportPage';
 import { MaterialConsumptionReportPage } from './production/MaterialConsumptionReportPage';
 import { ProductionQualityReportPage } from './production/ProductionQualityReportPage';
 import { ProductionCostAnalyticsPage } from './production/ProductionCostAnalyticsPage';
+import { AdministrationLayout } from '../components/admin/AdministrationLayout';
+import { OrganizationPage } from './admin/OrganizationPage';
+import { FactoriesPage } from './admin/FactoriesPage';
+import { UsersAdminPage } from './admin/UsersAdminPage';
+import { RolesPermissionsPage } from './admin/RolesPermissionsPage';
+import { WarehouseAccessPage } from './admin/WarehouseAccessPage';
+import { SystemSettingsPage } from './admin/SystemSettingsPage';
 
 export const router = createBrowserRouter([
   {
@@ -203,20 +210,19 @@ export const router = createBrowserRouter([
       {
         path: 'admin',
         element: (
-          <ProtectedRoute requiredRoles={['ADMIN', 'OWNER']}>
-            <ModulePlaceholder
-              moduleName="System Administration & Security"
-              phase="Phase 1.3 Certified Foundation"
-              summary="Role-based access control, user account provisioning, audit logging, and system configurations."
-              scopePoints={[
-                'User account management and role-based access control (RBAC)',
-                'Role matrix: SALESMAN, ADMIN, PRODUCTION, OWNER, AUDITOR',
-                'Comprehensive immutable security and operational audit logs',
-                'System backups and environment parameter configuration',
-              ]}
-            />
+          <ProtectedRoute requiredRoles={['ADMIN', 'OWNER', 'AUDITOR']}>
+            <AdministrationLayout />
           </ProtectedRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/admin/organization" replace /> },
+          { path: 'organization', element: <OrganizationPage /> },
+          { path: 'factories', element: <FactoriesPage /> },
+          { path: 'users', element: <UsersAdminPage /> },
+          { path: 'roles', element: <RolesPermissionsPage /> },
+          { path: 'warehouse-access', element: <WarehouseAccessPage /> },
+          { path: 'settings', element: <SystemSettingsPage /> },
+        ],
       },
       {
         path: '*',

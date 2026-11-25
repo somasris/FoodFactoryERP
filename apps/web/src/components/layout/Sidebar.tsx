@@ -67,8 +67,8 @@ const navItems = [
     name: 'System Admin',
     path: '/admin',
     icon: Settings,
-    badge: 'Phase 4',
-    badgeVariant: 'outline' as const,
+    badge: 'Phase 4.1',
+    badgeVariant: 'teal' as const,
   },
 ];
 
