@@ -9,6 +9,7 @@ import { productionRouter } from '../modules/production/production.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
 import { complianceRouter } from '../modules/compliance/compliance.routes';
 import { reportsRouter } from '../modules/reports/reports.routes';
+import { governanceRouter } from '../modules/governance/governance.routes';
 
 export const apiRouter: Router = Router();
 
@@ -41,3 +42,6 @@ apiRouter.use('/compliance', complianceRouter);
 
 // Mount Phase 4.3 Business Intelligence & Reports routes under /api/v1/reports
 apiRouter.use('/reports', reportsRouter);
+
+// Mount Phase 4.4 Audit & Governance routes under /api/v1/governance
+apiRouter.use('/governance', governanceRouter);

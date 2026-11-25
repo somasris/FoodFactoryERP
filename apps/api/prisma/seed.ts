@@ -725,6 +725,32 @@ const PERMISSIONS = [
     description: 'Export business intelligence analytics reports',
   },
 
+  // Phase 4.4 Audit & Governance
+  {
+    code: 'governance.audit.read',
+    module: 'governance',
+    action: 'READ',
+    description: 'Inspect centralized immutable audit trail and field-level diffs',
+  },
+  {
+    code: 'governance.audit.export',
+    module: 'governance',
+    action: 'READ',
+    description: 'Export redacted audit trail logs',
+  },
+  {
+    code: 'governance.approvals.read',
+    module: 'governance',
+    action: 'READ',
+    description: 'View centralized cross-module approval governance history',
+  },
+  {
+    code: 'governance.activity.read',
+    module: 'governance',
+    action: 'READ',
+    description: 'Monitor user login, security alert, and configuration activity',
+  },
+
   // Phase 1.4 Master Data Management
   {
     code: 'master_data.read',
@@ -970,6 +996,11 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'analytics.profitability.read',
     'analytics.factory.read',
     'analytics.export',
+    // Phase 4.4 Governance
+    'governance.audit.read',
+    'governance.audit.export',
+    'governance.approvals.read',
+    'governance.activity.read',
   ],
   PRODUCTION: [
     'production.read',
@@ -1096,6 +1127,11 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'analytics.profitability.read',
     'analytics.factory.read',
     'analytics.export',
+    // Phase 4.4 Governance
+    'governance.audit.read',
+    'governance.audit.export',
+    'governance.approvals.read',
+    'governance.activity.read',
   ],
 };
 

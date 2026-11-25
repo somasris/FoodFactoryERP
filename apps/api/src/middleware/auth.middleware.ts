@@ -65,6 +65,11 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'analytics.profitability.read',
   'analytics.factory.read',
   'analytics.export',
+  // Phase 4.4 Audit & Governance (Read-Only)
+  'governance.audit.read',
+  'governance.audit.export',
+  'governance.approvals.read',
+  'governance.activity.read',
 ]);
 
 /**
