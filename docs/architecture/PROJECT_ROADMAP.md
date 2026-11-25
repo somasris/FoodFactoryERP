@@ -66,7 +66,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.6** | Production Costing | `TESTED` | Yes (`ProductionBatchCosting`, `ProductionCostEntry`, `ProductionOverheadAllocation`, `ProductionCostingHistory`) | `apps/api/src/modules/production/production-costing.*` | `/production/costing/*` pages; API + Web tests passing |
 | **3.7** | Production Reports | `TESTED` | Yes (`production-reports.*`, `production-reports-export.service.ts`) | 3 API (`production-reports.test.ts`) + 3 Web (`production-reports.test.tsx`) | `/production/reports/*` pages + CSV/Excel/PDF export; pending manual browser UI verification |
 | **4.1** | System Administration | `TESTED` | Yes (`apps/api/src/modules/admin/*`, `AdministrationLayout`, 6 `/admin/*` pages) | 7 API (`admin-phase4-1.test.ts`) + 4 Web (`admin.test.tsx`) | Pending manual browser UI verification |
-| **4.2** | Financial & Compliance Management | `PLANNED` | No (`Payment`, `Expense`, GST ledgers in draft schema) | None | Not started |
+| **4.2** | Financial & Compliance Management | `TESTED` | Yes (`apps/api/src/modules/compliance/*`, `StockAudit`, `ComplianceDocument`, `/reports/compliance`, `/reports/stock-audit`) | 5 API (`compliance-phase4-2.test.ts`) + 3 Web (`compliance.test.tsx`) | Pending manual browser UI verification |
 | **4.3** | Business Intelligence & Reports | `PLANNED` | No (`/reports` UI is placeholder) | None | Not started |
 | **4.4** | Audit & Governance | `PLANNED` | Partial (`AuditLog` + `AuditService` active; no Audit UI/viewer) | Audited via auth/RBAC tests | Audit viewer UI not started |
 | **4.5** | System Reliability & Operations | `PLANNED` | Partial (Health checks exist; backups/ops runbooks pending) | None | Not started |
@@ -375,7 +375,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Phase 1.4 Tax/Suppliers/Customers, Phase 1.5 Inventory Receipts, Phase 2 Sales Orders.
 - **Testing Requirements:** GST split accuracy, payment allocation invariants, and `AUDITOR` read-only enforcement.
 - **Completion Criteria:** Statutory GST reports and payment ledgers reconcile 100% with invoices and transactions.
-- **Current Status:** `PLANNED`
+- **Current Status:** `TESTED` (Implemented with migration `20261125123652_financial_compliance_phase_4_2`, GST/HSN invoice snapshot summaries, honest purchase tax unavailability reporting, inventory valuation & ledger-backed `StockAudit` workflow, production cost compliance, traceability, CSV/Excel/PDF exports, `ComplianceDocument` metadata registry, 5 API tests, and 3 frontend tests passing; manual browser UI verification pending; see [PHASE_4_2_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_4_2_VERIFICATION_REPORT.md)).
 
 #### 4.3 Business Intelligence & Reports
 - **Purpose:** Provide executive dashboards for profitability margins, SKU contribution, inventory aging, and operational KPIs.
