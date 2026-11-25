@@ -10,11 +10,6 @@
     BlinkMacSystemFont,
     'Segoe UI',
     Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Open Sans',
-    'Helvetica Neue',
     sans-serif;
   color-scheme: light;
 }
@@ -22,7 +17,25 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #f8fafc;
+  background-color: #f4f6f9;
   color: #1e293b;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Consistent enterprise table typography & focus styles */
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid #1d5a96;
+  outline-offset: 1px;
 }
