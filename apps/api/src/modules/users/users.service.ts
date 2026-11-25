@@ -458,6 +458,12 @@ export class UsersService {
         })),
       });
 
+      // Revoke active refresh tokens so role changes take effect across sessions
+      await tx.refreshToken.updateMany({
+        where: { userId, isRevoked: false },
+        data: { isRevoked: true },
+      });
+
       // Write mandatory audit log
       await tx.auditLog.create({
         data: {

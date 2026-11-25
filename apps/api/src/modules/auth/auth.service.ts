@@ -22,6 +22,36 @@ const REFRESH_CONCURRENCY_GRACE_WINDOW_MS = 5000;
 
 export class AuthService {
   /**
+   * Resolve active roles and deduplicated permissions from database userRoles.
+   * Rejects accounts with no active role assignments.
+   */
+  private static resolveActiveRolesAndPermissions(
+    userRoles: Array<{
+      role: {
+        code: string;
+        isActive: boolean;
+        permissions: Array<{ permission: { code: string } }>;
+      };
+    }>,
+  ): { roles: string[]; permissions: string[] } {
+    const activeUserRoles = userRoles.filter(ur => ur.role.isActive);
+    const roles = activeUserRoles.map(ur => ur.role.code);
+
+    if (roles.length === 0) {
+      throw new AppError(
+        'Your account does not have an active role assigned. Please contact an administrator.',
+        403,
+      );
+    }
+
+    const permissions = Array.from(
+      new Set(activeUserRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code))),
+    );
+
+    return { roles, permissions };
+  }
+
+  /**
    * Public user registration.
    * Creates an inactive account in PENDING_APPROVAL state with zero roles or permissions.
    * An authorized OWNER or ADMIN must approve and assign a role before the user can sign in.
@@ -209,13 +239,7 @@ export class AuthService {
     }
 
     // Collect active roles and deduplicated permissions
-    const activeUserRoles = user.userRoles.filter(ur => ur.role.isActive);
-    const roles = activeUserRoles.map(ur => ur.role.code);
-    const permissions = Array.from(
-      new Set(
-        activeUserRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code)),
-      ),
-    );
+    const { roles, permissions } = AuthService.resolveActiveRolesAndPermissions(user.userRoles);
 
     const tokenPayload: TokenPayload = {
       userId: user.id,
@@ -413,9 +437,16 @@ export class AuthService {
         throw new AppError('User profile not found', 404);
       }
 
+      if (user.registrationStatus !== 'APPROVED') {
+        throw new AppError('Your registration is pending approval or was rejected.', 403);
+      }
+
       if (!user.isActive) {
         throw new AppError('Your account has been deactivated.', 403);
       }
+
+      // Resolve active roles and permissions before rotating token
+      const { roles, permissions } = AuthService.resolveActiveRolesAndPermissions(user.userRoles);
 
       // 5. Atomic rotation: Mark current token as revoked
       await tx.refreshToken.update({
@@ -442,15 +473,6 @@ export class AuthService {
       });
 
       // 7. Generate fresh access token
-      const roles = user.userRoles.map(ur => ur.role.code);
-      const permissions = Array.from(
-        new Set(
-          user.userRoles.flatMap(ur =>
-            ur.role.permissions.map(rp => rp.permission.code),
-          ),
-        ),
-      );
-
       const tokenPayload: TokenPayload = {
         userId: user.id,
         username: user.username,
@@ -577,16 +599,15 @@ export class AuthService {
       throw new AppError('User profile not found', 404);
     }
 
+    if (user.registrationStatus !== 'APPROVED') {
+      throw new AppError('Your registration is pending approval or was rejected.', 403);
+    }
+
     if (!user.isActive) {
       throw new AppError('Your account has been deactivated.', 403);
     }
 
-    const roles = user.userRoles.map(ur => ur.role.code);
-    const permissions = Array.from(
-      new Set(
-        user.userRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code)),
-      ),
-    );
+    const { roles, permissions } = AuthService.resolveActiveRolesAndPermissions(user.userRoles);
 
     return {
       id: user.id,

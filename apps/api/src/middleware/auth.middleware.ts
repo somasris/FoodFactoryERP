@@ -80,26 +80,110 @@ export const READ_ONLY_PERMISSIONS = new Set([
  * Authentication Middleware:
  * Validates JWT Bearer token in the Authorization header.
  */
-export const authenticate = (req: Request, _res: Response, next: NextFunction): void => {
+export const authenticate = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new AppError('Authentication required. Missing or malformed Bearer token.', 401);
+    next(new AppError('Authentication required. Missing or malformed Bearer token.', 401));
+    return;
   }
 
   const token = authHeader.split(' ')[1];
 
+  let payload: TokenPayload;
   try {
-    const payload = verifyAccessToken(token);
-    req.user = payload;
-    next();
+    payload = verifyAccessToken(token);
   } catch (error) {
     if (error instanceof Error && error.name === 'TokenExpiredError') {
-      throw new AppError('Access token has expired. Please refresh your session.', 401, {
-        code: 'TOKEN_EXPIRED',
-      });
+      next(
+        new AppError('Access token has expired. Please refresh your session.', 401, {
+          code: 'TOKEN_EXPIRED',
+        }),
+      );
+      return;
     }
-    throw new AppError('Invalid or corrupted access token.', 401);
+    next(new AppError('Invalid or corrupted access token.', 401));
+    return;
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        isActive: true,
+        registrationStatus: true,
+        userRoles: {
+          select: {
+            role: {
+              select: {
+                code: true,
+                isActive: true,
+                permissions: {
+                  select: {
+                    permission: {
+                      select: {
+                        code: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      next(new AppError('User account no longer exists.', 401));
+      return;
+    }
+
+    if (user.registrationStatus !== 'APPROVED') {
+      next(new AppError('Your registration is pending approval or was rejected.', 403));
+      return;
+    }
+
+    if (!user.isActive) {
+      next(new AppError('Your account has been deactivated. Please contact an administrator.', 403));
+      return;
+    }
+
+    const activeUserRoles = user.userRoles.filter(ur => ur.role.isActive);
+    const roles = activeUserRoles.map(ur => ur.role.code);
+
+    if (roles.length === 0) {
+      next(
+        new AppError(
+          'Your account does not have an active role assigned. Please contact an administrator.',
+          403,
+        ),
+      );
+      return;
+    }
+
+    const permissions = Array.from(
+      new Set(activeUserRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code))),
+    );
+
+    req.user = {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      roles,
+      permissions,
+    };
+
+    next();
+  } catch (err) {
+    next(err);
   }
 };
 
