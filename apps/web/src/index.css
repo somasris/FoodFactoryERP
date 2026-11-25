@@ -3,6 +3,28 @@
 @tailwind utilities;
 
 :root {
+  --ff-primary: #245c3a;
+  --ff-primary-dark: #17452c;
+  --ff-forest: #103b28;
+  --ff-secondary: #3d7651;
+  --ff-muted-green: #6f9478;
+  --ff-bg: #f7f8f2;
+  --ff-surface: #ffffff;
+  --ff-sidebar: #173f2b;
+  --ff-subtle: #eaf1e8;
+  --ff-input: #fafbf8;
+  --ff-gold: #c39a45;
+  --ff-gold-light: #e8d7aa;
+  --ff-cream: #f4f0e4;
+  --ff-border: #e1e7dd;
+  --ff-text: #24352a;
+  --ff-text-secondary: #66756a;
+  --ff-text-muted: #8a958c;
+  --ff-success: #27834a;
+  --ff-warning: #c58a25;
+  --ff-error: #c74440;
+  --ff-info: #3977a8;
+
   font-family:
     'Inter',
     system-ui,
@@ -17,8 +39,8 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: #f4f6f9;
-  color: #1e293b;
+  background-color: var(--ff-bg);
+  color: var(--ff-text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -30,12 +52,11 @@ body {
   }
 }
 
-/* Consistent enterprise table typography & focus styles */
 table {
   font-variant-numeric: tabular-nums;
 }
 
 :focus-visible {
-  outline: 2px solid #008000;
+  outline: 2px solid var(--ff-primary);
   outline-offset: 1px;
 }
