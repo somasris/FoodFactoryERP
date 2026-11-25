@@ -239,7 +239,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
         phoneNumber: parsed.data.phoneNumber || undefined,
         requestedRole: parsed.data.requestedRole,
       });
-      setSignUpSuccess({ email: registered.email, requestedRole: registered.requestedRole });
+      setSignUpSuccess({
+        email: registered.email,
+        requestedRole: registered.requestedRole || parsed.data.requestedRole,
+      });
+      setUsernameOrEmail(registered.email);
+      setPassword('');
+      setSelectedDemoRole(null);
+      setMode('signin');
       setFullName('');
       setEmail('');
       setPhoneNumber('');
@@ -359,6 +366,25 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
           </div>
 
           <div className="p-6">
+          {signUpSuccess && mode === 'signin' && (
+            <div
+              role="status"
+              className="mb-4 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800"
+            >
+              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700" />
+              <div>
+                <span className="font-semibold">
+                  Account created successfully. You can now sign in.
+                </span>
+                {signUpSuccess.requestedRole && (
+                  <span className="ml-1.5 inline-flex items-center rounded border border-emerald-300 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+                    Role: {signUpSuccess.requestedRole}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           {serverError && (
             <div
               role="alert"
@@ -537,29 +563,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                   )}
                 </div>
               )}
-            </div>
-          ) : signUpSuccess ? (
-            <div className="space-y-4 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                <CheckCircle2 className="h-6 w-6" />
-              </div>
-              <div className="space-y-1">
-                <h2 className="text-base font-semibold text-slate-900">
-                  Registration Submitted
-                </h2>
-                <p className="text-xs text-slate-600">
-                  Your account for <span className="font-medium">{signUpSuccess.email}</span> has
-                  been created and is pending administrator approval. You will be able to sign in
-                  once an administrator activates your account and assigns a role.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => switchMode('signin')}
-                className="w-full rounded-lg bg-[#172F50] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e3d68]"
-              >
-                Back to Sign In
-              </button>
             </div>
           ) : (
             <form onSubmit={handleSignUpSubmit} className="space-y-3.5" noValidate>

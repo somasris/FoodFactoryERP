@@ -41,6 +41,7 @@ export interface RegisterResponseData {
   isActive: boolean;
   registrationStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   requestedRole?: string | null;
+  roles?: string[];
   createdAt: string;
 }
 
