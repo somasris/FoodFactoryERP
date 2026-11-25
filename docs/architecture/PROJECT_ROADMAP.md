@@ -37,7 +37,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 1** | Foundation, Security, Master Data & Inventory | `TESTED` | None | 1.1–1.4 implemented & tested; 1.5 implemented with automated tests passing, pending manual E2E UI verification |
 | **Phase 2** | Sales & Order Management | `IN_PROGRESS` | Phase 1 | Active agent implementation (`sales` module + `InventoryReservationService`); invoicing (`2.6`) not in current Phase 2 scope |
-| **Phase 3** | BOM, Production & Costing | `PLANNED` | Phase 1, Phase 2 | Draft schema in `docs/database/prisma-schema-draft.prisma`; BOM master data in 1.4; `production` & `reports` API folders are placeholders |
+| **Phase 3** | BOM, Production & Costing | `TESTED` | Phase 1, Phase 2 | All 7 subphases (3.1–3.7) implemented, audited, and passing API E2E + Web tests (`PHASE_3_INTEGRATION_AUDIT_REPORT.md`); manual browser UI verification pending |
 | **Phase 4** | System Administration, Reporting & Compliance | `PLANNED` | All Core Modules | User/RBAC APIs & `AuditService` exist from 1.3; Admin UI, GST compliance, BI reports & operations pending |
 
 ---
