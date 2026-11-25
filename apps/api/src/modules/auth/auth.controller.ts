@@ -42,7 +42,7 @@ export class AuthController {
 
       sendSuccess(
         res,
-        'Registration submitted successfully. Your account is pending administrator approval.',
+        'Account created successfully. You can now sign in.',
         user,
         201,
       );

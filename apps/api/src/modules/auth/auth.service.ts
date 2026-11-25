@@ -53,8 +53,8 @@ export class AuthService {
 
   /**
    * Public user registration.
-   * Creates an inactive account in PENDING_APPROVAL state with zero roles or permissions.
-   * An authorized OWNER or ADMIN must approve and assign a role before the user can sign in.
+   * Validates the requested role against the non-OWNER allowlist, assigns the corresponding
+   * database Role record, and creates an immediately active account ready for sign-in.
    */
   static async register(input: RegisterInput, ipAddress?: string, userAgent?: string) {
     const normalizedEmail = input.email.trim().toLowerCase();
@@ -70,6 +70,14 @@ export class AuthService {
     });
     if (existing) {
       throw new AppError('An account with this email address already exists', 409);
+    }
+
+    const role = await prisma.role.findFirst({
+      where: { code: input.requestedRole, isActive: true },
+      select: { id: true, code: true },
+    });
+    if (!role || role.code === 'OWNER') {
+      throw new AppError('Selected role is not available for public registration', 400);
     }
 
     const emailPrefix =
@@ -89,9 +97,14 @@ export class AuthService {
           fullName: input.name.trim(),
           phone: input.phoneNumber?.trim() || null,
           passwordHash,
-          isActive: false,
-          registrationStatus: 'PENDING_APPROVAL',
-          requestedRole: input.requestedRole,
+          isActive: true,
+          registrationStatus: 'APPROVED',
+          requestedRole: role.code,
+          userRoles: {
+            create: {
+              roleId: role.id,
+            },
+          },
         },
         select: {
           id: true,
@@ -101,6 +114,13 @@ export class AuthService {
           registrationStatus: true,
           requestedRole: true,
           createdAt: true,
+          userRoles: {
+            select: {
+              role: {
+                select: { code: true },
+              },
+            },
+          },
         },
       });
 
@@ -116,14 +136,24 @@ export class AuthService {
             isActive: user.isActive,
             registrationStatus: user.registrationStatus,
             requestedRole: user.requestedRole,
+            roles: [role.code],
           },
           ipAddress: ipAddress || null,
           userAgent: userAgent || null,
-          remarks: `Public user registration submitted requesting role '${input.requestedRole}' (pending administrator approval)`,
+          remarks: `Public user registration completed with role '${role.code}'`,
         },
       });
 
-      return user;
+      return {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        isActive: user.isActive,
+        registrationStatus: user.registrationStatus,
+        requestedRole: user.requestedRole,
+        roles: user.userRoles.map(ur => ur.role.code),
+        createdAt: user.createdAt,
+      };
     });
 
     return createdUser;
