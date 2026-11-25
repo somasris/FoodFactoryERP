@@ -289,3 +289,12 @@ GET http://localhost:5000/api/v1/health/database
 - **Phase 2.2**: Sales Orders & GST Billing (Customer records, tax invoices, payment tracking).
 - **Phase 3.1**: BOM & Production Management (Recipes, batch work orders, scrap & yield tracking).
 - **Phase 3.2**: Unit Costing & Audit Financials (True manufacturing unit cost, GSTR audit exports).
+
+---
+
+## 14. Master Development Roadmap
+
+For the centralized, implementation-aware development roadmap, phase status tracking, and module dependency map, see:
+
+- [Master Development Roadmap](docs/architecture/PROJECT_ROADMAP.md)
+- [Phase & Module Dependency Map](docs/architecture/PHASE_DEPENDENCY_MAP.md)
