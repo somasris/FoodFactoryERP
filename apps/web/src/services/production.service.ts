@@ -4,22 +4,31 @@ import {
   BatchCostingDetailResponse,
   BatchReconciliation,
   BatchVarianceApproval,
+  BatchYieldReportRow,
   CostingDashboardSummary,
   CostVarianceReportResponse,
   MaterialAvailabilityDetail,
+  MaterialConsumptionReportRow,
+  PlanVsActualRow,
+  ProductionAnalyticsDashboard,
   ProductionBatch,
   ProductionBatchCosting,
+  ProductionCostAnalyticsRow,
   ProductionCostEntryItem,
   ProductionDemandResponse,
   ProductionExecutionDashboard,
   ProductionOverheadAllocationItem,
   ProductionPlan,
   ProductionPlanningDashboard,
+  ProductionQualityReportRow,
+  ProductionReportQuery,
+  ProductionTrendsResponse,
   QualityInspectionItem,
   RecallLookupResponse,
   WorkOrder,
   WorkOrderDashboardSummary,
   WorkOrderMaterialRequirement,
+  WorkOrderPerformanceRow,
 } from '../types/production';
 
 export interface ProductionPlanQuery {
@@ -286,5 +295,94 @@ export const productionService = {
       apiClient<CostVarianceReportResponse>(
         `/production/costing/variance-report${buildQuery(params)}`,
       ),
+  },
+  reports: {
+    dashboard: (params: ProductionReportQuery = {}) =>
+      apiClient<ProductionAnalyticsDashboard>(
+        `/production/reports/dashboard${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    trends: (params: ProductionReportQuery = {}) =>
+      apiClient<ProductionTrendsResponse>(
+        `/production/reports/trends${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    planVsActual: (params: ProductionReportQuery = {}) =>
+      apiClient<
+        PaginatedResponse<PlanVsActualRow> & {
+          productSummary: Array<{
+            productVariantId: string;
+            sku: string;
+            productName: string;
+            plannedQuantity: string;
+            actualProducedQuantity: string;
+            acceptedQuantity: string;
+          }>;
+        }
+      >(
+        `/production/reports/plan-vs-actual${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    workOrderPerformance: (params: ProductionReportQuery = {}) =>
+      apiClient<
+        PaginatedResponse<WorkOrderPerformanceRow> & {
+          summary: {
+            totalWorkOrders: number;
+            overdueWorkOrders: number;
+            delayedWorkOrders: number;
+          };
+        }
+      >(
+        `/production/reports/work-order-performance${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    batchYield: (params: ProductionReportQuery = {}) =>
+      apiClient<PaginatedResponse<BatchYieldReportRow> & { lowYieldBatchesCount: number }>(
+        `/production/reports/batch-yield${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    materialConsumption: (params: ProductionReportQuery = {}) =>
+      apiClient<
+        PaginatedResponse<MaterialConsumptionReportRow> & {
+          highestWastageMaterials: MaterialConsumptionReportRow[];
+        }
+      >(
+        `/production/reports/material-consumption${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    quality: (params: ProductionReportQuery = {}) =>
+      apiClient<
+        PaginatedResponse<ProductionQualityReportRow> & {
+          summary: {
+            totalInspectedQuantity: string;
+            acceptedQuantity: string;
+            rejectedQuantity: string;
+            quarantinedQuantity: string;
+            pendingInspectionQuantity: string;
+            acceptanceRatePercent: string;
+            rejectionRatePercent: string;
+          };
+        }
+      >(
+        `/production/reports/quality${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    costing: (params: ProductionReportQuery = {}) =>
+      apiClient<
+        PaginatedResponse<ProductionCostAnalyticsRow> & {
+          summary: {
+            finalizedStandardCost: string;
+            finalizedActualCost: string;
+            finalizedVarianceAmount: string;
+            provisionalNonFinalizedCost: string;
+            byStatus: Record<string, { count: number; totalActualCost: string }>;
+          };
+          highestVarianceBatches: ProductionCostAnalyticsRow[];
+        }
+      >(
+        `/production/reports/costing${buildQuery(params as Record<string, string | number | boolean | undefined>)}`,
+      ),
+    exportUrl: (
+      reportType: string,
+      format: 'csv' | 'excel' | 'pdf',
+      params: ProductionReportQuery = {},
+    ) =>
+      `/api/v1/production/reports/export/${reportType}${buildQuery({
+        ...(params as Record<string, string | number | boolean | undefined>),
+        format,
+      })}`,
   },
 };

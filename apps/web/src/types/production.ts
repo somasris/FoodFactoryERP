@@ -772,3 +772,201 @@ export interface CostVarianceReportResponse {
   };
   rows: ProductionBatchCosting[];
 }
+
+export type ReportPeriod = 'today' | 'week' | 'month' | 'fy' | 'custom';
+export type TrendGranularity = 'daily' | 'weekly' | 'monthly';
+
+export interface ProductionReportQuery {
+  period?: ReportPeriod;
+  fromDate?: string;
+  toDate?: string;
+  productId?: string;
+  productCategoryId?: string;
+  productVariantId?: string;
+  warehouseId?: string;
+  status?: string;
+  priority?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
+  granularity?: TrendGranularity;
+}
+
+export interface ProductionAnalyticsDashboard {
+  dateRange: {
+    period: string;
+    financialYear: string;
+    fromDate: string;
+    toDate: string;
+  };
+  kpis: {
+    totalProductionPlans: number;
+    pendingProductionPlans: number;
+    totalWorkOrders: number;
+    activeWorkOrders: number;
+    completedWorkOrders: number;
+    totalProductionBatches: number;
+    batchesInProgress: number;
+    completedBatches: number;
+    plannedProductionQuantity: string;
+    actualProducedQuantity: string;
+    acceptedFinishedGoodsQuantity: string;
+    rejectedQuantity: string;
+    overallYieldPercentage: string;
+    materialWastagePercentage: string;
+    costAccess: boolean;
+    totalActualProductionCost: string | null;
+    averageCostPerAcceptedUnit: string | null;
+    productionCostVariance: string | null;
+  };
+}
+
+export interface ProductionTrendPoint {
+  period: string;
+  plannedQuantity: string;
+  actualQuantity: string;
+  rejectedQuantity: string;
+  wastageQuantity: string;
+  yieldPercent: string;
+  wastagePercent: string;
+  completedBatches: number;
+  totalCost: string | null;
+}
+
+export interface ProductionTrendsResponse {
+  granularity: TrendGranularity;
+  series: ProductionTrendPoint[];
+}
+
+export interface PlanVsActualRow {
+  planId: string;
+  planNumber: string;
+  planName?: string | null;
+  planDate: string;
+  planStatus: string;
+  warehouseName: string;
+  productName: string;
+  sku: string;
+  variantName: string;
+  uomSymbol: string;
+  plannedQuantity: string;
+  workOrderedQuantity: string;
+  actualProducedQuantity: string;
+  acceptedQuantity: string;
+  rejectedQuantity: string;
+  remainingQuantity: string;
+  completionPercent: string;
+  varianceClassification: string;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface WorkOrderPerformanceRow {
+  id: string;
+  workOrderNumber: string;
+  productionPlanNumber: string;
+  productName: string;
+  sku: string;
+  warehouseName: string;
+  uomSymbol: string;
+  plannedQuantity: string;
+  allocatedBatchQuantity: string;
+  actualGoodQuantity: string;
+  scrapQuantity: string;
+  status: string;
+  priority: string;
+  plannedStartDate?: string | null;
+  plannedEndDate?: string | null;
+  executionDurationHours?: string | null;
+  delayDays: number;
+  isOverdue: boolean;
+  batchCount: number;
+}
+
+export interface BatchYieldReportRow {
+  id: string;
+  batchNumber: string;
+  workOrderNumber: string;
+  productName: string;
+  sku: string;
+  bomVersionNumber: number;
+  uomSymbol: string;
+  plannedQuantity: string;
+  actualOutputQuantity: string;
+  acceptedQuantity: string;
+  rejectedQuantity: string;
+  scrapQuantity: string;
+  actualYieldPercent: string;
+  expectedYieldPercent: string;
+  yieldVariancePercent: string;
+  isLowYield: boolean;
+  productionDurationHours?: string | null;
+  status: string;
+  expiryDate?: string | null;
+}
+
+export interface MaterialConsumptionReportRow {
+  productionBatchId: string;
+  batchNumber: string;
+  productName: string;
+  inventoryItemId: string;
+  itemCode: string;
+  itemName: string;
+  itemType: string;
+  uomSymbol: string;
+  warehouseName: string;
+  sourceBatchNumbers: string;
+  bomPlannedQuantity: string;
+  actualConsumedQuantity: string;
+  returnedQuantity: string;
+  netConsumption: string;
+  expectedWastage: string;
+  actualWastage: string;
+  consumptionVariance: string;
+  wastagePercent: string;
+  materialCost: string;
+}
+
+export interface ProductionQualityReportRow {
+  id: string;
+  inspectionNumber: string;
+  productionBatchNumber: string;
+  inventoryBatchNumber: string;
+  productName: string;
+  uomSymbol: string;
+  decision: string;
+  qualityStatus: string;
+  inspectedQuantity: string;
+  acceptedQuantity: string;
+  rejectedQuantity: string;
+  quarantinedQuantity: string;
+  pendingQuantity: string;
+  defectCategory?: string | null;
+  manufacturingDate?: string | null;
+  expiryDate?: string | null;
+}
+
+export interface ProductionCostAnalyticsRow {
+  id: string;
+  productionBatchId: string;
+  batchNumber: string;
+  productName: string;
+  uomSymbol: string;
+  status: ProductionCostingStatus;
+  isFinalized: boolean;
+  standardMaterialCost: string;
+  actualMaterialCost: string;
+  labourCost: string;
+  machineCost: string;
+  directExpenses: string;
+  overheadCost: string;
+  standardTotalCost: string;
+  totalActualCost: string;
+  costVariance: string;
+  costVariancePercent: string;
+  acceptedGoodQuantity: string;
+  costPerAcceptedUnit: string;
+  wastageAndRejectionCost: string;
+}
