@@ -130,7 +130,7 @@ describe('Phase 3.6: Production Costing Frontend Pages', () => {
             },
           },
         ],
-        meta: {
+        pagination: {
           total: 1,
           page: 1,
           limit: 30,
