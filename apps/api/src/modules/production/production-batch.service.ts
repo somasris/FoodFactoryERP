@@ -526,8 +526,12 @@ export class ProductionBatchService {
 
   static async pauseBatch(id: string, reason: string, user: UserContext, meta: AuditMeta) {
     const result = await prisma.$transaction(async tx => {
-      const batch = await tx.productionBatch.findUnique({ where: { id } });
-      if (!batch) throw new AppError('Production batch not found.', 404);
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM production_batches WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Production batch not found.', 404);
+
+      const batch = await tx.productionBatch.findUniqueOrThrow({ where: { id } });
       await assertWarehouseAccess(user, batch.warehouseId, 'READ_WRITE');
 
       if (batch.status !== 'IN_PROGRESS') {
@@ -583,8 +587,12 @@ export class ProductionBatchService {
 
   static async resumeBatch(id: string, user: UserContext, meta: AuditMeta) {
     const result = await prisma.$transaction(async tx => {
-      const batch = await tx.productionBatch.findUnique({ where: { id } });
-      if (!batch) throw new AppError('Production batch not found.', 404);
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM production_batches WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Production batch not found.', 404);
+
+      const batch = await tx.productionBatch.findUniqueOrThrow({ where: { id } });
       await assertWarehouseAccess(user, batch.warehouseId, 'READ_WRITE');
 
       if (batch.status !== 'PAUSED') {
@@ -1234,6 +1242,9 @@ export class ProductionBatchService {
           : new Prisma.Decimal(fgItem.moving_average_cost || '0');
       const totalReceiptCost = baseGoodQty.mul(unitCostInBase).toDecimalPlaces(4);
 
+      await tx.$queryRaw`
+        SELECT id FROM work_orders WHERE id = ${batch.workOrderId} FOR UPDATE
+      `;
       const wo = await tx.workOrder.findUniqueOrThrow({ where: { id: batch.workOrderId } });
       const now = new Date();
 
@@ -1482,11 +1493,57 @@ export class ProductionBatchService {
       `;
       if (locked.length === 0) throw new AppError('Production batch not found.', 404);
 
-      const batch = await tx.productionBatch.findUniqueOrThrow({ where: { id } });
+      const batch = await tx.productionBatch.findUniqueOrThrow({
+        where: { id },
+        include: {
+          bomVersion: { include: { items: { include: { inventoryItem: true } } } },
+          consumptions: { select: { inventoryItemId: true, baseQuantity: true } },
+        },
+      });
       await assertWarehouseAccess(user, batch.warehouseId, 'READ_WRITE');
 
       if (!['CREATED', 'IN_PROGRESS', 'PAUSED'].includes(batch.status)) {
         throw new AppError(`Cannot cancel batch in status ${batch.status}.`, 400);
+      }
+
+      if (batch.materialsReserved) {
+        const consumedByItem = new Map<string, Prisma.Decimal>();
+        for (const c of batch.consumptions) {
+          const prev = consumedByItem.get(c.inventoryItemId) ?? ZERO;
+          consumedByItem.set(c.inventoryItemId, prev.add(c.baseQuantity));
+        }
+
+        const plannedQty = new Prisma.Decimal(batch.plannedQuantity);
+        const expectedGoodOut = new Prisma.Decimal(batch.bomVersion.expectedGoodOutput);
+        const yieldPct = new Prisma.Decimal(batch.bomVersion.yieldPercentage);
+        const scaleFactor = plannedQty.div(expectedGoodOut).mul(HUNDRED.div(yieldPct));
+
+        const releaseItems: Array<{ inventoryItemId: string; baseQuantity: Prisma.Decimal }> = [];
+        for (const item of batch.bomVersion.items) {
+          const effQty = new Prisma.Decimal(item.standardQuantity)
+            .mul(scaleFactor)
+            .mul(HUNDRED.add(item.scrapTolerancePercent))
+            .div(HUNDRED)
+            .toDecimalPlaces(4);
+          const { converted: baseQty } = await convertQuantityDecimal(
+            tx,
+            effQty,
+            item.uomId,
+            item.inventoryItem.uomId,
+          );
+          const consumed = consumedByItem.get(item.inventoryItemId) ?? ZERO;
+          const remainingReserved = Prisma.Decimal.max(ZERO, baseQty.sub(consumed));
+          if (remainingReserved.gt(ZERO)) {
+            releaseItems.push({ inventoryItemId: item.inventoryItemId, baseQuantity: remainingReserved });
+          }
+        }
+        if (releaseItems.length > 0) {
+          await InventoryReservationService.releaseReservedStockInTx(
+            tx,
+            batch.warehouseId,
+            releaseItems,
+          );
+        }
       }
 
       await tx.$queryRaw`
@@ -1507,6 +1564,7 @@ export class ProductionBatchService {
         where: { id },
         data: {
           status: ProductionBatchStatus.CANCELLED,
+          materialsReserved: false,
           cancelledAt: new Date(),
           cancellationReason: reason,
         },

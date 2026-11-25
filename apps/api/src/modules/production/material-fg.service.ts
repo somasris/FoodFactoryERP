@@ -487,15 +487,28 @@ export class MaterialFgService {
     meta: AuditMeta,
   ) {
     await prisma.$transaction(async tx => {
-      const batch = await tx.productionBatch.findUnique({
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM production_batches WHERE id = ${batchId} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Production batch not found.', 404);
+
+      const batch = await tx.productionBatch.findUniqueOrThrow({
         where: { id: batchId },
-        include: { bomVersion: { include: { items: { include: { inventoryItem: true } } } } },
+        include: {
+          bomVersion: { include: { items: { include: { inventoryItem: true } } } },
+          consumptions: { select: { inventoryItemId: true, baseQuantity: true } },
+        },
       });
-      if (!batch) throw new AppError('Production batch not found.', 404);
       const targetWh = warehouseId || batch.warehouseId;
       await assertWarehouseAccess(user, targetWh, 'READ_WRITE');
 
       if (!batch.materialsReserved) return;
+
+      const consumedByItem = new Map<string, Prisma.Decimal>();
+      for (const c of batch.consumptions) {
+        const prev = consumedByItem.get(c.inventoryItemId) ?? ZERO;
+        consumedByItem.set(c.inventoryItemId, prev.add(c.baseQuantity));
+      }
 
       const plannedQty = new Prisma.Decimal(batch.plannedQuantity);
       const expectedGoodOut = new Prisma.Decimal(batch.bomVersion.expectedGoodOutput);
@@ -515,8 +528,10 @@ export class MaterialFgService {
           item.uomId,
           item.inventoryItem.uomId,
         );
-        if (baseQty.gt(ZERO)) {
-          releaseItems.push({ inventoryItemId: item.inventoryItemId, baseQuantity: baseQty });
+        const consumed = consumedByItem.get(item.inventoryItemId) ?? ZERO;
+        const remainingReserved = Prisma.Decimal.max(ZERO, baseQty.sub(consumed));
+        if (remainingReserved.gt(ZERO)) {
+          releaseItems.push({ inventoryItemId: item.inventoryItemId, baseQuantity: remainingReserved });
         }
       }
 
@@ -931,11 +946,15 @@ export class MaterialFgService {
     meta: AuditMeta,
   ) {
     const updated = await prisma.$transaction(async tx => {
-      const qi = await tx.qualityInspection.findUnique({
+      const locked = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM quality_inspections WHERE id = ${inspectionId} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Quality inspection not found.', 404);
+
+      const qi = await tx.qualityInspection.findUniqueOrThrow({
         where: { id: inspectionId },
         include: { inventoryBatch: true },
       });
-      if (!qi) throw new AppError('Quality inspection not found.', 404);
       await assertWarehouseAccess(user, qi.warehouseId, 'READ_WRITE');
 
       if (qi.decision !== 'QUARANTINED') {
