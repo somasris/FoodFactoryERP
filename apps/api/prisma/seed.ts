@@ -751,6 +751,50 @@ const PERMISSIONS = [
     description: 'Monitor user login, security alert, and configuration activity',
   },
 
+  // Phase 4.5 System Reliability & Operations
+  {
+    code: 'operations.health.read',
+    module: 'operations',
+    action: 'READ',
+    description: 'View authenticated system health, database status, and migration info',
+  },
+  {
+    code: 'operations.monitoring.read',
+    module: 'operations',
+    action: 'READ',
+    description: 'View API performance telemetry and redacted error logs',
+  },
+  {
+    code: 'operations.backup.read',
+    module: 'operations',
+    action: 'READ',
+    description: 'View backup history, verification status, and restore requests',
+  },
+  {
+    code: 'operations.backup.create',
+    module: 'operations',
+    action: 'CREATE',
+    description: 'Trigger and verify database backups',
+  },
+  {
+    code: 'operations.restore.request',
+    module: 'operations',
+    action: 'CREATE',
+    description: 'Request a controlled database restore workflow',
+  },
+  {
+    code: 'operations.restore.approve',
+    module: 'operations',
+    action: 'APPROVE',
+    description: 'Approve or reject controlled database restore requests',
+  },
+  {
+    code: 'operations.maintenance.manage',
+    module: 'operations',
+    action: 'UPDATE',
+    description: 'Enable or disable controlled application maintenance mode',
+  },
+
   // Phase 1.4 Master Data Management
   {
     code: 'master_data.read',
@@ -1001,6 +1045,14 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'governance.audit.export',
     'governance.approvals.read',
     'governance.activity.read',
+    // Phase 4.5 Operations
+    'operations.health.read',
+    'operations.monitoring.read',
+    'operations.backup.read',
+    'operations.backup.create',
+    'operations.restore.request',
+    'operations.restore.approve',
+    'operations.maintenance.manage',
   ],
   PRODUCTION: [
     'production.read',
@@ -1132,6 +1184,10 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'governance.audit.export',
     'governance.approvals.read',
     'governance.activity.read',
+    // Phase 4.5 Operations (Read-Only)
+    'operations.health.read',
+    'operations.monitoring.read',
+    'operations.backup.read',
   ],
 };
 

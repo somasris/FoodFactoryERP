@@ -3,6 +3,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { env } from './config/env';
 import { requestLogger } from './middleware/logger.middleware';
+import { maintenanceMiddleware } from './middleware/maintenance.middleware';
 import { notFoundHandler } from './middleware/not-found.middleware';
 import { errorHandler, AppError } from './middleware/error.middleware';
 import { apiRouter } from './routes';
@@ -36,6 +37,7 @@ export const createApp = (): Express => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
   app.use(requestLogger);
+  app.use(maintenanceMiddleware);
 
   // Root welcoming endpoint
   app.get('/', (_req, res) => {

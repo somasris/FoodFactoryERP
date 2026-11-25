@@ -70,6 +70,10 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'governance.audit.export',
   'governance.approvals.read',
   'governance.activity.read',
+  // Phase 4.5 System Reliability & Operations (Read-Only)
+  'operations.health.read',
+  'operations.monitoring.read',
+  'operations.backup.read',
 ]);
 
 /**

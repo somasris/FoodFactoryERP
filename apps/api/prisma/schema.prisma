@@ -263,6 +263,25 @@ enum ComplianceDocVerificationStatus {
   EXPIRED
 }
 
+enum BackupStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  UNAVAILABLE
+}
+
+enum BackupVerificationStatus {
+  UNVERIFIED
+  VERIFIED
+  FAILED
+}
+
+enum RestoreRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+}
+
 // ------------------------------------------------------------------------------
 // 0. FOUNDATION & CONFIG
 // ------------------------------------------------------------------------------
@@ -2238,4 +2257,49 @@ model ComplianceDocument {
   @@index([verificationStatus])
   @@index([entityType, entityId])
   @@map("compliance_documents")
+}
+
+// ------------------------------------------------------------------------------
+// 13. SYSTEM RELIABILITY & OPERATIONS (PHASE 4.5)
+// ------------------------------------------------------------------------------
+
+model BackupRecord {
+  id                 String                   @id @default(uuid())
+  backupName         String                   @map("backup_name") @db.VarChar(120)
+  backupType         String                   @default("MANUAL") @map("backup_type") @db.VarChar(20)
+  status             BackupStatus             @default(PENDING)
+  filePathReference  String?                  @map("file_path_reference") @db.VarChar(500)
+  fileSizeBytes      Int?                     @map("file_size_bytes")
+  checksumSha256     String?                  @map("checksum_sha256") @db.VarChar(64)
+  retentionDays      Int                      @default(30) @map("retention_days")
+  verificationStatus BackupVerificationStatus @default(UNVERIFIED) @map("verification_status")
+  verifiedAt         DateTime?                @map("verified_at")
+  failureReason      String?                  @map("failure_reason") @db.Text
+  triggeredById      String?                  @map("triggered_by_id")
+  createdAt          DateTime                 @default(now()) @map("created_at")
+  completedAt        DateTime?                @map("completed_at")
+
+  restoreRequests RestoreRequest[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("backup_records")
+}
+
+model RestoreRequest {
+  id               String               @id @default(uuid())
+  backupRecordId   String               @map("backup_record_id")
+  status           RestoreRequestStatus @default(REQUESTED)
+  requestedById    String               @map("requested_by_id")
+  requestedAt      DateTime             @default(now()) @map("requested_at")
+  approvedById     String?              @map("approved_by_id")
+  approvedAt       DateTime?            @map("approved_at")
+  rejectionReason  String?              @map("rejection_reason") @db.Text
+  recoveryNotes    String?              @map("recovery_notes") @db.Text
+  environmentLabel String               @default("ISOLATED_STAGING") @map("environment_label") @db.VarChar(50)
+
+  backupRecord BackupRecord @relation(fields: [backupRecordId], references: [id])
+
+  @@index([status])
+  @@map("restore_requests")
 }
