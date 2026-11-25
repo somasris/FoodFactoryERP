@@ -42,11 +42,11 @@ const STATUS_TONE_MAP: Record<string, StatusTone> = {
 };
 
 const TONE_CLASSES: Record<StatusTone, string> = {
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-  warning: 'border-amber-200 bg-amber-50 text-amber-800',
-  danger: 'border-rose-200 bg-rose-50 text-rose-800',
-  info: 'border-blue-200 bg-blue-50 text-blue-800',
-  neutral: 'border-slate-200 bg-slate-100 text-slate-700',
+  success: 'border-[#27834A]/35 bg-[#27834A]/10 text-[#27834A]',
+  warning: 'border-[#C58A25]/35 bg-[#C58A25]/10 text-[#946414]',
+  danger: 'border-[#C74440]/35 bg-[#C74440]/10 text-[#C74440]',
+  info: 'border-[#3977A8]/35 bg-[#3977A8]/10 text-[#3977A8]',
+  neutral: 'border-[#E1E7DD] bg-[#FAFBF8] text-[#66756A]',
 };
 
 function getStatusIcon(tone: StatusTone) {

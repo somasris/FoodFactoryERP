@@ -7,15 +7,16 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        default: 'border-brand-navy bg-brand-navy text-white',
-        secondary: 'border-brand-blue bg-brand-blue text-white',
-        teal: 'border-teal-200 bg-teal-50 text-teal-800',
-        warning: 'border-amber-200 bg-amber-50 text-amber-800',
-        danger: 'border-rose-200 bg-rose-50 text-rose-800',
-        info: 'border-blue-200 bg-blue-50 text-blue-800',
-        outline: 'border-slate-300 bg-white text-slate-700',
-        neutral: 'border-slate-200 bg-slate-100 text-slate-700',
-        success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+        default: 'border-[#245C3A] bg-[#245C3A] text-white',
+        secondary: 'border-[#E1E7DD] bg-[#EAF1E8] text-[#17452C]',
+        teal: 'border-[#E1E7DD] bg-[#EAF1E8] text-[#245C3A]',
+        gold: 'border-[#E8D7AA] bg-[#F4F0E4] text-[#8A671D]',
+        warning: 'border-[#C58A25]/35 bg-[#C58A25]/10 text-[#946414]',
+        danger: 'border-[#C74440]/35 bg-[#C74440]/10 text-[#C74440]',
+        info: 'border-[#3977A8]/35 bg-[#3977A8]/10 text-[#3977A8]',
+        outline: 'border-[#E1E7DD] bg-white text-[#24352A]',
+        neutral: 'border-[#E1E7DD] bg-[#FAFBF8] text-[#66756A]',
+        success: 'border-[#27834A]/35 bg-[#27834A]/10 text-[#27834A]',
       },
     },
     defaultVariants: {

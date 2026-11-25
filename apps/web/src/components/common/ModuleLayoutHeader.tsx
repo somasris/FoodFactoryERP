@@ -18,7 +18,6 @@ export interface ModuleLayoutHeaderProps {
 
 /**
  * Shared enterprise module header and horizontal sub-navigation bar.
- * Ensures uniform visual hierarchy and tab behavior across all ERP modules.
  */
 export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
   title,
@@ -28,14 +27,14 @@ export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
 }) => {
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-slate-200 bg-white px-5 pt-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="rounded-lg border border-[#E1E7DD] bg-white px-5 pt-4 shadow-[0_1px_2px_rgba(16,59,40,0.04)]">
         <div className="pb-3">
-          <h1 className="text-lg font-semibold tracking-tight text-slate-900">{title}</h1>
-          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+          <h1 className="text-lg font-semibold tracking-tight text-[#24352A]">{title}</h1>
+          <p className="mt-0.5 text-xs text-[#66756A]">{description}</p>
         </div>
         <nav
           aria-label={ariaLabel}
-          className="-mb-px flex items-center gap-1 overflow-x-auto border-t border-slate-100 pt-1"
+          className="-mb-px flex items-center gap-1 overflow-x-auto border-t border-[#E1E7DD] pt-1"
         >
           {tabs.map(tab => {
             const Icon = tab.icon;
@@ -48,8 +47,8 @@ export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
                   cn(
                     'inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-medium transition-colors whitespace-nowrap',
                     isActive
-                      ? 'border-brand-navy text-brand-navy font-semibold'
-                      : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900',
+                      ? 'border-[#245C3A] text-[#17452C] font-semibold'
+                      : 'border-transparent text-[#66756A] hover:border-[#6F9478] hover:text-[#24352A]',
                   )
                 }
               >

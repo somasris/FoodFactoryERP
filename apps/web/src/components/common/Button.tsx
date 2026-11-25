@@ -4,16 +4,16 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer',
   {
     variants: {
       variant: {
-        default: 'bg-brand-navy text-white hover:bg-[#006600] shadow-xs',
-        secondary: 'bg-brand-blue text-white hover:bg-[#006600] shadow-xs',
-        outline: 'border border-slate-300 bg-white hover:bg-slate-50 text-slate-700',
-        ghost: 'hover:bg-slate-100 text-slate-700',
-        teal: 'bg-brand-teal text-white hover:bg-[#004D00] shadow-xs',
-        danger: 'bg-rose-700 text-white hover:bg-rose-800 shadow-xs',
+        default: 'bg-[#245C3A] text-white hover:bg-[#17452C] shadow-xs',
+        secondary: 'bg-[#EAF1E8] text-[#17452C] hover:bg-[#DCE7D8] border border-[#E1E7DD]',
+        outline: 'border border-[#245C3A]/45 bg-white hover:bg-[#EAF1E8] text-[#245C3A]',
+        ghost: 'hover:bg-[#EAF1E8] text-[#24352A] hover:text-[#17452C]',
+        teal: 'bg-[#3D7651] text-white hover:bg-[#17452C] shadow-xs',
+        danger: 'bg-[#C74440] text-white hover:bg-[#A93632] shadow-xs',
       },
       size: {
         default: 'h-9 px-3.5 py-2',
