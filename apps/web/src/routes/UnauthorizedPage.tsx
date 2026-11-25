@@ -10,21 +10,21 @@ export const UnauthorizedPage: React.FC = () => {
   const homePath = getDefaultDashboardPath(user);
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-200 p-8 text-center">
-        <div className="inline-flex p-4 bg-amber-50 rounded-2xl ring-1 ring-amber-200 mb-5">
-          <ShieldAlert className="w-10 h-10 text-amber-600" />
+    <div className="min-h-screen flex items-center justify-center bg-brand-bg p-6">
+      <div className="max-w-md w-full bg-white rounded-lg shadow-sm border border-slate-200 p-7 text-center">
+        <div className="inline-flex p-3 bg-amber-50 rounded-lg border border-amber-200 mb-4">
+          <ShieldAlert className="w-8 h-8 text-amber-700" />
         </div>
 
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Access Restricted</h1>
-        <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+        <h1 className="text-lg font-semibold text-slate-900 tracking-tight">Access Restricted</h1>
+        <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
           Your current account does not hold the necessary security permissions or facility
           authorization to view this resource.
         </p>
 
         {user && (
-          <div className="mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-left text-xs">
-            <div className="text-slate-500 font-medium">Signed in as:</div>
+          <div className="mt-5 p-3.5 bg-slate-50 border border-slate-200 rounded-md text-left text-xs">
+            <div className="text-slate-500 font-medium">Signed in as</div>
             <div className="font-semibold text-slate-900 mt-0.5">
               {user.fullName} ({user.email})
             </div>
@@ -33,7 +33,7 @@ export const UnauthorizedPage: React.FC = () => {
               {user.roles.map(r => (
                 <span
                   key={r}
-                  className="px-2 py-0.5 bg-slate-200 text-slate-800 font-semibold rounded text-[10px]"
+                  className="px-2 py-0.5 bg-white border border-slate-200 text-slate-800 font-semibold rounded text-[10px]"
                 >
                   {r}
                 </span>
@@ -42,17 +42,19 @@ export const UnauthorizedPage: React.FC = () => {
           </div>
         )}
 
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="mt-6 flex flex-col sm:flex-row gap-2.5 justify-center">
           <button
+            type="button"
             onClick={() => navigate(-1)}
-            className="px-4 py-2 border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
+            className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Go Back</span>
           </button>
           <button
+            type="button"
             onClick={() => navigate(homePath)}
-            className="px-4 py-2 bg-[#172F50] hover:bg-[#1f3f6b] text-white font-medium text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
+            className="px-4 py-2 bg-brand-navy hover:bg-[#0F2034] text-white font-medium text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
           >
             <Home className="w-3.5 h-3.5" />
             <span>My Dashboard</span>
