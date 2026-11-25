@@ -7,6 +7,7 @@ import { inventoryRouter } from '../modules/inventory/inventory.routes';
 import { salesRouter } from '../modules/sales/sales.routes';
 import { productionRouter } from '../modules/production/production.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
+import { complianceRouter } from '../modules/compliance/compliance.routes';
 
 export const apiRouter: Router = Router();
 
@@ -33,3 +34,6 @@ apiRouter.use('/production', productionRouter);
 
 // Mount Phase 4.1 System Administration routes under /api/v1/admin
 apiRouter.use('/admin', adminRouter);
+
+// Mount Phase 4.2 Financial & Compliance routes under /api/v1/compliance
+apiRouter.use('/compliance', complianceRouter);

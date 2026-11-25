@@ -631,6 +631,56 @@ const PERMISSIONS = [
     description: 'Update validated system configuration settings',
   },
 
+  // Phase 4.2 Financial & Compliance Management
+  {
+    code: 'compliance.tax.read',
+    module: 'compliance',
+    action: 'READ',
+    description: 'View GST, HSN, and sales/purchase tax compliance summaries',
+  },
+  {
+    code: 'compliance.inventory.read',
+    module: 'compliance',
+    action: 'READ',
+    description: 'View inventory valuation and movement reconciliation reports',
+  },
+  {
+    code: 'compliance.stock_audit.read',
+    module: 'compliance',
+    action: 'READ',
+    description: 'View physical stock audit sessions and variance details',
+  },
+  {
+    code: 'compliance.stock_audit.create',
+    module: 'compliance',
+    action: 'CREATE',
+    description: 'Create and submit physical stock count audit sessions',
+  },
+  {
+    code: 'compliance.stock_audit.review',
+    module: 'compliance',
+    action: 'APPROVE',
+    description: 'Approve, reject, and post stock audit adjustments to inventory ledger',
+  },
+  {
+    code: 'compliance.documents.read',
+    module: 'compliance',
+    action: 'READ',
+    description: 'View compliance document metadata and verification status',
+  },
+  {
+    code: 'compliance.documents.manage',
+    module: 'compliance',
+    action: 'UPDATE',
+    description: 'Register and verify compliance document metadata',
+  },
+  {
+    code: 'compliance.export',
+    module: 'compliance',
+    action: 'READ',
+    description: 'Export compliance, tax, valuation, and traceability reports',
+  },
+
   // Phase 1.4 Master Data Management
   {
     code: 'master_data.read',
@@ -859,6 +909,15 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'administration.warehouse_access.manage',
     'administration.settings.read',
     'administration.settings.update',
+    // Phase 4.2 Compliance
+    'compliance.tax.read',
+    'compliance.inventory.read',
+    'compliance.stock_audit.read',
+    'compliance.stock_audit.create',
+    'compliance.stock_audit.review',
+    'compliance.documents.read',
+    'compliance.documents.manage',
+    'compliance.export',
   ],
   PRODUCTION: [
     'production.read',
@@ -904,6 +963,11 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'bom.read',
     'bom.create',
     'bom.update',
+    // Phase 4.2 Compliance (Inventory & Stock Audit Count Creation)
+    'compliance.inventory.read',
+    'compliance.stock_audit.read',
+    'compliance.stock_audit.create',
+    'compliance.documents.read',
   ],
   SALESMAN: [
     'customers.read',
@@ -960,6 +1024,12 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'administration.roles.read',
     'administration.warehouse_access.read',
     'administration.settings.read',
+    // Phase 4.2 Compliance (Read-Only)
+    'compliance.tax.read',
+    'compliance.inventory.read',
+    'compliance.stock_audit.read',
+    'compliance.documents.read',
+    'compliance.export',
   ],
 };
 

@@ -246,6 +246,23 @@ enum AdjustmentReason {
   OTHER
 }
 
+enum StockAuditStatus {
+  DRAFT
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  POSTED
+  CANCELLED
+}
+
+enum ComplianceDocVerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
 // ------------------------------------------------------------------------------
 // 0. FOUNDATION & CONFIG
 // ------------------------------------------------------------------------------
@@ -351,6 +368,7 @@ model Warehouse {
   batchConsumptions    ProductionBatchConsumption[]
   batchReturns         ProductionBatchReturn[]
   qualityInspections   QualityInspection[]
+  stockAudits          StockAudit[]
 
   @@map("warehouses")
 }
@@ -400,6 +418,9 @@ model User {
   overheadAllocations         ProductionOverheadAllocation[]
   costingHistoryChanges       ProductionCostingHistory[]
   updatedSystemConfigs        SystemConfig[]                @relation("SystemConfigUpdater")
+  stockAuditsCreated          StockAudit[]                  @relation("StockAuditCreator")
+  complianceDocsUploaded      ComplianceDocument[]          @relation("ComplianceDocUploader")
+  complianceDocsVerified      ComplianceDocument[]          @relation("ComplianceDocVerifier")
 
   @@map("users")
 }
@@ -2132,4 +2153,89 @@ model ProductionCostingHistory {
 
   @@index([productionBatchCostingId])
   @@map("production_costing_history")
+}
+
+// ------------------------------------------------------------------------------
+// 12. FINANCIAL & COMPLIANCE MANAGEMENT (PHASE 4.2)
+// ------------------------------------------------------------------------------
+
+model StockAudit {
+  id                    String           @id @default(uuid())
+  auditNumber           String           @unique @map("audit_number") @db.VarChar(40)
+  warehouseId           String           @map("warehouse_id")
+  status                StockAuditStatus @default(DRAFT)
+  auditDate             DateTime         @default(now()) @map("audit_date")
+  notes                 String?          @db.Text
+  idempotencyKey        String?          @unique @map("idempotency_key") @db.VarChar(100)
+  inventoryAdjustmentId String?          @map("inventory_adjustment_id")
+  createdById           String           @map("created_by_id")
+  submittedById         String?          @map("submitted_by_id")
+  submittedAt           DateTime?        @map("submitted_at")
+  reviewedById          String?          @map("reviewed_by_id")
+  reviewedAt            DateTime?        @map("reviewed_at")
+  reviewReason          String?          @map("review_reason") @db.Text
+  postedById            String?          @map("posted_by_id")
+  postedAt              DateTime?        @map("posted_at")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  updatedAt             DateTime         @updatedAt @map("updated_at")
+
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  createdBy User             @relation("StockAuditCreator", fields: [createdById], references: [id])
+  lines     StockAuditLine[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@index([auditDate])
+  @@map("stock_audits")
+}
+
+model StockAuditLine {
+  id                   String            @id @default(uuid())
+  stockAuditId         String            @map("stock_audit_id")
+  lineNumber           Int               @map("line_number")
+  inventoryItemId      String            @map("inventory_item_id")
+  batchId              String?           @map("batch_id")
+  uomId                String            @map("uom_id")
+  expectedBaseQuantity Decimal           @map("expected_base_quantity") @db.Decimal(18, 4)
+  countedBaseQuantity  Decimal           @map("counted_base_quantity") @db.Decimal(18, 4)
+  varianceBaseQuantity Decimal           @map("variance_base_quantity") @db.Decimal(18, 4)
+  unitCost             Decimal           @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  varianceValue        Decimal           @default(0) @map("variance_value") @db.Decimal(14, 2)
+  varianceReason       AdjustmentReason? @map("variance_reason")
+  remarks              String?           @db.Text
+
+  stockAudit StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
+
+  @@unique([stockAuditId, lineNumber])
+  @@index([inventoryItemId])
+  @@map("stock_audit_lines")
+}
+
+model ComplianceDocument {
+  id                 String                          @id @default(uuid())
+  category           String                          @db.VarChar(50)
+  referenceNumber    String                          @map("reference_number") @db.VarChar(100)
+  documentDate       DateTime                        @map("document_date") @db.Date
+  expiryDate         DateTime?                       @map("expiry_date") @db.Date
+  entityType         String?                         @map("entity_type") @db.VarChar(50)
+  entityId           String?                         @map("entity_id") @db.VarChar(36)
+  fileName           String                          @map("file_name") @db.VarChar(255)
+  mimeType           String                          @map("mime_type") @db.VarChar(100)
+  fileSizeBytes      Int                             @map("file_size_bytes")
+  fileReference      String                          @map("file_reference") @db.VarChar(500)
+  uploadedById       String                          @map("uploaded_by_id")
+  verificationStatus ComplianceDocVerificationStatus @default(PENDING) @map("verification_status")
+  verifiedById       String?                         @map("verified_by_id")
+  verifiedAt         DateTime?                       @map("verified_at")
+  remarks            String?                         @db.Text
+  createdAt          DateTime                        @default(now()) @map("created_at")
+  updatedAt          DateTime                        @updatedAt @map("updated_at")
+
+  uploadedBy User  @relation("ComplianceDocUploader", fields: [uploadedById], references: [id])
+  verifiedBy User? @relation("ComplianceDocVerifier", fields: [verifiedById], references: [id])
+
+  @@index([category])
+  @@index([verificationStatus])
+  @@index([entityType, entityId])
+  @@map("compliance_documents")
 }

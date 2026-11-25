@@ -51,6 +51,12 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'administration.roles.read',
   'administration.warehouse_access.read',
   'administration.settings.read',
+  // Phase 4.2 Financial & Compliance (Read-Only)
+  'compliance.tax.read',
+  'compliance.inventory.read',
+  'compliance.stock_audit.read',
+  'compliance.documents.read',
+  'compliance.export',
 ]);
 
 /**
