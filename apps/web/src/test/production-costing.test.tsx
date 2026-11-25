@@ -48,6 +48,7 @@ describe('Phase 3.6: Production Costing Frontend Pages', () => {
     vi.spyOn(productionService.costing, 'dashboard').mockResolvedValue({
       success: true,
       message: 'ok',
+      timestamp: '2026-11-25T00:00:00.000Z',
       data: {
         totalBatches: 2,
         costedBatchesCount: 1,
@@ -64,6 +65,7 @@ describe('Phase 3.6: Production Costing Frontend Pages', () => {
     vi.spyOn(productionService.costing, 'listBatches').mockResolvedValue({
       success: true,
       message: 'ok',
+      timestamp: '2026-11-25T00:00:00.000Z',
       data: {
         items: [
           {
@@ -128,10 +130,12 @@ describe('Phase 3.6: Production Costing Frontend Pages', () => {
             },
           },
         ],
-        total: 1,
-        page: 1,
-        limit: 30,
-        totalPages: 1,
+        meta: {
+          total: 1,
+          page: 1,
+          limit: 30,
+          totalPages: 1,
+        },
       },
     });
 
@@ -149,6 +153,7 @@ describe('Phase 3.6: Production Costing Frontend Pages', () => {
     vi.spyOn(productionService.costing, 'getBatchDetail').mockResolvedValue({
       success: true,
       message: 'ok',
+      timestamp: '2026-11-25T00:00:00.000Z',
       data: {
         batch: {
           id: 'pb-1',
@@ -266,6 +271,7 @@ describe('Phase 3.6: Production Costing Frontend Pages', () => {
     vi.spyOn(productionService.costing, 'varianceReport').mockResolvedValue({
       success: true,
       message: 'ok',
+      timestamp: '2026-11-25T00:00:00.000Z',
       data: {
         summary: {
           batchCount: 1,
