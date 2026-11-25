@@ -68,7 +68,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **4.1** | System Administration | `TESTED` | Yes (`apps/api/src/modules/admin/*`, `AdministrationLayout`, 6 `/admin/*` pages) | 7 API (`admin-phase4-1.test.ts`) + 4 Web (`admin.test.tsx`) | Pending manual browser UI verification |
 | **4.2** | Financial & Compliance Management | `TESTED` | Yes (`apps/api/src/modules/compliance/*`, `StockAudit`, `ComplianceDocument`, `/reports/compliance`, `/reports/stock-audit`) | 5 API (`compliance-phase4-2.test.ts`) + 3 Web (`compliance.test.tsx`) | Pending manual browser UI verification |
 | **4.3** | Business Intelligence & Reports | `TESTED` | Yes (`apps/api/src/modules/reports/*`, `ExecutiveDashboardPage`, `BusinessIntelligencePage`) | 4 API (`reports-phase4-3.test.ts`) + 2 Web (`reports.test.tsx`) | Pending manual browser UI verification |
-| **4.4** | Audit & Governance | `PLANNED` | Partial (`AuditLog` + `AuditService` active; no Audit UI/viewer) | Audited via auth/RBAC tests | Audit viewer UI not started |
+| **4.4** | Audit & Governance | `TESTED` | Yes (`apps/api/src/modules/governance/*`, `AuditGovernancePage`) | 4 API (`governance-phase4-4.test.ts`) + 1 Web (`governance.test.tsx`) | Pending manual browser UI verification |
 | **4.5** | System Reliability & Operations | `PLANNED` | Partial (Health checks exist; backups/ops runbooks pending) | None | Not started |
 
 > **Historical Milestone Naming Note:**  
@@ -399,7 +399,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** All modules writing to `AuditService`.
 - **Testing Requirements:** Immutable read-only access tests, filter accuracy, and `AUDITOR` access verification.
 - **Completion Criteria:** Auditors can inspect end-to-end entity histories across all modules via UI.
-- **Current Status:** `PLANNED` (Write-side `AuditLog` + `AuditService` active; read API and UI pending).
+- **Current Status:** `TESTED` (Implemented with `/api/v1/governance/*` append-only audit explorer, field-level diffs, sensitive field redaction, cross-module approval governance, user activity monitoring, unified transaction history, CSV export, 4 API tests, and 1 frontend test passing; manual browser UI verification pending; see [PHASE_4_4_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_4_4_VERIFICATION_REPORT.md)).
 
 #### 4.5 System Reliability & Operations
 - **Purpose:** Ensure production readiness with automated backups, migration safety runbooks, rate-limiting hardening, and operational monitoring.
