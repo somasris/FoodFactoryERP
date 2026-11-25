@@ -233,6 +233,9 @@ export interface WorkOrder {
   warehouseId: string;
   uomId: string;
   plannedQuantity: string;
+  allocatedBatchQuantity?: string;
+  actualGoodQuantity?: string;
+  actualScrapQuantity?: string;
   completedQuantity: string;
   status: WorkOrderStatus;
   priority: WorkOrderPriority;
@@ -287,4 +290,150 @@ export interface WorkOrderDashboardSummary {
   cancelledCount: number;
   urgentCount: number;
   recentWorkOrders: WorkOrder[];
+}
+
+export type ProductionBatchStatus =
+  | 'CREATED'
+  | 'IN_PROGRESS'
+  | 'PAUSED'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export interface ProductionBatchExpectedMaterial {
+  bomItemId: string;
+  inventoryItemId: string;
+  itemCode: string;
+  itemName: string;
+  itemType: string;
+  uomId: string;
+  uomCode: string;
+  uomSymbol: string;
+  expectedQuantity: string;
+  consumedQuantity: string;
+  remainingQuantity: string;
+}
+
+export interface ProductionBatchConsumption {
+  id: string;
+  inventoryItemId: string;
+  warehouseId: string;
+  batchId?: string | null;
+  uomId: string;
+  plannedQuantity: string;
+  consumedQuantity: string;
+  baseQuantity: string;
+  unitCost: string;
+  totalCost: string;
+  inventoryIssueId?: string | null;
+  inventoryTransactionId?: string | null;
+  consumedAt: string;
+  notes?: string | null;
+  inventoryItem?: { id: string; code: string; name: string; itemType: string };
+  warehouse?: { id: string; code: string; name: string };
+  batch?: { id: string; batchNumber: string; expiryDate?: string | null } | null;
+  uom?: { id: string; code: string; symbol: string };
+  consumedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface ProductionBatchStatusHistoryItem {
+  id: string;
+  fromStatus: ProductionBatchStatus | null;
+  toStatus: ProductionBatchStatus;
+  reason?: string | null;
+  createdAt: string;
+  changedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface ProductionExecutionEntryItem {
+  id: string;
+  entryType: string;
+  goodQuantity?: string | null;
+  rejectedQuantity?: string | null;
+  wastageQuantity?: string | null;
+  reason?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  recordedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface ProductionBatch {
+  id: string;
+  batchNumber: string;
+  financialYear: string;
+  workOrderId: string;
+  productId: string;
+  productVariantId: string;
+  inventoryItemId: string;
+  bomId: string;
+  bomVersionId: string;
+  warehouseId: string;
+  uomId: string;
+  plannedQuantity: string;
+  actualGoodQuantity: string;
+  rejectedQuantity: string;
+  wastageQuantity: string;
+  actualYieldPercent: string;
+  completionPercent: string;
+  wastageReason?: string | null;
+  notes?: string | null;
+  status: ProductionBatchStatus;
+  operatorId: string;
+  startedAt?: string | null;
+  pausedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  manufacturingDate?: string | null;
+  expiryDate?: string | null;
+  materialsReserved: boolean;
+  finishedGoodsBatchId?: string | null;
+  finishedGoodsReceiptId?: string | null;
+  finishedGoodsTransactionId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  workOrder?: {
+    id: string;
+    workOrderNumber: string;
+    status: WorkOrderStatus;
+    plannedQuantity: string;
+    allocatedBatchQuantity: string;
+    actualGoodQuantity: string;
+    actualScrapQuantity: string;
+  };
+  product?: { id: string; code: string; name: string };
+  productVariant?: { id: string; sku: string; name: string };
+  bom?: { id: string; code: string; name: string };
+  bomVersion?: {
+    id: string;
+    versionNumber: number;
+    status: string;
+    expectedGoodOutput: string;
+    yieldPercentage: string;
+    expectedWastagePercent: string;
+  };
+  warehouse?: { id: string; code: string; name: string };
+  uom?: { id: string; code: string; symbol: string };
+  operator?: { id: string; fullName: string; username: string };
+  finishedGoodsBatch?: {
+    id: string;
+    batchNumber: string;
+    manufacturingDate?: string | null;
+    expiryDate?: string | null;
+    unitCost: string;
+  } | null;
+  expectedMaterials?: ProductionBatchExpectedMaterial[];
+  consumptions?: ProductionBatchConsumption[];
+  statusHistory?: ProductionBatchStatusHistoryItem[];
+  executionEntries?: ProductionExecutionEntryItem[];
+}
+
+export interface ProductionExecutionDashboard {
+  totalBatches: number;
+  createdCount: number;
+  inProgressCount: number;
+  pausedCount: number;
+  completedCount: number;
+  cancelledCount: number;
+  releasedWorkOrdersCount: number;
+  recentBatches: ProductionBatch[];
 }

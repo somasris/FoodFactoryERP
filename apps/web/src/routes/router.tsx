@@ -47,6 +47,9 @@ import { WorkOrdersDashboardPage } from './production/WorkOrdersDashboardPage';
 import { WorkOrdersPage } from './production/WorkOrdersPage';
 import { WorkOrderFormPage } from './production/WorkOrderFormPage';
 import { WorkOrderDetailPage } from './production/WorkOrderDetailPage';
+import { ProductionExecutionDashboardPage } from './production/ProductionExecutionDashboardPage';
+import { ProductionBatchesPage } from './production/ProductionBatchesPage';
+import { ProductionBatchDetailPage } from './production/ProductionBatchDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -147,6 +150,9 @@ export const router = createBrowserRouter([
           { path: 'work-orders/dashboard', element: <WorkOrdersDashboardPage /> },
           { path: 'work-orders', element: <WorkOrdersPage /> },
           { path: 'work-orders/:id', element: <WorkOrderDetailPage /> },
+          { path: 'execution', element: <ProductionExecutionDashboardPage /> },
+          { path: 'batches', element: <ProductionBatchesPage /> },
+          { path: 'batches/:id', element: <ProductionBatchDetailPage /> },
           { path: 'boms', element: <BomsPage /> },
         ],
       },

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { LayoutDashboard, ClipboardList, CalendarRange, TrendingUp, Factory, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, ClipboardList, CalendarRange, TrendingUp, Factory, BarChart3, PlayCircle, Layers } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
@@ -37,6 +37,18 @@ export const ProductionLayout: React.FC = () => {
       to: '/production/work-orders/dashboard',
       icon: BarChart3,
       permission: 'production.work_orders.read',
+    },
+    {
+      label: 'Execution',
+      to: '/production/execution',
+      icon: PlayCircle,
+      permission: 'production.batches.read',
+    },
+    {
+      label: 'Batches',
+      to: '/production/batches',
+      icon: Layers,
+      permission: 'production.batches.read',
     },
     {
       label: 'BOM & Recipes',

@@ -2,7 +2,9 @@ import { apiClient } from './api-client';
 import { PaginatedResponse } from '../types/master-data';
 import {
   MaterialAvailabilityDetail,
+  ProductionBatch,
   ProductionDemandResponse,
+  ProductionExecutionDashboard,
   ProductionPlan,
   ProductionPlanningDashboard,
   WorkOrder,
@@ -30,6 +32,15 @@ export interface WorkOrderQuery {
   productionPlanId?: string;
   fromDate?: string;
   toDate?: string;
+}
+
+export interface ProductionBatchQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  status?: string;
+  workOrderId?: string;
+  warehouseId?: string;
 }
 
 const buildQuery = (params: object = {}): string => {
@@ -108,6 +119,51 @@ export const productionService = {
       apiClient<WorkOrder>(`/production/work-orders/${id}/release`, { method: 'POST', body: '{}' }),
     cancel: (id: string, reason: string) =>
       apiClient<WorkOrder>(`/production/work-orders/${id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+  },
+  batches: {
+    dashboard: () => apiClient<ProductionExecutionDashboard>('/production/batches/dashboard'),
+    list: (params: ProductionBatchQuery = {}) =>
+      apiClient<PaginatedResponse<ProductionBatch>>(`/production/batches${buildQuery(params)}`),
+    getById: (id: string) => apiClient<ProductionBatch>(`/production/batches/${id}`),
+    create: (payload: Record<string, unknown>) =>
+      apiClient<ProductionBatch>('/production/batches', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    start: (id: string) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/start`, { method: 'POST', body: '{}' }),
+    pause: (id: string, reason: string) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/pause`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    resume: (id: string) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/resume`, { method: 'POST', body: '{}' }),
+    reserveMaterials: (id: string, warehouseId?: string) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/reserve-materials`, {
+        method: 'POST',
+        body: JSON.stringify(warehouseId ? { warehouseId } : {}),
+      }),
+    consume: (id: string, payload: Record<string, unknown>) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/consume`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    recordOutput: (id: string, payload: Record<string, unknown>) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/output`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    complete: (id: string, payload: Record<string, unknown> = {}) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    cancel: (id: string, reason: string) =>
+      apiClient<ProductionBatch>(`/production/batches/${id}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
       }),

@@ -3,6 +3,7 @@ import { authenticate, requirePermissions } from '../../middleware/auth.middlewa
 import { bomsRouter } from '../master-data/boms/boms.routes';
 import { ProductionPlanController } from './production-plan.controller';
 import { WorkOrderController } from './work-order.controller';
+import { ProductionBatchController } from './production-batch.controller';
 
 export const productionRouter: Router = Router();
 
@@ -128,4 +129,66 @@ productionRouter.post(
   '/work-orders/:id/cancel',
   requirePermissions('production.work_orders.cancel'),
   WorkOrderController.cancelWorkOrder,
+);
+
+// Phase 3.4: Batch Production Execution
+productionRouter.get(
+  '/batches/dashboard',
+  requirePermissions('production.batches.read'),
+  ProductionBatchController.getDashboard,
+);
+productionRouter.get(
+  '/batches',
+  requirePermissions('production.batches.read'),
+  ProductionBatchController.listBatches,
+);
+productionRouter.get(
+  '/batches/:id',
+  requirePermissions('production.batches.read'),
+  ProductionBatchController.getBatchById,
+);
+productionRouter.post(
+  '/batches',
+  requirePermissions('production.batches.create'),
+  ProductionBatchController.createBatch,
+);
+productionRouter.post(
+  '/batches/:id/start',
+  requirePermissions('production.batches.execute'),
+  ProductionBatchController.startBatch,
+);
+productionRouter.post(
+  '/batches/:id/pause',
+  requirePermissions('production.batches.execute'),
+  ProductionBatchController.pauseBatch,
+);
+productionRouter.post(
+  '/batches/:id/resume',
+  requirePermissions('production.batches.execute'),
+  ProductionBatchController.resumeBatch,
+);
+productionRouter.post(
+  '/batches/:id/reserve-materials',
+  requirePermissions('production.batches.consume'),
+  ProductionBatchController.reserveMaterials,
+);
+productionRouter.post(
+  '/batches/:id/consume',
+  requirePermissions('production.batches.consume'),
+  ProductionBatchController.consumeMaterials,
+);
+productionRouter.post(
+  '/batches/:id/output',
+  requirePermissions('production.batches.execute'),
+  ProductionBatchController.recordOutput,
+);
+productionRouter.post(
+  '/batches/:id/complete',
+  requirePermissions('production.batches.complete'),
+  ProductionBatchController.completeBatch,
+);
+productionRouter.post(
+  '/batches/:id/cancel',
+  requirePermissions('production.batches.cancel'),
+  ProductionBatchController.cancelBatch,
 );

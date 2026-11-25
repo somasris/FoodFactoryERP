@@ -144,6 +144,8 @@ export const WorkOrderDetailPage: React.FC = () => {
   const canSubmit = wo.status === 'DRAFT' && hasPermission('production.work_orders.submit');
   const canApprove = wo.status === 'SUBMITTED' && hasPermission('production.work_orders.approve');
   const canRelease = wo.status === 'APPROVED' && hasPermission('production.work_orders.release');
+  const canExecuteBatch =
+    ['RELEASED', 'IN_PROGRESS'].includes(wo.status) && hasPermission('production.batches.create');
   const canCancel =
     ['DRAFT', 'SUBMITTED', 'APPROVED', 'RELEASED'].includes(wo.status) &&
     hasPermission('production.work_orders.cancel');
@@ -214,6 +216,13 @@ export const WorkOrderDetailPage: React.FC = () => {
             >
               <Rocket className="mr-1 h-3.5 w-3.5" /> Release to Floor
             </Button>
+          )}
+          {canExecuteBatch && (
+            <Link to="/production/execution">
+              <Button variant="teal" size="sm">
+                Execute Production Batch
+              </Button>
+            </Link>
           )}
           {canCancel && (
             <Button

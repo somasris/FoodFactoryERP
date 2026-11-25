@@ -136,6 +136,22 @@ enum WorkOrderPriority {
   URGENT
 }
 
+enum ProductionBatchStatus {
+  CREATED
+  IN_PROGRESS
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum ProductionExecutionEntryType {
+  STATUS_CHANGE
+  MATERIAL_CONSUMPTION
+  OUTPUT_UPDATE
+  MATERIAL_RESERVATION
+  NOTE
+}
+
 enum InventoryDocumentStatus {
   DRAFT
   SUBMITTED
@@ -261,6 +277,8 @@ model Warehouse {
   salesInvoices        SalesInvoice[]
   productionPlans      ProductionPlan[]
   workOrders           WorkOrder[]
+  productionBatches    ProductionBatch[]
+  batchConsumptions    ProductionBatchConsumption[]
 
   @@map("warehouses")
 }
@@ -293,6 +311,10 @@ model User {
   productionPlanStatusChanges ProductionPlanStatusHistory[]
   assignedWorkOrders          WorkOrder[]                   @relation("WorkOrderAssignee")
   workOrderStatusChanges      WorkOrderStatusHistory[]
+  operatedBatches             ProductionBatch[]             @relation("BatchOperator")
+  batchStatusChanges          ProductionBatchStatusHistory[]
+  batchExecutionEntries       ProductionExecutionEntry[]
+  batchConsumptions           ProductionBatchConsumption[]
 
   @@map("users")
 }
@@ -447,6 +469,8 @@ model UnitOfMeasure {
   salesInvoiceLines   SalesInvoiceLine[]
   productionPlanItems ProductionPlanItem[]
   workOrders          WorkOrder[]
+  productionBatches   ProductionBatch[]
+  batchConsumptions   ProductionBatchConsumption[]
 
   @@map("units_of_measure")
 }
@@ -576,8 +600,9 @@ model Product {
 
   category ProductCategory  @relation(fields: [categoryId], references: [id])
   baseUom  UnitOfMeasure    @relation(fields: [baseUomId], references: [id])
-  taxRate  TaxRate          @relation(fields: [taxRateId], references: [id])
-  variants ProductVariant[]
+  taxRate           TaxRate           @relation(fields: [taxRateId], references: [id])
+  variants          ProductVariant[]
+  productionBatches ProductionBatch[]
 
   @@index([categoryId])
   @@index([baseUomId])
@@ -606,6 +631,7 @@ model ProductVariant {
   salesInvoiceLines   SalesInvoiceLine[]
   productionPlanItems ProductionPlanItem[]
   workOrders          WorkOrder[]
+  productionBatches   ProductionBatch[]
 
   @@index([productId])
   @@index([uomId])
@@ -642,6 +668,8 @@ model InventoryItem {
   productionPlanItems       ProductionPlanItem[]
   productionPlanMaterials   ProductionPlanMaterialRequirement[]
   workOrders                WorkOrder[]
+  productionBatches         ProductionBatch[]
+  batchConsumptions         ProductionBatchConsumption[]
 
   @@map("inventory_items")
 }
@@ -742,6 +770,7 @@ model BOM {
   versions            BOMVersion[]
   productionPlanItems ProductionPlanItem[]
   workOrders          WorkOrder[]
+  productionBatches   ProductionBatch[]
 
   @@index([productVariantId])
   @@map("boms")
@@ -770,6 +799,7 @@ model BOMVersion {
   overheads           BOMOverhead[]
   productionPlanItems ProductionPlanItem[]
   workOrders          WorkOrder[]
+  productionBatches   ProductionBatch[]
 
   @@unique([bomId, versionNumber])
   @@map("bom_versions")
@@ -832,8 +862,10 @@ model InventoryBatch {
   transactionLines InventoryTransactionLine[]
   receiptLines     InventoryReceiptLine[]
   issueLines       InventoryIssueLine[]
-  transferLines    InventoryTransferLine[]
-  adjustmentLines  InventoryAdjustmentLine[]
+  transferLines        InventoryTransferLine[]
+  adjustmentLines      InventoryAdjustmentLine[]
+  producedFromBatches  ProductionBatch[]            @relation("FinishedGoodsBatch")
+  consumedInBatches    ProductionBatchConsumption[]
 
   @@unique([inventoryItemId, batchNumber])
   @@index([inventoryItemId])
@@ -1566,9 +1598,10 @@ model WorkOrder {
   bomId                String            @map("bom_id")
   bomVersionId         String            @map("bom_version_id")
   warehouseId          String            @map("warehouse_id")
-  uomId                String            @map("uom_id")
-  plannedQuantity      Decimal           @map("planned_quantity") @db.Decimal(14, 4)
-  actualGoodQuantity   Decimal           @default(0) @map("actual_good_quantity") @db.Decimal(14, 4)
+  uomId                  String            @map("uom_id")
+  plannedQuantity        Decimal           @map("planned_quantity") @db.Decimal(14, 4)
+  allocatedBatchQuantity Decimal           @default(0) @map("allocated_batch_quantity") @db.Decimal(14, 4)
+  actualGoodQuantity     Decimal           @default(0) @map("actual_good_quantity") @db.Decimal(14, 4)
   actualScrapQuantity  Decimal           @default(0) @map("actual_scrap_quantity") @db.Decimal(14, 4)
   priority             WorkOrderPriority @default(NORMAL)
   status               WorkOrderStatus   @default(DRAFT)
@@ -1605,6 +1638,7 @@ model WorkOrder {
   uom                UnitOfMeasure            @relation(fields: [uomId], references: [id])
   assignedTo         User?                    @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
   statusHistory      WorkOrderStatusHistory[]
+  productionBatches  ProductionBatch[]
 
   @@index([productionPlanId])
   @@index([productionPlanItemId])
@@ -1630,4 +1664,142 @@ model WorkOrderStatusHistory {
 
   @@index([workOrderId])
   @@map("work_order_status_history")
+}
+
+model ProductionBatchNumberSequence {
+  id            String   @id @default(uuid())
+  prefix        String   @db.VarChar(15)
+  financialYear String   @map("financial_year") @db.VarChar(10)
+  lastNumber    Int      @default(0) @map("last_number")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([prefix, financialYear])
+  @@map("production_batch_number_sequences")
+}
+
+model ProductionBatch {
+  id                         String                @id @default(uuid())
+  batchNumber                String                @unique @map("batch_number") @db.VarChar(40)
+  financialYear              String                @map("financial_year") @db.VarChar(10)
+  workOrderId                String                @map("work_order_id")
+  productId                  String                @map("product_id")
+  productVariantId           String                @map("product_variant_id")
+  inventoryItemId            String                @map("inventory_item_id")
+  bomId                      String                @map("bom_id")
+  bomVersionId               String                @map("bom_version_id")
+  warehouseId                String                @map("warehouse_id")
+  uomId                      String                @map("uom_id")
+  plannedQuantity            Decimal               @map("planned_quantity") @db.Decimal(14, 4)
+  actualGoodQuantity         Decimal               @default(0) @map("actual_good_quantity") @db.Decimal(14, 4)
+  rejectedQuantity           Decimal               @default(0) @map("rejected_quantity") @db.Decimal(14, 4)
+  wastageQuantity            Decimal               @default(0) @map("wastage_quantity") @db.Decimal(14, 4)
+  actualYieldPercent         Decimal               @default(0) @map("actual_yield_percent") @db.Decimal(6, 2)
+  completionPercent          Decimal               @default(0) @map("completion_percent") @db.Decimal(6, 2)
+  wastageReason              String?               @map("wastage_reason") @db.Text
+  notes                      String?               @db.Text
+  status                     ProductionBatchStatus @default(CREATED)
+  operatorId                 String                @map("operator_id")
+  startedAt                  DateTime?             @map("started_at")
+  pausedAt                   DateTime?             @map("paused_at")
+  completedAt                DateTime?             @map("completed_at")
+  cancelledAt                DateTime?             @map("cancelled_at")
+  cancellationReason         String?               @map("cancellation_reason") @db.Text
+  manufacturingDate          DateTime?             @map("manufacturing_date") @db.Date
+  expiryDate                 DateTime?             @map("expiry_date") @db.Date
+  materialsReserved          Boolean               @default(false) @map("materials_reserved")
+  finishedGoodsBatchId       String?               @map("finished_goods_batch_id")
+  finishedGoodsReceiptId     String?               @map("finished_goods_receipt_id")
+  finishedGoodsTransactionId String?               @map("finished_goods_transaction_id")
+  idempotencyKey             String?               @unique @map("idempotency_key") @db.VarChar(100)
+  completionIdempotencyKey   String?               @unique @map("completion_idempotency_key") @db.VarChar(100)
+  createdAt                  DateTime              @default(now()) @map("created_at")
+  updatedAt                  DateTime              @updatedAt @map("updated_at")
+
+  workOrder          WorkOrder                      @relation(fields: [workOrderId], references: [id])
+  product            Product                        @relation(fields: [productId], references: [id])
+  productVariant     ProductVariant                 @relation(fields: [productVariantId], references: [id])
+  inventoryItem      InventoryItem                  @relation(fields: [inventoryItemId], references: [id])
+  bom                BOM                            @relation(fields: [bomId], references: [id])
+  bomVersion         BOMVersion                     @relation(fields: [bomVersionId], references: [id])
+  warehouse          Warehouse                      @relation(fields: [warehouseId], references: [id])
+  uom                UnitOfMeasure                  @relation(fields: [uomId], references: [id])
+  operator           User                           @relation("BatchOperator", fields: [operatorId], references: [id])
+  finishedGoodsBatch InventoryBatch?                @relation("FinishedGoodsBatch", fields: [finishedGoodsBatchId], references: [id])
+  consumptions       ProductionBatchConsumption[]
+  statusHistory      ProductionBatchStatusHistory[]
+  executionEntries   ProductionExecutionEntry[]
+
+  @@index([workOrderId])
+  @@index([productVariantId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([operatorId])
+  @@map("production_batches")
+}
+
+model ProductionBatchConsumption {
+  id                     String   @id @default(uuid())
+  productionBatchId      String   @map("production_batch_id")
+  inventoryItemId        String   @map("inventory_item_id")
+  warehouseId            String   @map("warehouse_id")
+  batchId                String?  @map("batch_id")
+  uomId                  String   @map("uom_id")
+  plannedQuantity        Decimal  @default(0) @map("planned_quantity") @db.Decimal(14, 4)
+  consumedQuantity       Decimal  @map("consumed_quantity") @db.Decimal(14, 4)
+  baseQuantity           Decimal  @map("base_quantity") @db.Decimal(14, 4)
+  unitCost               Decimal  @default(0) @map("unit_cost") @db.Decimal(18, 4)
+  totalCost              Decimal  @default(0) @map("total_cost") @db.Decimal(18, 4)
+  inventoryIssueId       String?  @map("inventory_issue_id")
+  inventoryTransactionId String?  @map("inventory_transaction_id")
+  idempotencyKey         String?  @unique @map("idempotency_key") @db.VarChar(100)
+  consumedById           String   @map("consumed_by_id")
+  consumedAt             DateTime @default(now()) @map("consumed_at")
+  notes                  String?  @db.Text
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  inventoryItem   InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  warehouse       Warehouse       @relation(fields: [warehouseId], references: [id])
+  batch           InventoryBatch? @relation(fields: [batchId], references: [id])
+  uom             UnitOfMeasure   @relation(fields: [uomId], references: [id])
+  consumedBy      User            @relation(fields: [consumedById], references: [id])
+
+  @@index([productionBatchId])
+  @@index([inventoryItemId])
+  @@index([batchId])
+  @@map("production_batch_consumptions")
+}
+
+model ProductionBatchStatusHistory {
+  id                String                 @id @default(uuid())
+  productionBatchId String                 @map("production_batch_id")
+  fromStatus        ProductionBatchStatus? @map("from_status")
+  toStatus          ProductionBatchStatus  @map("to_status")
+  changedById       String                 @map("changed_by_id")
+  reason            String?                @db.Text
+  createdAt         DateTime               @default(now()) @map("created_at")
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  changedBy       User            @relation(fields: [changedById], references: [id])
+
+  @@index([productionBatchId])
+  @@map("production_batch_status_history")
+}
+
+model ProductionExecutionEntry {
+  id                String                       @id @default(uuid())
+  productionBatchId String                       @map("production_batch_id")
+  entryType         ProductionExecutionEntryType @map("entry_type")
+  goodQuantity      Decimal?                     @map("good_quantity") @db.Decimal(14, 4)
+  rejectedQuantity  Decimal?                     @map("rejected_quantity") @db.Decimal(14, 4)
+  wastageQuantity   Decimal?                     @map("wastage_quantity") @db.Decimal(14, 4)
+  reason            String?                      @db.Text
+  notes             String?                      @db.Text
+  recordedById      String                       @map("recorded_by_id")
+  createdAt         DateTime                     @default(now()) @map("created_at")
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  recordedBy      User            @relation(fields: [recordedById], references: [id])
+
+  @@index([productionBatchId])
+  @@map("production_execution_entries")
 }

@@ -33,6 +33,7 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'production.plans.read',
   'production.demand.read',
   'production.work_orders.read',
+  'production.batches.read',
   'purchases.read',
   'invoices.read',
   'payments.read',

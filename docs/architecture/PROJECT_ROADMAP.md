@@ -61,7 +61,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.1** | BOM & Recipe Management | `TESTED` | Yes (`BOM`, `BOMVersion` yield/wastage, cost estimate, `/production/boms`) | 3 API (`bom-phase3.test.ts`) + 3 Web (`boms.test.tsx`) | Pending manual browser UI verification |
 | **3.2** | Production Planning | `TESTED` | Yes (`ProductionPlan`, demand MRP, shortages, `/production/planning`) | 3 API (`production-planning.test.ts`) + 4 Web (`production-planning.test.tsx`) | Pending manual browser UI verification |
 | **3.3** | Work Order Management | `TESTED` | Yes (`WorkOrder`, `WorkOrderStatusHistory`, `WorkOrderNumberSequence`, `/production/work-orders`) | 6 API (`work-orders.test.ts`) + 5 Web (`work-orders.test.tsx`) | Pending manual browser UI verification |
-| **3.4** | Batch Production Execution | `PLANNED` | No (`ProductionRun` in draft schema) | None | Not started |
+| **3.4** | Batch Production Execution | `TESTED` | Yes (`ProductionBatch`, consumption/output/yield, FG receipt, `/production/execution`) | 5 API (`production-batches.test.ts`) + 4 Web (`production-batches.test.tsx`) | Pending manual browser UI verification |
 | **3.5** | Material Consumption & Finished Goods | `PLANNED` | No (`MaterialIssue`, `MaterialReturn`, `ProductionScrap` in draft) | None | Not started |
 | **3.6** | Production Costing | `PLANNED` | No (`ProductionOverhead`, `ProductionVariance` in draft) | None | Not started |
 | **3.7** | Production Reports | `PLANNED` | No (`apps/api/src/modules/reports/.gitkeep` placeholder) | None | Not started |
@@ -302,16 +302,16 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Current Status:** `TESTED` (Implemented with `WorkOrder` models, `WO/YYYY-YY/00001` numbering, partial allocation, read-only material requirements, schedule conflict warnings, RBAC, frontend pages, 6 API tests, and 5 frontend tests passing; manual browser UI verification pending; see [PHASE_3_3_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_3_VERIFICATION_REPORT.md)).
 
 #### 3.4 Batch Production Execution
-- **Purpose:** Record shop-floor processing stages (mixing, frying/roasting, quality check, packaging) and actual batch yields.
-- **Functional Scope:** Batch execution tracking, good output vs damaged/rejected output, scrap logging (`ProductionScrap`).
-- **Key Features:** Recording packaging bursts/scrap analytically without double-counting cost (`production_scraps`).
-- **Database Dependencies:** `ProductionRun`, `ProductionScrap` (draft schema).
-- **Backend Dependencies:** `apps/api/src/modules/production/` (placeholder).
-- **Frontend Components:** `/production` (placeholder).
-- **Integration Dependencies:** Phase 3.3 Work Orders, Phase 3.5 Material Consumption.
-- **Testing Requirements:** Yield percentage calculation and scrap analytical logging tests.
-- **Completion Criteria:** Good output and scrap quantities reconcile with issued packaging/ingredients.
-- **Current Status:** `PLANNED`
+- **Purpose:** Execute released work orders on the shop floor via production batches, recording material consumption, good output, rejections, wastage, yield, and finished-goods inventory receipts.
+- **Functional Scope:** `ProductionBatch` lifecycle (`CREATED` → `IN_PROGRESS` → `PAUSED` → `IN_PROGRESS` → `COMPLETED` / `CANCELLED`), FY-aware batch numbering (`PB/YYYY-YY/00001`), multi-batch partial execution per work order.
+- **Key Features:** Transactional material reservation & idempotent BOM material consumption (`InventoryIssue` + `InventoryTransaction`), Decimal yield/completion calculation, idempotent finished-goods `InventoryBatch` + `InventoryReceipt` + MWAC valuation, full RM-to-FG traceability.
+- **Database Dependencies:** `ProductionBatch`, `ProductionBatchConsumption`, `ProductionBatchStatusHistory`, `ProductionExecutionEntry`, `ProductionBatchNumberSequence`, `WorkOrder.allocatedBatchQuantity`.
+- **Backend Dependencies:** `apps/api/src/modules/production/production-batch.{service,controller,types}.ts`.
+- **Frontend Components:** `/production/execution`, `/production/batches`, `/production/batches/:id`.
+- **Integration Dependencies:** Phase 3.3 Work Orders, Inventory Reservation/Issue/Receipt ledger.
+- **Testing Requirements:** Batch lifecycle, concurrency, material consumption & UOM/stock validation, idempotency, yield/wastage, FG receipt, and RBAC tests.
+- **Completion Criteria:** Good output and scrap quantities reconcile with consumed ingredients and post atomically to the inventory ledger.
+- **Current Status:** `TESTED` (Implemented with `ProductionBatch` models, `PB/YYYY-YY/00001` numbering, idempotent material consumption & FG receipt, yield/wastage tracking, RBAC, frontend execution pages, 5 API tests, and 4 frontend tests passing; manual browser UI verification pending; see [PHASE_3_4_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_4_VERIFICATION_REPORT.md)).
 
 #### 3.5 Material Consumption & Finished Goods
 - **Purpose:** Issue raw materials and packaging from warehouses to production runs, handle unused returns, and receive finished goods into `WH-FG-01`.
