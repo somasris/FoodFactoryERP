@@ -505,10 +505,22 @@ export class MaterialFgService {
           consumptions: { select: { inventoryItemId: true, baseQuantity: true } },
         },
       });
-      const targetWh = warehouseId || batch.warehouseId;
-      await assertWarehouseAccess(user, targetWh, 'READ_WRITE');
-
       if (!batch.materialsReserved) return;
+
+      let resolvedWh = warehouseId;
+      if (!resolvedWh) {
+        const lastResEntry = await tx.productionExecutionEntry.findFirst({
+          where: {
+            productionBatchId: batchId,
+            entryType: ProductionExecutionEntryType.MATERIAL_RESERVATION,
+          },
+          orderBy: { createdAt: 'desc' },
+        });
+        const whMatch = lastResEntry?.notes?.match(/\[WH:([^\]]+)\]/);
+        resolvedWh = whMatch?.[1] || batch.warehouseId;
+      }
+      const targetWh = resolvedWh;
+      await assertWarehouseAccess(user, targetWh, 'READ_WRITE');
 
       const consumedByItem = new Map<string, Prisma.Decimal>();
       for (const c of batch.consumptions) {

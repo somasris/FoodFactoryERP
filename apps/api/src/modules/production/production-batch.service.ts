@@ -706,7 +706,7 @@ export class ProductionBatchService {
         data: {
           productionBatchId: id,
           entryType: ProductionExecutionEntryType.MATERIAL_RESERVATION,
-          notes: `Reserved BOM materials in warehouse`,
+          notes: `Reserved BOM materials in warehouse [WH:${targetWhId}]`,
           recordedById: user.userId,
         },
       });
@@ -1553,9 +1553,18 @@ export class ProductionBatchService {
           }
         }
         if (releaseItems.length > 0) {
+          const lastResEntry = await tx.productionExecutionEntry.findFirst({
+            where: {
+              productionBatchId: id,
+              entryType: ProductionExecutionEntryType.MATERIAL_RESERVATION,
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+          const whMatch = lastResEntry?.notes?.match(/\[WH:([^\]]+)\]/);
+          const reservedWhId = whMatch?.[1] || batch.warehouseId;
           await InventoryReservationService.releaseReservedStockInTx(
             tx,
-            batch.warehouseId,
+            reservedWhId,
             releaseItems,
           );
         }
