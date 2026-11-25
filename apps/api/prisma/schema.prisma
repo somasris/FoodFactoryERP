@@ -152,7 +152,36 @@ enum ProductionExecutionEntryType {
   MATERIAL_RESERVATION
   VARIANCE_APPROVAL
   QUALITY_INSPECTION
+  COST_ENTRY
+  COSTING_CALCULATION
+  COSTING_FINALIZATION
   NOTE
+}
+
+enum ProductionCostingStatus {
+  DRAFT
+  CALCULATED
+  REVIEWED
+  FINALIZED
+}
+
+enum ProductionCostEntryType {
+  DIRECT_LABOUR
+  MACHINE_COST
+  OTHER_DIRECT_EXPENSE
+}
+
+enum CostEntryApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum OverheadAllocationMethod {
+  PER_BATCH
+  PER_UNIT
+  PERCENT_OF_MATERIAL
+  PER_LABOUR_HOUR
 }
 
 enum QualityStatus {
@@ -345,6 +374,13 @@ model User {
   varianceApprovals           ProductionBatchVarianceApproval[]
   qualityInspections          QualityInspection[]           @relation("QualityInspector")
   qualityReleases             QualityInspection[]           @relation("QualityReleaser")
+  costingsCalculated          ProductionBatchCosting[]      @relation("CostingCalculator")
+  costingsReviewed            ProductionBatchCosting[]      @relation("CostingReviewer")
+  costingsFinalized           ProductionBatchCosting[]      @relation("CostingFinalizer")
+  costEntriesRecorded         ProductionCostEntry[]         @relation("CostEntryRecorder")
+  costEntriesApproved         ProductionCostEntry[]         @relation("CostEntryApprover")
+  overheadAllocations         ProductionOverheadAllocation[]
+  costingHistoryChanges       ProductionCostingHistory[]
 
   @@map("users")
 }
@@ -866,7 +902,8 @@ model BOMOverhead {
   createdAt      DateTime         @default(now()) @map("created_at")
   updatedAt      DateTime         @updatedAt @map("updated_at")
 
-  bomVersion BOMVersion @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
+  bomVersion          BOMVersion                     @relation(fields: [bomVersionId], references: [id], onDelete: Cascade)
+  overheadAllocations ProductionOverheadAllocation[]
 
   @@index([bomVersionId])
   @@map("bom_overheads")
@@ -1766,6 +1803,9 @@ model ProductionBatch {
   returns            ProductionBatchReturn[]
   varianceApprovals  ProductionBatchVarianceApproval[]
   qualityInspection  QualityInspection?
+  costing            ProductionBatchCosting?
+  costEntries        ProductionCostEntry[]
+  overheadAllocations ProductionOverheadAllocation[]
   statusHistory      ProductionBatchStatusHistory[]
   executionEntries   ProductionExecutionEntry[]
 
@@ -1929,4 +1969,147 @@ model QualityInspection {
   @@index([decision])
   @@index([inventoryBatchId])
   @@map("quality_inspections")
+}
+
+// ------------------------------------------------------------------------------
+// 11. PRODUCTION COSTING (PHASE 3.6)
+// ------------------------------------------------------------------------------
+
+model ProductionBatchCosting {
+  id                            String                  @id @default(uuid())
+  productionBatchId             String                  @unique @map("production_batch_id")
+  status                        ProductionCostingStatus @default(DRAFT)
+  plannedQuantity               Decimal                 @default(0) @map("planned_quantity") @db.Decimal(14, 4)
+  actualGoodQuantity            Decimal                 @default(0) @map("actual_good_quantity") @db.Decimal(14, 4)
+  acceptedQuantity              Decimal                 @default(0) @map("accepted_quantity") @db.Decimal(14, 4)
+  rejectedQuantity              Decimal                 @default(0) @map("rejected_quantity") @db.Decimal(14, 4)
+  wastageQuantity               Decimal                 @default(0) @map("wastage_quantity") @db.Decimal(14, 4)
+  standardMaterialCost          Decimal                 @default(0) @map("standard_material_cost") @db.Decimal(18, 4)
+  standardLabourCost            Decimal                 @default(0) @map("standard_labour_cost") @db.Decimal(18, 4)
+  standardOverheadCost          Decimal                 @default(0) @map("standard_overhead_cost") @db.Decimal(18, 4)
+  standardTotalCost             Decimal                 @default(0) @map("standard_total_cost") @db.Decimal(18, 4)
+  grossMaterialCost             Decimal                 @default(0) @map("gross_material_cost") @db.Decimal(18, 4)
+  materialReturnCost            Decimal                 @default(0) @map("material_return_cost") @db.Decimal(18, 4)
+  netMaterialCost               Decimal                 @default(0) @map("net_material_cost") @db.Decimal(18, 4)
+  rawMaterialCost               Decimal                 @default(0) @map("raw_material_cost") @db.Decimal(18, 4)
+  packagingMaterialCost         Decimal                 @default(0) @map("packaging_material_cost") @db.Decimal(18, 4)
+  actualLabourCost              Decimal                 @default(0) @map("actual_labour_cost") @db.Decimal(18, 4)
+  actualMachineCost             Decimal                 @default(0) @map("actual_machine_cost") @db.Decimal(18, 4)
+  otherDirectCost               Decimal                 @default(0) @map("other_direct_cost") @db.Decimal(18, 4)
+  actualOverheadCost            Decimal                 @default(0) @map("actual_overhead_cost") @db.Decimal(18, 4)
+  wastageAndRejectionCost       Decimal                 @default(0) @map("wastage_and_rejection_cost") @db.Decimal(18, 4)
+  totalActualCost               Decimal                 @default(0) @map("total_actual_cost") @db.Decimal(18, 4)
+  goodOutputCost                Decimal                 @default(0) @map("good_output_cost") @db.Decimal(18, 4)
+  costPerAcceptedUnit           Decimal                 @default(0) @map("cost_per_accepted_unit") @db.Decimal(18, 4)
+  materialVarianceAmount        Decimal                 @default(0) @map("material_variance_amount") @db.Decimal(18, 4)
+  materialVariancePercent       Decimal                 @default(0) @map("material_variance_percent") @db.Decimal(8, 2)
+  labourVarianceAmount          Decimal                 @default(0) @map("labour_variance_amount") @db.Decimal(18, 4)
+  labourVariancePercent         Decimal                 @default(0) @map("labour_variance_percent") @db.Decimal(8, 2)
+  overheadVarianceAmount        Decimal                 @default(0) @map("overhead_variance_amount") @db.Decimal(18, 4)
+  overheadVariancePercent       Decimal                 @default(0) @map("overhead_variance_percent") @db.Decimal(8, 2)
+  totalVarianceAmount           Decimal                 @default(0) @map("total_variance_amount") @db.Decimal(18, 4)
+  totalVariancePercent          Decimal                 @default(0) @map("total_variance_percent") @db.Decimal(8, 2)
+  fgValuationApplied            Boolean                 @default(false) @map("fg_valuation_applied")
+  fgValuationUnitCost           Decimal?                @map("fg_valuation_unit_cost") @db.Decimal(18, 4)
+  fgValuationAdjustmentTxId     String?                 @map("fg_valuation_adjustment_tx_id")
+  fgValuationAppliedAt          DateTime?               @map("fg_valuation_applied_at")
+  postFinalizationAdjustmentNote String?                @map("post_finalization_adjustment_note") @db.Text
+  calculatedAt                  DateTime?               @map("calculated_at")
+  calculatedById                String?                 @map("calculated_by_id")
+  reviewedAt                    DateTime?               @map("reviewed_at")
+  reviewedById                  String?                 @map("reviewed_by_id")
+  reviewNotes                   String?                 @map("review_notes") @db.Text
+  finalizedAt                   DateTime?               @map("finalized_at")
+  finalizedById                 String?                 @map("finalized_by_id")
+  finalizationIdempotencyKey    String?                 @unique @map("finalization_idempotency_key") @db.VarChar(100)
+  createdAt                     DateTime                @default(now()) @map("created_at")
+  updatedAt                     DateTime                @updatedAt @map("updated_at")
+
+  productionBatch     ProductionBatch              @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  calculatedBy        User?                        @relation("CostingCalculator", fields: [calculatedById], references: [id])
+  reviewedBy          User?                        @relation("CostingReviewer", fields: [reviewedById], references: [id])
+  finalizedBy         User?                        @relation("CostingFinalizer", fields: [finalizedById], references: [id])
+  costEntries         ProductionCostEntry[]
+  overheadAllocations ProductionOverheadAllocation[]
+  history             ProductionCostingHistory[]
+
+  @@index([status])
+  @@index([finalizedAt])
+  @@map("production_batch_costings")
+}
+
+model ProductionCostEntry {
+  id                     String                  @id @default(uuid())
+  productionBatchCostingId String                @map("production_batch_costing_id")
+  productionBatchId      String                  @map("production_batch_id")
+  entryType              ProductionCostEntryType @map("entry_type")
+  description            String                  @db.VarChar(200)
+  quantityOrHours        Decimal                 @map("quantity_or_hours") @db.Decimal(14, 4)
+  rate                   Decimal                 @db.Decimal(18, 4)
+  totalAmount            Decimal                 @map("total_amount") @db.Decimal(18, 4)
+  reference              String?                 @db.VarChar(100)
+  approvalStatus         CostEntryApprovalStatus @default(APPROVED) @map("approval_status")
+  notes                  String?                 @db.Text
+  recordedById           String                  @map("recorded_by_id")
+  recordedAt             DateTime                @default(now()) @map("recorded_at")
+  approvedById           String?                 @map("approved_by_id")
+  approvedAt             DateTime?               @map("approved_at")
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+
+  costing         ProductionBatchCosting @relation(fields: [productionBatchCostingId], references: [id], onDelete: Cascade)
+  productionBatch ProductionBatch        @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  recordedBy      User                   @relation("CostEntryRecorder", fields: [recordedById], references: [id])
+  approvedBy      User?                  @relation("CostEntryApprover", fields: [approvedById], references: [id])
+
+  @@index([productionBatchCostingId])
+  @@index([productionBatchId])
+  @@index([entryType])
+  @@index([approvalStatus])
+  @@map("production_cost_entries")
+}
+
+model ProductionOverheadAllocation {
+  id                       String                   @id @default(uuid())
+  productionBatchCostingId String                   @map("production_batch_costing_id")
+  productionBatchId        String                   @map("production_batch_id")
+  bomOverheadId            String?                  @map("bom_overhead_id")
+  costType                 OverheadCostType         @map("cost_type")
+  description              String                   @db.VarChar(150)
+  allocationMethod         OverheadAllocationMethod @map("allocation_method")
+  basisValue               Decimal                  @default(1) @map("basis_value") @db.Decimal(18, 4)
+  rateOrAmount             Decimal                  @map("rate_or_amount") @db.Decimal(18, 4)
+  allocatedAmount          Decimal                  @map("allocated_amount") @db.Decimal(18, 4)
+  isFromBom                Boolean                  @default(false) @map("is_from_bom")
+  recordedById             String                   @map("recorded_by_id")
+  createdAt                DateTime                 @default(now()) @map("created_at")
+  updatedAt                DateTime                 @updatedAt @map("updated_at")
+
+  costing         ProductionBatchCosting @relation(fields: [productionBatchCostingId], references: [id], onDelete: Cascade)
+  productionBatch ProductionBatch        @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+  bomOverhead     BOMOverhead?           @relation(fields: [bomOverheadId], references: [id])
+  recordedBy      User                   @relation(fields: [recordedById], references: [id])
+
+  @@unique([productionBatchId, bomOverheadId])
+  @@index([productionBatchCostingId])
+  @@index([productionBatchId])
+  @@map("production_overhead_allocations")
+}
+
+model ProductionCostingHistory {
+  id                       String                   @id @default(uuid())
+  productionBatchCostingId String                   @map("production_batch_costing_id")
+  fromStatus               ProductionCostingStatus? @map("from_status")
+  toStatus                 ProductionCostingStatus  @map("to_status")
+  action                   String                   @db.VarChar(50)
+  changedById              String                   @map("changed_by_id")
+  notes                    String?                  @db.Text
+  snapshot                 Json?
+  createdAt                DateTime                 @default(now()) @map("created_at")
+
+  costing   ProductionBatchCosting @relation(fields: [productionBatchCostingId], references: [id], onDelete: Cascade)
+  changedBy User                   @relation(fields: [changedById], references: [id])
+
+  @@index([productionBatchCostingId])
+  @@map("production_costing_history")
 }
