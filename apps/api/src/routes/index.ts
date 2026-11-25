@@ -8,6 +8,7 @@ import { salesRouter } from '../modules/sales/sales.routes';
 import { productionRouter } from '../modules/production/production.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
 import { complianceRouter } from '../modules/compliance/compliance.routes';
+import { reportsRouter } from '../modules/reports/reports.routes';
 
 export const apiRouter: Router = Router();
 
@@ -37,3 +38,6 @@ apiRouter.use('/admin', adminRouter);
 
 // Mount Phase 4.2 Financial & Compliance routes under /api/v1/compliance
 apiRouter.use('/compliance', complianceRouter);
+
+// Mount Phase 4.3 Business Intelligence & Reports routes under /api/v1/reports
+apiRouter.use('/reports', reportsRouter);

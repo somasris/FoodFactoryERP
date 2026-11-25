@@ -681,6 +681,50 @@ const PERMISSIONS = [
     description: 'Export compliance, tax, valuation, and traceability reports',
   },
 
+  // Phase 4.3 Business Intelligence & Reports
+  {
+    code: 'analytics.dashboard.read',
+    module: 'analytics',
+    action: 'READ',
+    description: 'View executive KPI dashboard',
+  },
+  {
+    code: 'analytics.sales.read',
+    module: 'analytics',
+    action: 'READ',
+    description: 'View sales intelligence and fulfillment analytics',
+  },
+  {
+    code: 'analytics.inventory.read',
+    module: 'analytics',
+    action: 'READ',
+    description: 'View inventory aging, quality distribution, and valuation analytics',
+  },
+  {
+    code: 'analytics.production.read',
+    module: 'analytics',
+    action: 'READ',
+    description: 'View integrated production efficiency analytics',
+  },
+  {
+    code: 'analytics.profitability.read',
+    module: 'analytics',
+    action: 'READ',
+    description: 'View product-wise gross margin and profitability analytics',
+  },
+  {
+    code: 'analytics.factory.read',
+    module: 'analytics',
+    action: 'READ',
+    description: 'View factory-level performance comparison analytics',
+  },
+  {
+    code: 'analytics.export',
+    module: 'analytics',
+    action: 'READ',
+    description: 'Export business intelligence analytics reports',
+  },
+
   // Phase 1.4 Master Data Management
   {
     code: 'master_data.read',
@@ -918,6 +962,14 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'compliance.documents.read',
     'compliance.documents.manage',
     'compliance.export',
+    // Phase 4.3 Analytics
+    'analytics.dashboard.read',
+    'analytics.sales.read',
+    'analytics.inventory.read',
+    'analytics.production.read',
+    'analytics.profitability.read',
+    'analytics.factory.read',
+    'analytics.export',
   ],
   PRODUCTION: [
     'production.read',
@@ -968,6 +1020,10 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'compliance.stock_audit.read',
     'compliance.stock_audit.create',
     'compliance.documents.read',
+    // Phase 4.3 Production & Inventory Analytics (no profitability/sales)
+    'analytics.production.read',
+    'analytics.inventory.read',
+    'analytics.factory.read',
   ],
   SALESMAN: [
     'customers.read',
@@ -987,6 +1043,8 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'inventory.read',
     'master_data.read',
     'warehouses.read',
+    // Phase 4.3 Sales Analytics only
+    'analytics.sales.read',
   ],
   AUDITOR: [
     // Strictly read-only
@@ -1030,6 +1088,14 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'compliance.stock_audit.read',
     'compliance.documents.read',
     'compliance.export',
+    // Phase 4.3 Business Intelligence (Read-Only)
+    'analytics.dashboard.read',
+    'analytics.sales.read',
+    'analytics.inventory.read',
+    'analytics.production.read',
+    'analytics.profitability.read',
+    'analytics.factory.read',
+    'analytics.export',
   ],
 };
 

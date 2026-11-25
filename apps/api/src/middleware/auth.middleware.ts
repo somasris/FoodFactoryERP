@@ -57,6 +57,14 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'compliance.stock_audit.read',
   'compliance.documents.read',
   'compliance.export',
+  // Phase 4.3 Business Intelligence & Reports (Read-Only)
+  'analytics.dashboard.read',
+  'analytics.sales.read',
+  'analytics.inventory.read',
+  'analytics.production.read',
+  'analytics.profitability.read',
+  'analytics.factory.read',
+  'analytics.export',
 ]);
 
 /**
