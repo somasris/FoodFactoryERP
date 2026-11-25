@@ -25,6 +25,8 @@ export const READ_ONLY_PERMISSIONS = new Set([
   'bom.read',
   'sales.orders.read',
   'sales.dashboard.read',
+  'sales.invoices.read',
+  'sales.invoices.download',
   'inventory.read',
   'inventory.valuation.read',
   'production.read',

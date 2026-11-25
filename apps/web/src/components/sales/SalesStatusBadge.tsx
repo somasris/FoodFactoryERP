@@ -12,6 +12,7 @@ const STATUS_MAP: Record<
   CONFIRMED: { label: 'Confirmed', variant: 'teal' },
   PARTIALLY_FULFILLED: { label: 'Partial', variant: 'warning' },
   FULFILLED: { label: 'Fulfilled', variant: 'success' },
+  ISSUED: { label: 'Issued', variant: 'success' },
   CANCELLED: { label: 'Cancelled', variant: 'outline' },
 };
 

@@ -56,7 +56,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **2.3** | Order Lifecycle Management | `IN_PROGRESS` | Yes (Draft→Submit→Approve/Reject→Confirm→Fulfill/Cancel) | Covered in `sales.test.ts` & `sales.test.tsx` | Pending Phase 2 completion & verification |
 | **2.4** | Stock Reservation | `IN_PROGRESS` | Yes (`InventoryReservationService` + `FOR UPDATE`) | Covered in `sales.test.ts` & `inventory.test.ts` | Pending Phase 2 completion & verification |
 | **2.5** | Order Fulfillment | `IN_PROGRESS` | Yes (`SalesOrderFulfillment` + `InventoryIssue`) | Covered in `sales.test.ts` | Pending Phase 2 completion & verification |
-| **2.6** | Sales Invoicing | `NOT_STARTED` | No (`SalesInvoice`/`Payment` only in draft schema) | None | Not in current Phase 2 implementation |
+| **2.6** | Sales Invoicing | `TESTED` | Yes (`SalesInvoice`, `SalesInvoiceLine`, PDFKit, UI pages) | 5 API (`sales-invoices.test.ts`) + 4 Web (`sales-invoices.test.tsx`) | Pending manual UI & E2E verification |
 | **2.7** | Sales Dashboard & Reports | `IN_PROGRESS` | Yes (`GET /api/v1/sales/dashboard`, `SalesDashboardPage`) | Covered in `sales.test.tsx` | Pending Phase 2 completion & verification |
 | **3.1** | BOM & Recipe Management | `IN_PROGRESS` | Partial (`BOM`/`BOMVersion`/`BOMItem`/`BOMOverhead` in 1.4; recipe execution pending) | Master data BOM tests in 1.4 | Pending Phase 3 execution |
 | **3.2** | Production Planning | `PLANNED` | No (`ProductionOrder` in draft schema only) | None | Not started |
@@ -238,16 +238,16 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Current Status:** `IN_PROGRESS` (Implemented in `49d80e4`; awaiting final Phase 2 verification).
 
 #### 2.6 Sales Invoicing
-- **Purpose:** Generate GST-compliant tax invoices, dispatch notes, credit notes, and track customer payments against invoices.
-- **Functional Scope:** `SalesInvoice`, `SalesInvoiceItem`, `InvoiceTaxBreakdown`, `Dispatch`, `SalesReturn`, `CreditNote`, `Payment`, `PaymentAllocation`.
-- **Key Features:** Immutable invoice tax snapshots, partial payment allocation with `SELECT ... FOR UPDATE` locking, outstanding balance tracking.
-- **Database Dependencies:** Draft models in `docs/database/prisma-schema-draft.prisma` (not yet migrated to `apps/api/prisma/schema.prisma`).
-- **Backend Dependencies:** Permissions `invoices.*` and `payments.*` exist in `seed.ts`; no routes/services exist yet.
-- **Frontend Components:** None.
-- **Integration Dependencies:** Phase 2.5 Order Fulfillment and Phase 1.4 Tax/Customer Master Data.
-- **Testing Requirements:** GST invoice math, payment allocation invariants, and credit note reversal tests.
-- **Completion Criteria:** Invoices post with immutable GST snapshots and reconcile with customer payment allocations.
-- **Current Status:** `NOT_STARTED` (Excluded from current Phase 2 implementation; planned for follow-up/Phase 2 extension or Phase 4.2).
+- **Purpose:** Generate GST-compliant tax invoices, sequential financial-year invoice numbers, and downloadable PDF tax invoices from fulfilled or partially fulfilled sales orders.
+- **Functional Scope:** `SalesInvoice`, `SalesInvoiceLine`, `SalesInvoiceStatusHistory`, `InvoiceNumberSequence`, GST CGST/SGST vs IGST calculation, rupee round-off, PDFKit rendering, and frontend invoice workflows.
+- **Key Features:** Immutable company/customer/tax snapshots, concurrency-safe FY numbering (`INV/YYYY-YY/NNNNN`), `invoicedBaseQuantity` tracking preventing over-invoicing or duplicate invoicing, draft editing, `ISSUED` locking, `CANCELLED` with mandatory reason (without inventory reversal), and authenticated PDF download.
+- **Database Dependencies:** `SalesInvoice`, `SalesInvoiceLine`, `SalesInvoiceStatusHistory`, `InvoiceNumberSequence`, `SalesOrderLine.invoicedBaseQuantity` (`20261125055717_sales_invoicing_phase_2_6`).
+- **Backend Dependencies:** `sales-invoice.service.ts`, `sales-invoice-pdf.service.ts`, `sales-invoice.controller.ts`, `sales.routes.ts`, `AuditService`.
+- **Frontend Components:** `SalesInvoicesPage`, `SalesInvoiceDetailPage`, `SalesInvoiceFormPage`, `SalesDashboardPage` (invoice metrics), `SalesOrderDetailPage` ("Create Invoice" action).
+- **Integration Dependencies:** Phase 2.5 Order Fulfillment (`fulfilledBaseQuantity`), Phase 1.4 Tax/Customer/Company Master Data, Phase 1.3 RBAC (`sales.invoices.*`).
+- **Testing Requirements:** GST CGST/SGST & IGST math, partial/multiple fulfillment invoicing, concurrent numbering, snapshot preservation, lifecycle transitions, RBAC, and PDF generation tests.
+- **Completion Criteria:** Invoices post with immutable GST snapshots, prevent duplicate/over-invoicing, generate valid PDFs, and pass manual UI verification.
+- **Current Status:** `TESTED` (Implemented with 5 API integration tests in `sales-invoices.test.ts` and 4 frontend tests in `sales-invoices.test.tsx` passing; manual UI & E2E verification pending). Note: `SalesReturn`, `CreditNote`, and `Payment`/`PaymentAllocation` remain out of scope for Phase 2.6.
 
 #### 2.7 Sales Dashboard & Reports
 - **Purpose:** Provide real-time visibility into order volumes, revenue summaries, pending approvals, and fulfillment backlogs.

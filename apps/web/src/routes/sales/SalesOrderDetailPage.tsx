@@ -129,6 +129,9 @@ export const SalesOrderDetailPage: React.FC = () => {
   const canFulfill =
     hasPermission('sales.orders.fulfill') &&
     (order.status === 'CONFIRMED' || order.status === 'PARTIALLY_FULFILLED');
+  const canInvoice =
+    hasPermission('sales.invoices.create') &&
+    (order.status === 'PARTIALLY_FULFILLED' || order.status === 'FULFILLED');
   const canCancel =
     hasPermission('sales.orders.cancel') &&
     ['DRAFT', 'SUBMITTED', 'APPROVED', 'CONFIRMED'].includes(order.status);
@@ -196,6 +199,15 @@ export const SalesOrderDetailPage: React.FC = () => {
           {canFulfill && (
             <Button size="sm" onClick={() => setFulfillOpen(true)}>
               Fulfill Remaining
+            </Button>
+          )}
+          {canInvoice && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => navigate(`/sales/orders/${order.id}/invoices/new`)}
+            >
+              Create Invoice
             </Button>
           )}
           {canCancel && (

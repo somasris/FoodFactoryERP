@@ -18,6 +18,7 @@ export interface SalesOrderLine {
   baseQuantity: string;
   reservedBaseQuantity: string;
   fulfilledBaseQuantity: string;
+  invoicedBaseQuantity?: string;
   unitPrice: string;
   discountPercent: string;
   taxRateId: string;
@@ -100,6 +101,15 @@ export interface SalesOrder {
   _count?: { lines: number };
 }
 
+export interface SalesInvoiceMetrics {
+  totalInvoices: number;
+  draftInvoices: number;
+  issuedInvoices: number;
+  cancelledInvoices: number;
+  totalInvoicedValue: string;
+  invoiceTrends: Array<{ period: string; count: number; totalValue: string }>;
+}
+
 export interface SalesDashboardSummary {
   totalOrders: number;
   draftOrders: number;
@@ -112,4 +122,103 @@ export interface SalesDashboardSummary {
   rejectedOrders: number;
   confirmedSalesValue: string;
   recentOrders: SalesOrder[];
+  invoiceMetrics?: SalesInvoiceMetrics;
+}
+
+export type SalesInvoiceStatus = 'DRAFT' | 'ISSUED' | 'CANCELLED';
+
+export interface SalesInvoiceLine {
+  id: string;
+  salesOrderLineId: string;
+  lineNumber: number;
+  productVariantId: string;
+  inventoryItemId: string;
+  uomId: string;
+  taxRateId: string;
+  itemCode: string;
+  itemName: string;
+  description?: string | null;
+  hsnCode: string;
+  uomCode: string;
+  uomSymbol: string;
+  quantity: string;
+  baseQuantity: string;
+  unitPrice: string;
+  discountPercent: string;
+  discountAmount: string;
+  taxableAmount: string;
+  gstRate: string;
+  cgstRate: string;
+  sgstRate: string;
+  igstRate: string;
+  cgstAmount: string;
+  sgstAmount: string;
+  igstAmount: string;
+  taxAmount: string;
+  lineTotal: string;
+}
+
+export interface SalesInvoiceStatusHistoryItem {
+  id: string;
+  fromStatus: SalesInvoiceStatus | null;
+  toStatus: SalesInvoiceStatus;
+  reason?: string | null;
+  createdAt: string;
+  changedBy?: { id: string; fullName: string; username: string };
+}
+
+export interface SalesInvoice {
+  id: string;
+  invoiceNumber: string;
+  financialYear: string;
+  salesOrderId: string;
+  fulfillmentId?: string | null;
+  customerId: string;
+  billingAddressId?: string | null;
+  warehouseId: string;
+  companyId: string;
+  invoiceDate: string;
+  dueDate?: string | null;
+  status: SalesInvoiceStatus;
+  companyLegalName: string;
+  companyGstin: string;
+  companyStateCode: string;
+  companyAddress: string;
+  customerLegalName: string;
+  customerGstin?: string | null;
+  customerStateCode: string;
+  customerBillingAddress: string;
+  placeOfSupply: string;
+  isInterState: boolean;
+  subtotal: string;
+  discountAmount: string;
+  taxableAmount: string;
+  cgstAmount: string;
+  sgstAmount: string;
+  igstAmount: string;
+  taxAmount: string;
+  roundOffAmount: string;
+  grandTotal: string;
+  notes?: string | null;
+  termsAndConditions?: string | null;
+  cancellationReason?: string | null;
+  issuedAt?: string | null;
+  cancelledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  salesOrder: { id: string; orderNumber: string; status?: string; orderDate?: string };
+  fulfillment?: { id: string; fulfillmentNumber: string; fulfilledAt: string } | null;
+  customer: {
+    id: string;
+    code: string;
+    legalName: string;
+    tradeName?: string | null;
+    gstin?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
+  warehouse: { id: string; code: string; name: string };
+  lines?: SalesInvoiceLine[];
+  statusHistory?: SalesInvoiceStatusHistoryItem[];
+  _count?: { lines: number };
 }

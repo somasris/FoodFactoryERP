@@ -117,6 +117,53 @@ export class SalesService {
       }),
     ]);
 
+    const invWhere: Prisma.SalesInvoiceWhereInput = allowedWh
+      ? { warehouseId: { in: allowedWh } }
+      : {};
+    if (filters.fromDate || filters.toDate) {
+      invWhere.invoiceDate = {};
+      if (filters.fromDate) invWhere.invoiceDate.gte = new Date(filters.fromDate);
+      if (filters.toDate) invWhere.invoiceDate.lte = new Date(filters.toDate);
+    }
+
+    const [
+      totalInvoices,
+      draftInvoices,
+      issuedInvoices,
+      cancelledInvoices,
+      issuedValueAgg,
+      issuedForTrends,
+    ] = await Promise.all([
+      prisma.salesInvoice.count({ where: invWhere }),
+      prisma.salesInvoice.count({ where: { ...invWhere, status: 'DRAFT' } }),
+      prisma.salesInvoice.count({ where: { ...invWhere, status: 'ISSUED' } }),
+      prisma.salesInvoice.count({ where: { ...invWhere, status: 'CANCELLED' } }),
+      prisma.salesInvoice.aggregate({
+        where: { ...invWhere, status: 'ISSUED' },
+        _sum: { grandTotal: true },
+      }),
+      prisma.salesInvoice.findMany({
+        where: { ...invWhere, status: 'ISSUED' },
+        select: { invoiceDate: true, grandTotal: true },
+        orderBy: { invoiceDate: 'asc' },
+        take: 200,
+      }),
+    ]);
+
+    const trendMap = new Map<string, { count: number; totalValue: Prisma.Decimal }>();
+    for (const row of issuedForTrends) {
+      const monthKey = row.invoiceDate.toISOString().slice(0, 7);
+      const curr = trendMap.get(monthKey) ?? { count: 0, totalValue: ZERO };
+      curr.count += 1;
+      curr.totalValue = curr.totalValue.add(row.grandTotal);
+      trendMap.set(monthKey, curr);
+    }
+    const invoiceTrends = Array.from(trendMap.entries()).map(([period, stats]) => ({
+      period,
+      count: stats.count,
+      totalValue: stats.totalValue.toDecimalPlaces(2).toString(),
+    }));
+
     return {
       totalOrders,
       draftOrders,
@@ -131,6 +178,16 @@ export class SalesService {
         .toDecimalPlaces(2)
         .toString(),
       recentOrders,
+      invoiceMetrics: {
+        totalInvoices,
+        draftInvoices,
+        issuedInvoices,
+        cancelledInvoices,
+        totalInvoicedValue: new Prisma.Decimal(issuedValueAgg._sum.grandTotal ?? 0)
+          .toDecimalPlaces(2)
+          .toString(),
+        invoiceTrends,
+      },
     };
   }
 

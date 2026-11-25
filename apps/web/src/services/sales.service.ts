@@ -1,7 +1,9 @@
-import { apiClient } from './api-client';
+import { apiClient, getAccessToken } from './api-client';
+import { config } from '../config/env';
 import { PaginatedResponse } from '../types/master-data';
 import {
   SalesDashboardSummary,
+  SalesInvoice,
   SalesOrder,
   SalesOrderFulfillmentItem,
   SalesOrderStatusHistoryItem,
@@ -78,5 +80,46 @@ export const salesService = {
           body: JSON.stringify(payload),
         },
       ),
+  },
+
+  invoices: {
+    list: (params: SalesQuery & { salesOrderId?: string } = {}) =>
+      apiClient<PaginatedResponse<SalesInvoice>>(`/sales/invoices${buildQuery(params)}`),
+    listByOrder: (orderId: string) =>
+      apiClient<SalesInvoice[]>(`/sales/orders/${orderId}/invoices`),
+    getById: (id: string) => apiClient<SalesInvoice>(`/sales/invoices/${id}`),
+    getByNumber: (invoiceNumber: string) =>
+      apiClient<SalesInvoice>(`/sales/invoices/number/${encodeURIComponent(invoiceNumber)}`),
+    createFromOrder: (orderId: string, payload: Record<string, unknown>) =>
+      apiClient<SalesInvoice>(`/sales/orders/${orderId}/invoices`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+    update: (id: string, payload: Record<string, unknown>) =>
+      apiClient<SalesInvoice>(`/sales/invoices/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+    issue: (id: string) =>
+      apiClient<SalesInvoice>(`/sales/invoices/${id}/issue`, { method: 'POST', body: '{}' }),
+    cancel: (id: string, reason: string) =>
+      apiClient<SalesInvoice>(`/sales/invoices/${id}/cancel`, {
+        method: 'POST',
+        body: JSON.stringify({ reason }),
+      }),
+    fetchPdfBlob: async (id: string): Promise<Blob> => {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(`${config.apiBaseUrl}/sales/invoices/${id}/pdf`, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+      if (!res.ok) {
+        throw new Error('Failed to download invoice PDF');
+      }
+      return res.blob();
+    },
   },
 };

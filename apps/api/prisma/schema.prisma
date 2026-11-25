@@ -78,6 +78,8 @@ enum AuditAction {
   RESERVE
   RELEASE
   FULFILL
+  ISSUE
+  DOWNLOAD
   POST
   CANCEL
   DISPATCH
@@ -97,6 +99,12 @@ enum SalesOrderStatus {
   CONFIRMED
   PARTIALLY_FULFILLED
   FULFILLED
+  CANCELLED
+}
+
+enum SalesInvoiceStatus {
+  DRAFT
+  ISSUED
   CANCELLED
 }
 
@@ -176,8 +184,9 @@ model Company {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  factories Factory[]
-  users     User[]
+  factories     Factory[]
+  users         User[]
+  salesInvoices SalesInvoice[]
 
   @@map("companies")
 }
@@ -221,6 +230,7 @@ model Warehouse {
   transfersTo          InventoryTransfer[]    @relation("TransferDestWarehouse")
   inventoryAdjustments InventoryAdjustment[]
   salesOrders          SalesOrder[]
+  salesInvoices        SalesInvoice[]
 
   @@map("warehouses")
 }
@@ -249,6 +259,7 @@ model User {
   postedInventoryTransactions InventoryTransaction[] @relation("TxPostedBy")
   salesOrders                 SalesOrder[]           @relation("SalesmanOrders")
   salesOrderStatusChanges     SalesOrderStatusHistory[]
+  salesInvoiceStatusChanges   SalesInvoiceStatusHistory[]
 
   @@map("users")
 }
@@ -395,11 +406,12 @@ model UnitOfMeasure {
   bomItems        BOMItem[]
   txLines         InventoryTransactionLine[] @relation("TxLineUom")
   txBaseLines     InventoryTransactionLine[] @relation("TxLineBaseUom")
-  receiptLines    InventoryReceiptLine[]
-  issueLines      InventoryIssueLine[]
-  transferLines   InventoryTransferLine[]
-  adjustmentLines InventoryAdjustmentLine[]
-  salesOrderLines SalesOrderLine[]
+  receiptLines      InventoryReceiptLine[]
+  issueLines        InventoryIssueLine[]
+  transferLines     InventoryTransferLine[]
+  adjustmentLines   InventoryAdjustmentLine[]
+  salesOrderLines   SalesOrderLine[]
+  salesInvoiceLines SalesInvoiceLine[]
 
   @@map("units_of_measure")
 }
@@ -432,10 +444,11 @@ model TaxRate {
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
-  rawMaterials   RawMaterial[]
-  products       Product[]
-  configurations TaxConfiguration[]
-  salesOrderLines SalesOrderLine[]
+  rawMaterials      RawMaterial[]
+  products          Product[]
+  configurations    TaxConfiguration[]
+  salesOrderLines   SalesOrderLine[]
+  salesInvoiceLines SalesInvoiceLine[]
 
   @@map("tax_rates")
 }
@@ -550,11 +563,12 @@ model ProductVariant {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  product       Product        @relation(fields: [productId], references: [id])
-  uom           UnitOfMeasure  @relation(fields: [uomId], references: [id])
-  inventoryItem InventoryItem?
-  boms          BOM[]
-  salesOrderLines SalesOrderLine[]
+  product           Product            @relation(fields: [productId], references: [id])
+  uom               UnitOfMeasure      @relation(fields: [uomId], references: [id])
+  inventoryItem     InventoryItem?
+  boms              BOM[]
+  salesOrderLines   SalesOrderLine[]
+  salesInvoiceLines SalesInvoiceLine[]
 
   @@index([productId])
   @@index([uomId])
@@ -585,8 +599,9 @@ model InventoryItem {
   receiptLines     InventoryReceiptLine[]
   issueLines       InventoryIssueLine[]
   transferLines    InventoryTransferLine[]
-  adjustmentLines  InventoryAdjustmentLine[]
-  salesOrderLines  SalesOrderLine[]
+  adjustmentLines   InventoryAdjustmentLine[]
+  salesOrderLines   SalesOrderLine[]
+  salesInvoiceLines SalesInvoiceLine[]
 
   @@map("inventory_items")
 }
@@ -645,8 +660,9 @@ model Customer {
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
-  addresses   CustomerAddress[]
-  salesOrders SalesOrder[]
+  addresses     CustomerAddress[]
+  salesOrders   SalesOrder[]
+  salesInvoices SalesInvoice[]
 
   @@map("customers")
 }
@@ -662,8 +678,9 @@ model CustomerAddress {
   pincode      String      @db.VarChar(10)
   isDefault    Boolean     @default(true) @map("is_default")
 
-  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  salesOrders SalesOrder[]
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  salesOrders   SalesOrder[]
+  salesInvoices SalesInvoice[]
 
   @@index([customerId])
   @@map("customer_addresses")
@@ -1120,6 +1137,7 @@ model SalesOrder {
   lines           SalesOrderLine[]
   statusHistory   SalesOrderStatusHistory[]
   fulfillments    SalesOrderFulfillment[]
+  invoices        SalesInvoice[]
 
   @@index([customerId])
   @@index([warehouseId])
@@ -1140,6 +1158,7 @@ model SalesOrderLine {
   baseQuantity          Decimal  @map("base_quantity") @db.Decimal(14, 4)
   reservedBaseQuantity  Decimal  @default(0) @map("reserved_base_quantity") @db.Decimal(14, 4)
   fulfilledBaseQuantity Decimal  @default(0) @map("fulfilled_base_quantity") @db.Decimal(14, 4)
+  invoicedBaseQuantity  Decimal  @default(0) @map("invoiced_base_quantity") @db.Decimal(14, 4)
   unitPrice             Decimal  @map("unit_price") @db.Decimal(12, 2)
   discountPercent       Decimal  @default(0) @map("discount_percent") @db.Decimal(5, 2)
   taxRateId             String   @map("tax_rate_id")
@@ -1154,6 +1173,7 @@ model SalesOrderLine {
   inventoryItem  InventoryItem  @relation(fields: [inventoryItemId], references: [id])
   uom            UnitOfMeasure  @relation(fields: [uomId], references: [id])
   taxRate        TaxRate        @relation(fields: [taxRateId], references: [id])
+  invoiceLines   SalesInvoiceLine[]
 
   @@unique([salesOrderId, lineNumber])
   @@index([productVariantId])
@@ -1188,8 +1208,151 @@ model SalesOrderFulfillment {
   notes             String?  @db.Text
   createdAt         DateTime @default(now()) @map("created_at")
 
-  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  salesOrder SalesOrder     @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  invoices   SalesInvoice[]
 
   @@index([salesOrderId])
   @@map("sales_order_fulfillments")
+}
+
+// ------------------------------------------------------------------------------
+// 8. SALES INVOICING (PHASE 2.6)
+// ------------------------------------------------------------------------------
+
+model InvoiceNumberSequence {
+  id            String   @id @default(uuid())
+  prefix        String   @default("INV") @db.VarChar(15)
+  financialYear String   @map("financial_year") @db.VarChar(10)
+  lastNumber    Int      @default(0) @map("last_number")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([prefix, financialYear])
+  @@map("invoice_number_sequences")
+}
+
+model SalesInvoice {
+  id                     String             @id @default(uuid())
+  invoiceNumber          String             @unique @map("invoice_number") @db.VarChar(40)
+  financialYear          String             @map("financial_year") @db.VarChar(10)
+  salesOrderId           String             @map("sales_order_id")
+  fulfillmentId          String?            @map("fulfillment_id")
+  customerId             String             @map("customer_id")
+  billingAddressId       String?            @map("billing_address_id")
+  warehouseId            String             @map("warehouse_id")
+  companyId              String             @map("company_id")
+  invoiceDate            DateTime           @default(now()) @map("invoice_date")
+  dueDate                DateTime?          @map("due_date") @db.Date
+  status                 SalesInvoiceStatus @default(DRAFT)
+  // Company & Customer GST Snapshots
+  companyLegalName       String             @map("company_legal_name") @db.VarChar(150)
+  companyGstin           String             @map("company_gstin") @db.VarChar(15)
+  companyStateCode       String             @map("company_state_code") @db.VarChar(2)
+  companyAddress         String             @map("company_address") @db.Text
+  customerLegalName      String             @map("customer_legal_name") @db.VarChar(150)
+  customerGstin          String?            @map("customer_gstin") @db.VarChar(15)
+  customerStateCode      String             @map("customer_state_code") @db.VarChar(2)
+  customerBillingAddress String             @map("customer_billing_address") @db.Text
+  placeOfSupply          String             @map("place_of_supply") @db.VarChar(100)
+  isInterState           Boolean            @default(false) @map("is_inter_state")
+  // Financial Totals (Prisma.Decimal)
+  subtotal               Decimal            @default(0) @db.Decimal(14, 2)
+  discountAmount         Decimal            @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  taxableAmount          Decimal            @default(0) @map("taxable_amount") @db.Decimal(14, 2)
+  cgstAmount             Decimal            @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstAmount             Decimal            @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstAmount             Decimal            @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  taxAmount              Decimal            @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  roundOffAmount         Decimal            @default(0) @map("round_off_amount") @db.Decimal(10, 2)
+  grandTotal             Decimal            @default(0) @map("grand_total") @db.Decimal(14, 2)
+  // Metadata & Lifecycle
+  notes                  String?            @db.Text
+  termsAndConditions     String?            @map("terms_and_conditions") @db.Text
+  idempotencyKey         String?            @unique @map("idempotency_key") @db.VarChar(100)
+  createdById            String             @map("created_by_id")
+  issuedById             String?            @map("issued_by_id")
+  issuedAt               DateTime?          @map("issued_at")
+  cancelledById          String?            @map("cancelled_by_id")
+  cancelledAt            DateTime?          @map("cancelled_at")
+  cancellationReason     String?            @map("cancellation_reason") @db.Text
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  salesOrder     SalesOrder                  @relation(fields: [salesOrderId], references: [id])
+  fulfillment    SalesOrderFulfillment?      @relation(fields: [fulfillmentId], references: [id])
+  customer       Customer                    @relation(fields: [customerId], references: [id])
+  billingAddress CustomerAddress?            @relation(fields: [billingAddressId], references: [id])
+  warehouse      Warehouse                   @relation(fields: [warehouseId], references: [id])
+  company        Company                     @relation(fields: [companyId], references: [id])
+  lines          SalesInvoiceLine[]
+  statusHistory  SalesInvoiceStatusHistory[]
+
+  @@index([salesOrderId])
+  @@index([customerId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([invoiceDate])
+  @@index([financialYear])
+  @@map("sales_invoices")
+}
+
+model SalesInvoiceLine {
+  id               String  @id @default(uuid())
+  salesInvoiceId   String  @map("sales_invoice_id")
+  salesOrderLineId String  @map("sales_order_line_id")
+  lineNumber       Int     @map("line_number")
+  productVariantId String  @map("product_variant_id")
+  inventoryItemId  String  @map("inventory_item_id")
+  uomId            String  @map("uom_id")
+  taxRateId        String  @map("tax_rate_id")
+  // Product & Tax Snapshots
+  itemCode         String  @map("item_code") @db.VarChar(40)
+  itemName         String  @map("item_name") @db.VarChar(150)
+  description      String? @db.Text
+  hsnCode          String  @map("hsn_code") @db.VarChar(10)
+  uomCode          String  @map("uom_code") @db.VarChar(10)
+  uomSymbol        String  @map("uom_symbol") @db.VarChar(10)
+  // Quantities & Pricing
+  quantity         Decimal @db.Decimal(14, 4)
+  baseQuantity     Decimal @map("base_quantity") @db.Decimal(14, 4)
+  unitPrice        Decimal @map("unit_price") @db.Decimal(12, 2)
+  discountPercent  Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount   Decimal @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  taxableAmount    Decimal @map("taxable_amount") @db.Decimal(14, 2)
+  gstRate          Decimal @map("gst_rate") @db.Decimal(5, 2)
+  cgstRate         Decimal @default(0) @map("cgst_rate") @db.Decimal(5, 2)
+  sgstRate         Decimal @default(0) @map("sgst_rate") @db.Decimal(5, 2)
+  igstRate         Decimal @default(0) @map("igst_rate") @db.Decimal(5, 2)
+  cgstAmount       Decimal @default(0) @map("cgst_amount") @db.Decimal(14, 2)
+  sgstAmount       Decimal @default(0) @map("sgst_amount") @db.Decimal(14, 2)
+  igstAmount       Decimal @default(0) @map("igst_amount") @db.Decimal(14, 2)
+  taxAmount        Decimal @map("tax_amount") @db.Decimal(14, 2)
+  lineTotal        Decimal @map("line_total") @db.Decimal(14, 2)
+
+  salesInvoice   SalesInvoice   @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  salesOrderLine SalesOrderLine @relation(fields: [salesOrderLineId], references: [id])
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  inventoryItem  InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+  uom            UnitOfMeasure  @relation(fields: [uomId], references: [id])
+  taxRate        TaxRate        @relation(fields: [taxRateId], references: [id])
+
+  @@unique([salesInvoiceId, lineNumber])
+  @@index([salesOrderLineId])
+  @@index([productVariantId])
+  @@map("sales_invoice_lines")
+}
+
+model SalesInvoiceStatusHistory {
+  id             String              @id @default(uuid())
+  salesInvoiceId String              @map("sales_invoice_id")
+  fromStatus     SalesInvoiceStatus? @map("from_status")
+  toStatus       SalesInvoiceStatus  @map("to_status")
+  changedById    String              @map("changed_by_id")
+  reason         String?             @db.Text
+  createdAt      DateTime            @default(now()) @map("created_at")
+
+  salesInvoice SalesInvoice @relation(fields: [salesInvoiceId], references: [id], onDelete: Cascade)
+  changedBy    User         @relation(fields: [changedById], references: [id])
+
+  @@index([salesInvoiceId])
+  @@map("sales_invoice_status_history")
 }

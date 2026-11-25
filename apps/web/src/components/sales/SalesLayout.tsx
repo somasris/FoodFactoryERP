@@ -6,6 +6,7 @@ import {
   PlusCircle,
   CheckSquare,
   PackageCheck,
+  FileText,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
@@ -23,6 +24,7 @@ const salesTabs: NavTab[] = [
   { label: 'New Order', to: '/sales/orders/new', icon: PlusCircle, permission: 'sales.orders.create' },
   { label: 'Pending Approvals', to: '/sales/approvals', icon: CheckSquare, permission: 'sales.orders.approve' },
   { label: 'Fulfillment', to: '/sales/fulfillment', icon: PackageCheck, permission: 'sales.orders.fulfill' },
+  { label: 'Invoices', to: '/sales/invoices', icon: FileText, permission: 'sales.invoices.read' },
 ];
 
 export const SalesLayout: React.FC = () => {

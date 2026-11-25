@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, requirePermissions } from '../../middleware/auth.middleware';
 import { SalesController } from './sales.controller';
+import { SalesInvoiceController } from './sales-invoice.controller';
 
 export const salesRouter: Router = Router();
 
@@ -59,4 +60,51 @@ salesRouter.post(
   '/orders/:id/fulfill',
   requirePermissions('sales.orders.fulfill'),
   SalesController.fulfillOrder,
+);
+
+// Phase 2.6: Sales Invoicing
+salesRouter.get(
+  '/invoices',
+  requirePermissions('sales.invoices.read'),
+  SalesInvoiceController.listInvoices,
+);
+salesRouter.get(
+  '/invoices/number/:invoiceNumber',
+  requirePermissions('sales.invoices.read'),
+  SalesInvoiceController.getInvoiceByNumber,
+);
+salesRouter.get(
+  '/invoices/:id',
+  requirePermissions('sales.invoices.read'),
+  SalesInvoiceController.getInvoiceById,
+);
+salesRouter.get(
+  '/invoices/:id/pdf',
+  requirePermissions('sales.invoices.download'),
+  SalesInvoiceController.downloadInvoicePdf,
+);
+salesRouter.patch(
+  '/invoices/:id',
+  requirePermissions('sales.invoices.update'),
+  SalesInvoiceController.updateDraftInvoice,
+);
+salesRouter.post(
+  '/invoices/:id/issue',
+  requirePermissions('sales.invoices.issue'),
+  SalesInvoiceController.issueInvoice,
+);
+salesRouter.post(
+  '/invoices/:id/cancel',
+  requirePermissions('sales.invoices.cancel'),
+  SalesInvoiceController.cancelInvoice,
+);
+salesRouter.get(
+  '/orders/:orderId/invoices',
+  requirePermissions('sales.invoices.read'),
+  SalesInvoiceController.listOrderInvoices,
+);
+salesRouter.post(
+  '/orders/:orderId/invoices',
+  requirePermissions('sales.invoices.create'),
+  SalesInvoiceController.createInvoiceFromOrder,
 );

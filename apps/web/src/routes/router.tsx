@@ -35,6 +35,9 @@ import { SalesOrderFormPage } from './sales/SalesOrderFormPage';
 import { SalesOrderDetailPage } from './sales/SalesOrderDetailPage';
 import { PendingApprovalsPage } from './sales/PendingApprovalsPage';
 import { OrderFulfillmentPage } from './sales/OrderFulfillmentPage';
+import { SalesInvoicesPage } from './sales/SalesInvoicesPage';
+import { SalesInvoiceDetailPage } from './sales/SalesInvoiceDetailPage';
+import { SalesInvoiceFormPage } from './sales/SalesInvoiceFormPage';
 
 export const router = createBrowserRouter([
   {
@@ -92,6 +95,10 @@ export const router = createBrowserRouter([
           { path: 'orders/:id/edit', element: <SalesOrderFormPage /> },
           { path: 'approvals', element: <PendingApprovalsPage /> },
           { path: 'fulfillment', element: <OrderFulfillmentPage /> },
+          { path: 'invoices', element: <SalesInvoicesPage /> },
+          { path: 'invoices/:id', element: <SalesInvoiceDetailPage /> },
+          { path: 'invoices/:id/edit', element: <SalesInvoiceFormPage /> },
+          { path: 'orders/:orderId/invoices/new', element: <SalesInvoiceFormPage /> },
         ],
       },
       {

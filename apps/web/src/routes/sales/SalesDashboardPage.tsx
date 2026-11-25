@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ShoppingCart, Clock, CheckCircle2, IndianRupee, XCircle, ArrowRight } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle2, IndianRupee, XCircle, ArrowRight, FileText } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/common/Card';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
@@ -140,6 +140,75 @@ export const SalesDashboardPage: React.FC = () => {
               </CardContent>
             </Card>
           </div>
+
+          {summary.invoiceMetrics && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-medium text-slate-500">
+                    Total Invoiced Value (Issued)
+                  </CardTitle>
+                  <FileText className="h-4 w-4 text-brand-navy" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-brand-navy">
+                    ₹
+                    {Number(summary.invoiceMetrics.totalInvoicedValue).toLocaleString('en-IN', {
+                      minimumFractionDigits: 2,
+                    })}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {summary.invoiceMetrics.issuedInvoices} issued GST invoices
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-medium text-slate-500">
+                    Sales Invoices
+                  </CardTitle>
+                  <FileText className="h-4 w-4 text-teal-600" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-slate-900">
+                    {summary.invoiceMetrics.totalInvoices}
+                  </div>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {summary.invoiceMetrics.draftInvoices} draft ·{' '}
+                    {summary.invoiceMetrics.cancelledInvoices} cancelled
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-xs font-medium text-slate-500">
+                    Invoice Trends
+                  </CardTitle>
+                  <Link to="/sales/invoices" className="text-xs text-brand-blue hover:underline">
+                    View invoices
+                  </Link>
+                </CardHeader>
+                <CardContent>
+                  {summary.invoiceMetrics.invoiceTrends.length === 0 ? (
+                    <p className="text-xs text-slate-500">No issued invoices in selected period.</p>
+                  ) : (
+                    <div className="space-y-1 text-xs">
+                      {summary.invoiceMetrics.invoiceTrends.slice(-3).map(t => (
+                        <div key={t.period} className="flex justify-between">
+                          <span className="font-mono text-slate-600">{t.period}</span>
+                          <span className="font-medium text-slate-800">
+                            {t.count} · ₹{Number(t.totalValue).toLocaleString('en-IN')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
