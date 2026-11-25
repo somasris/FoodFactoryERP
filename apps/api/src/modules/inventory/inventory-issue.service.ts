@@ -1,6 +1,7 @@
 import { AuditAction, InventoryDocumentStatus, InventoryTransactionType, PickingStrategy, Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import { AuditMeta, paginatedResult, PaginationParams, toPlainJson } from '../master-data/master-data.utils';
 import { CreateIssueInput } from './inventory.types';
@@ -482,6 +483,13 @@ export class InventoryIssueService {
       newState: { status: posted.status, issueNumber: posted.issueNumber },
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
+    });
+
+    await NotificationEventsService.onInventoryIssuePosted({
+      id: posted.id,
+      issueNumber: posted.issueNumber,
+      warehouseId: posted.warehouseId,
+      itemIds: posted.lines.map(l => l.inventoryItemId),
     });
 
     return posted;

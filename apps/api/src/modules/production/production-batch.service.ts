@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import {
   AuditMeta,
@@ -521,6 +522,16 @@ export class ProductionBatchService {
       remarks: 'Started production batch execution',
     });
 
+    await NotificationEventsService.onProductionBatchEvent(
+      {
+        id: result.id,
+        batchNumber: result.batchNumber,
+        warehouseId: result.warehouseId,
+        operatorId: result.operatorId,
+      },
+      'STARTED',
+    );
+
     return result;
   }
 
@@ -581,6 +592,16 @@ export class ProductionBatchService {
       userAgent: meta.userAgent,
       remarks: reason,
     });
+
+    await NotificationEventsService.onProductionBatchEvent(
+      {
+        id: result.id,
+        batchNumber: result.batchNumber,
+        warehouseId: result.warehouseId,
+        operatorId: result.operatorId,
+      },
+      'PAUSED',
+    );
 
     return result;
   }
@@ -1498,7 +1519,18 @@ export class ProductionBatchService {
       remarks: 'Completed production batch and received finished goods',
     });
 
-    return this.getBatchById(id, user);
+    const completedBatch = await this.getBatchById(id, user);
+    await NotificationEventsService.onProductionBatchEvent(
+      {
+        id: completedBatch.id,
+        batchNumber: completedBatch.batchNumber,
+        warehouseId: completedBatch.warehouseId,
+        operatorId: completedBatch.operatorId,
+      },
+      'COMPLETED',
+    );
+
+    return completedBatch;
   }
 
   static async cancelBatch(id: string, reason: string, user: UserContext, meta: AuditMeta) {

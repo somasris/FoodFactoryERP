@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { AuditAction, Prisma, WorkOrderPriority, WorkOrderStatus } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import {
   AuditMeta,
@@ -481,6 +482,16 @@ export class WorkOrderService {
       userAgent: meta.userAgent,
     });
 
+    await NotificationEventsService.onWorkOrderEvent(
+      {
+        id: created.id,
+        workOrderNumber: created.workOrderNumber,
+        warehouseId: created.warehouseId,
+        assignedToId: created.assignedToId,
+      },
+      'CREATED',
+    );
+
     return created;
   }
 
@@ -648,6 +659,25 @@ export class WorkOrderService {
       userAgent: meta.userAgent,
       remarks: reason,
     });
+
+    if (
+      toStatus === 'SUBMITTED' ||
+      toStatus === 'APPROVED' ||
+      toStatus === 'REJECTED' ||
+      toStatus === 'RELEASED' ||
+      toStatus === 'COMPLETED'
+    ) {
+      await NotificationEventsService.onWorkOrderEvent(
+        {
+          id: result.wo.id,
+          workOrderNumber: result.wo.workOrderNumber,
+          warehouseId: result.wo.warehouseId,
+          assignedToId: result.wo.assignedToId,
+        },
+        toStatus,
+        reason,
+      );
+    }
 
     return result.wo;
   }

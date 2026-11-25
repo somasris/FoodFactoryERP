@@ -1,6 +1,7 @@
 import { AuditAction, InventoryTransactionType, Prisma, TransferDocumentStatus } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import { AuditMeta, paginatedResult, PaginationParams, toPlainJson } from '../master-data/master-data.utils';
 import { CreateTransferInput } from './inventory.types';
@@ -420,6 +421,15 @@ export class InventoryTransferService {
       userAgent: meta.userAgent,
     });
 
+    await NotificationEventsService.onInventoryTransferEvent({
+      id: dispatched.id,
+      transferNumber: dispatched.transferNumber,
+      fromWarehouseId: dispatched.sourceWarehouseId,
+      toWarehouseId: dispatched.destinationWarehouseId,
+      event: 'DISPATCHED',
+      itemIds: dispatched.lines.map(l => l.inventoryItemId),
+    });
+
     return dispatched;
   }
 
@@ -567,6 +577,15 @@ export class InventoryTransferService {
       newState: { status: received.status, transferNumber: received.transferNumber },
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
+    });
+
+    await NotificationEventsService.onInventoryTransferEvent({
+      id: received.id,
+      transferNumber: received.transferNumber,
+      fromWarehouseId: received.sourceWarehouseId,
+      toWarehouseId: received.destinationWarehouseId,
+      event: 'RECEIVED',
+      itemIds: received.lines.map(l => l.inventoryItemId),
     });
 
     return received;

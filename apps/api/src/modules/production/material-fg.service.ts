@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import {
   AuditMeta,
@@ -957,6 +958,14 @@ export class MaterialFgService {
       remarks: `Quality inspection decision: ${updated.decision}`,
     });
 
+    await NotificationEventsService.onQualityInspectionEvent({
+      id: updated.id,
+      inspectionNumber: updated.inspectionNumber,
+      status: updated.decision,
+      warehouseId: updated.warehouseId,
+      event: 'COMPLETED',
+    });
+
     return updated;
   }
 
@@ -1038,6 +1047,14 @@ export class MaterialFgService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       remarks: releaseNotes,
+    });
+
+    await NotificationEventsService.onQualityInspectionEvent({
+      id: updated.id,
+      inspectionNumber: updated.inspectionNumber,
+      status: updated.decision,
+      warehouseId: updated.warehouseId,
+      event: 'QUARANTINE_RELEASED',
     });
 
     return updated;

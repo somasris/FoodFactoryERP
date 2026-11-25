@@ -2,6 +2,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
 import { READ_ONLY_PERMISSIONS } from '../../middleware/auth.middleware';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import {
   CreateRoleInput,
   UpdateRoleInput,
@@ -301,6 +302,12 @@ export class RolePermissionService {
           userAgent: actor.userAgent || null,
         },
       });
+    });
+
+    await NotificationEventsService.onRolePermissionsChanged({
+      id: role.id,
+      code: role.code,
+      name: role.name,
     });
 
     return {

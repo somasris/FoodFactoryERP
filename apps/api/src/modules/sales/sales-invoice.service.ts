@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { AuditAction, Prisma, SalesInvoiceStatus } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import {
   AuditMeta,
@@ -588,6 +589,16 @@ export class SalesInvoiceService {
       userAgent: meta.userAgent,
     });
 
+    await NotificationEventsService.onSalesInvoiceEvent(
+      {
+        id: created.id,
+        invoiceNumber: created.invoiceNumber,
+        warehouseId: created.warehouseId,
+        salesmanId: (created as { salesOrder?: { salesmanId?: string } }).salesOrder?.salesmanId,
+      },
+      'CREATED',
+    );
+
     return created;
   }
 
@@ -762,6 +773,16 @@ export class SalesInvoiceService {
       userAgent: meta.userAgent,
     });
 
+    await NotificationEventsService.onSalesInvoiceEvent(
+      {
+        id: issued.id,
+        invoiceNumber: issued.invoiceNumber,
+        warehouseId: issued.warehouseId,
+        salesmanId: (issued as { salesOrder?: { salesmanId?: string } }).salesOrder?.salesmanId,
+      },
+      'ISSUED',
+    );
+
     return issued;
   }
 
@@ -831,6 +852,17 @@ export class SalesInvoiceService {
       userAgent: meta.userAgent,
       remarks: reason,
     });
+
+    await NotificationEventsService.onSalesInvoiceEvent(
+      {
+        id: cancelled.inv.id,
+        invoiceNumber: cancelled.inv.invoiceNumber,
+        warehouseId: cancelled.inv.warehouseId,
+        salesmanId: (cancelled.inv as { salesOrder?: { salesmanId?: string } }).salesOrder?.salesmanId,
+      },
+      'CANCELLED',
+      reason,
+    );
 
     return cancelled.inv;
   }

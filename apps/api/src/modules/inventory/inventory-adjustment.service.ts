@@ -1,6 +1,7 @@
 import { AdjustmentReason, AuditAction, InventoryDocumentStatus, InventoryTransactionType, Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import { AuditMeta, paginatedResult, PaginationParams, toPlainJson } from '../master-data/master-data.utils';
 import { CreateAdjustmentInput } from './inventory.types';
@@ -420,6 +421,13 @@ export class InventoryAdjustmentService {
       newState: { status: posted.status, adjustmentNumber: posted.adjustmentNumber },
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
+    });
+
+    await NotificationEventsService.onInventoryAdjustmentPosted({
+      id: posted.id,
+      adjustmentNumber: posted.adjustmentNumber,
+      warehouseId: posted.warehouseId,
+      itemIds: posted.lines.map(l => l.inventoryItemId),
     });
 
     return posted;

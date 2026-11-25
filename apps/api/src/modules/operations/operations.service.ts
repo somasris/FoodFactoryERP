@@ -7,6 +7,7 @@ import { AuditAction, BackupStatus, BackupVerificationStatus, RestoreRequestStat
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
 import { invalidateMaintenanceCache } from '../../middleware/maintenance.middleware';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { TelemetryStore } from '../../utils/telemetry';
 
 const execFileAsync = promisify(execFile);
@@ -207,6 +208,11 @@ export class OperationsService {
           completedAt: new Date(),
         },
       });
+      await NotificationEventsService.onBackupEvent({
+        id: record.id,
+        backupName: record.backupName,
+        failed: false,
+      });
       return record;
     } catch (err) {
       const record = await prisma.backupRecord.create({
@@ -217,6 +223,12 @@ export class OperationsService {
           failureReason: err instanceof Error ? err.message : 'pg_dump execution failed',
           triggeredById: actor.userId,
         },
+      });
+      await NotificationEventsService.onBackupEvent({
+        id: record.id,
+        backupName: record.backupName,
+        failed: true,
+        failureReason: record.failureReason,
       });
       return record;
     }
@@ -294,6 +306,11 @@ export class OperationsService {
       },
     });
 
+    await NotificationEventsService.onRestoreRequestEvent(
+      { id: reqRecord.id, requestedById: reqRecord.requestedById, status: reqRecord.status },
+      'SUBMITTED',
+    );
+
     return reqRecord;
   }
 
@@ -333,6 +350,11 @@ export class OperationsService {
         userAgent: actor.userAgent || null,
       },
     });
+
+    await NotificationEventsService.onRestoreRequestEvent(
+      { id: updated.id, requestedById: updated.requestedById, status: updated.status },
+      decision,
+    );
 
     return updated;
   }
@@ -407,6 +429,7 @@ export class OperationsService {
     });
 
     invalidateMaintenanceCache();
+    await NotificationEventsService.onSystemSettingsChanged(['MAINTENANCE_MODE']);
     return this.getMaintenanceMode();
   }
 }

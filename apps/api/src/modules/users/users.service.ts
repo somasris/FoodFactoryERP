@@ -1,4 +1,5 @@
 import { prisma } from '../../services/prisma.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import { hashPassword, validatePasswordPolicy } from '../../utils/password';
 import {
@@ -480,6 +481,13 @@ export class UsersService {
       });
     });
 
+    await NotificationEventsService.onUserAccountChanged(
+      userId,
+      user.username,
+      `Your assigned role(s) changed to: ${input.roleCodes.join(', ')}.`,
+      'roles_updated',
+    );
+
     return {
       userId,
       roles: input.roleCodes,
@@ -579,6 +587,13 @@ export class UsersService {
 
       return res;
     });
+
+    await NotificationEventsService.onUserAccountChanged(
+      userId,
+      user.username,
+      `Your account was ${input.isActive ? 'activated' : 'deactivated'}.`,
+      input.isActive ? 'activated' : 'deactivated',
+    );
 
     return updated;
   }

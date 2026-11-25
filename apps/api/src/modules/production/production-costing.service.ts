@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import { AuditMeta, paginatedResult } from '../master-data/master-data.utils';
 import {
@@ -1282,6 +1283,12 @@ export class ProductionCostingService {
           fgValuationApplied,
         },
         ...auditMeta,
+      });
+
+      await NotificationEventsService.onProductionCostingFinalized({
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        variancePercent: Number(finalized.totalVariancePercent ?? 0),
       });
 
       return finalized;

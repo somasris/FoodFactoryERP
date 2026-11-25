@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { hashPassword, validatePasswordPolicy } from '../../utils/password';
 import {
   AdminListUsersQuery,
@@ -197,6 +198,13 @@ export class AdminUserService {
           },
         });
       });
+
+      await NotificationEventsService.onUserAccountChanged(
+        targetUserId,
+        target.username,
+        `Your registration was approved with role(s): ${roles.map(r => r.code).join(', ')}.`,
+        'registration_approved',
+      );
 
       return {
         userId: targetUserId,

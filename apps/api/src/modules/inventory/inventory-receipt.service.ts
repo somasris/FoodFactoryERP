@@ -1,6 +1,7 @@
 import { AuditAction, InventoryDocumentStatus, InventoryTransactionType, Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import { AuditMeta, paginatedResult, PaginationParams, toPlainJson } from '../master-data/master-data.utils';
 import { CreateReceiptInput } from './inventory.types';
@@ -449,6 +450,13 @@ export class InventoryReceiptService {
       newState: { status: posted.status, receiptNumber: posted.receiptNumber },
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
+    });
+
+    await NotificationEventsService.onInventoryReceiptPosted({
+      id: posted.id,
+      receiptNumber: posted.receiptNumber,
+      warehouseId: posted.warehouseId,
+      itemIds: posted.lines.map(l => l.inventoryItemId),
     });
 
     return posted;

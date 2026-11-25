@@ -1,6 +1,7 @@
 import { AuditAction, Prisma, SalesOrderStatus } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import {
   AuditMeta,
@@ -438,6 +439,14 @@ export class SalesService {
       userAgent: meta.userAgent,
     });
 
+    await NotificationEventsService.onSalesOrderCreated({
+      id: created.id,
+      orderNumber: created.orderNumber,
+      warehouseId: created.warehouseId,
+      salesmanId: created.salesmanId,
+      customerName: created.customer?.legalName,
+    });
+
     return created;
   }
 
@@ -585,6 +594,13 @@ export class SalesService {
       userAgent: meta.userAgent,
     });
 
+    await NotificationEventsService.onSalesOrderSubmitted({
+      id: updated.id,
+      orderNumber: updated.orderNumber,
+      warehouseId: updated.warehouseId,
+      salesmanId: updated.salesmanId,
+    });
+
     return updated;
   }
 
@@ -633,6 +649,13 @@ export class SalesService {
       newState: { status: updated.status },
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
+    });
+
+    await NotificationEventsService.onSalesOrderApproved({
+      id: updated.id,
+      orderNumber: updated.orderNumber,
+      warehouseId: updated.warehouseId,
+      salesmanId: updated.salesmanId,
     });
 
     return updated;
@@ -685,6 +708,13 @@ export class SalesService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       remarks: reason,
+    });
+
+    await NotificationEventsService.onSalesOrderRejected({
+      id: updated.id,
+      orderNumber: updated.orderNumber,
+      salesmanId: updated.salesmanId,
+      reason,
     });
 
     return updated;
@@ -790,6 +820,13 @@ export class SalesService {
       remarks: `Confirmed sales order ${confirmed.orderNumber} and reserved inventory`,
     });
 
+    await NotificationEventsService.onSalesOrderConfirmed({
+      id: confirmed.id,
+      orderNumber: confirmed.orderNumber,
+      warehouseId: confirmed.warehouseId,
+      salesmanId: confirmed.salesmanId,
+    });
+
     return confirmed;
   }
 
@@ -870,6 +907,14 @@ export class SalesService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
       remarks: reason,
+    });
+
+    await NotificationEventsService.onSalesOrderCancelled({
+      id: cancelled.updatedOrder.id,
+      orderNumber: cancelled.updatedOrder.orderNumber,
+      warehouseId: cancelled.updatedOrder.warehouseId,
+      salesmanId: cancelled.updatedOrder.salesmanId,
+      reason,
     });
 
     return cancelled.updatedOrder;
@@ -1061,6 +1106,18 @@ export class SalesService {
       ipAddress: meta.ipAddress,
       userAgent: meta.userAgent,
     });
+
+    await NotificationEventsService.onSalesOrderFulfilled({
+      id: result.order.id,
+      orderNumber: result.order.orderNumber,
+      warehouseId: result.order.warehouseId,
+      salesmanId: result.order.salesmanId,
+      status: result.order.status,
+    });
+    await NotificationEventsService.evaluateInventoryAlerts(
+      result.order.warehouseId,
+      result.order.lines.map(l => l.inventoryItemId),
+    );
 
     return { order: result.order, fulfillment: result.fulfillment };
   }

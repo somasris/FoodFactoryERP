@@ -10,6 +10,7 @@ import {
   TokenPayload,
 } from '../../utils/token';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AuthResult, AuthUserData, LoginInput, RegisterInput } from './auth.types';
 
 // Dummy hash for timing attack mitigation when user is not found
@@ -154,6 +155,12 @@ export class AuthService {
         roles: user.userRoles.map(ur => ur.role.code),
         createdAt: user.createdAt,
       };
+    });
+
+    await NotificationEventsService.onUserRegistered({
+      id: createdUser.id,
+      username: createdUser.email,
+      requestedRole: createdUser.requestedRole,
     });
 
     return createdUser;

@@ -1,6 +1,7 @@
 import { AuditAction, Prisma, ProductionPlanStatus } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AuditService } from '../../services/audit.service';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AppError } from '../../middleware/error.middleware';
 import {
   AuditMeta,
@@ -1049,6 +1050,18 @@ export class ProductionPlanService {
       userAgent: meta.userAgent,
       remarks: reason,
     });
+
+    if (toStatus === 'SUBMITTED' || toStatus === 'APPROVED' || toStatus === 'REJECTED') {
+      await NotificationEventsService.onProductionPlanEvent(
+        {
+          id: result.plan.id,
+          planNumber: result.plan.planNumber,
+          warehouseId: result.plan.warehouseId,
+        },
+        toStatus,
+        reason,
+      );
+    }
 
     return result.plan;
   }

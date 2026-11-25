@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AssignUserWarehouseAccessInput } from './admin.types';
 import { AdminActorMeta } from './organization.service';
 
@@ -120,6 +121,16 @@ export class WarehouseAccessService {
       });
     });
 
+    for (const a of dedupedAssignments) {
+      await NotificationEventsService.onWarehouseAccessChanged({
+        userId,
+        warehouseId: a.warehouseId,
+        warehouseCode: a.warehouseId.slice(0, 8),
+        granted: true,
+        accessLevel: a.accessLevel,
+      });
+    }
+
     return this.listWarehouseAccess({ userId });
   }
 
@@ -164,6 +175,13 @@ export class WarehouseAccessService {
           userAgent: actor.userAgent || null,
         },
       });
+    });
+
+    await NotificationEventsService.onWarehouseAccessChanged({
+      userId,
+      warehouseId,
+      warehouseCode: existing.warehouse.code,
+      granted: false,
     });
 
     return { revoked: true, userId, warehouseId };

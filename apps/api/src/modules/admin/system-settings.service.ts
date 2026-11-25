@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
+import { NotificationEventsService } from '../notifications/notification-events.service';
 import { UpdateSettingsInput } from './admin.types';
 import { AdminActorMeta } from './organization.service';
 
@@ -327,6 +328,8 @@ export class SystemSettingsService {
 
       return results;
     });
+
+    await NotificationEventsService.onSystemSettingsChanged(input.settings.map(s => s.key));
 
     return updatedItems;
   }
