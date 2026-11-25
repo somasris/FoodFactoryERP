@@ -1,22 +1,35 @@
 import React from 'react';
-import { Badge } from '../common/Badge';
+import { StatusBadge } from '../common/StatusBadge';
 
-const STATUS_MAP: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'teal' | 'warning' | 'outline' | 'success' }
-> = {
-  DRAFT: { label: 'Draft', variant: 'outline' },
-  SUBMITTED: { label: 'Submitted', variant: 'secondary' },
-  APPROVED: { label: 'Approved', variant: 'teal' },
-  REJECTED: { label: 'Rejected', variant: 'default' },
-  CONFIRMED: { label: 'Confirmed', variant: 'teal' },
-  PARTIALLY_FULFILLED: { label: 'Partial', variant: 'warning' },
-  FULFILLED: { label: 'Fulfilled', variant: 'success' },
-  ISSUED: { label: 'Issued', variant: 'success' },
-  CANCELLED: { label: 'Cancelled', variant: 'outline' },
+const LABEL_MAP: Record<string, string> = {
+  DRAFT: 'Draft',
+  SUBMITTED: 'Submitted',
+  APPROVED: 'Approved',
+  REJECTED: 'Rejected',
+  CONFIRMED: 'Confirmed',
+  PARTIALLY_FULFILLED: 'Partial',
+  FULFILLED: 'Fulfilled',
+  ISSUED: 'Issued',
+  CANCELLED: 'Cancelled',
+};
+
+const TONE_MAP: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+  DRAFT: 'neutral',
+  SUBMITTED: 'info',
+  APPROVED: 'success',
+  REJECTED: 'danger',
+  CONFIRMED: 'info',
+  PARTIALLY_FULFILLED: 'warning',
+  FULFILLED: 'success',
+  ISSUED: 'success',
+  CANCELLED: 'danger',
 };
 
 export const SalesStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const cfg = STATUS_MAP[status] || { label: status, variant: 'outline' as const };
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  return (
+    <StatusBadge
+      status={LABEL_MAP[status] || status}
+      tone={TONE_MAP[status] || 'neutral'}
+    />
+  );
 };

@@ -7,6 +7,9 @@ import { useAuth } from '../../hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
+import { PageHeader } from '../../components/common/PageHeader';
+import { KpiCard } from '../../components/common/KpiCard';
+import { ErrorState, LoadingState } from '../../components/common/StateViews';
 import { WorkOrder } from '../../types/production';
 
 const STATUS_BADGE: Record<string, 'default' | 'secondary' | 'teal' | 'warning' | 'outline' | 'success'> = {
@@ -68,18 +71,15 @@ export const ProductionExecutionDashboardPage: React.FC = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">
-        Loading production execution dashboard...
-      </div>
-    );
+    return <LoadingState label="Loading production execution dashboard..." />;
   }
 
   if (error || !summary) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700">
-        {error instanceof Error ? error.message : 'Failed to load execution dashboard'}
-      </div>
+      <ErrorState
+        title="Failed to load execution dashboard"
+        message={error instanceof Error ? error.message : 'Failed to load execution dashboard'}
+      />
     );
   }
 
@@ -96,55 +96,48 @@ export const ProductionExecutionDashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Total Batches</CardTitle>
-            <Layers className="h-4 w-4 text-brand-navy" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-brand-navy">{summary.totalBatches}</div>
-            <p className="mt-1 text-xs text-slate-500">
-              {summary.createdCount} created · {summary.cancelledCount} cancelled
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+      <PageHeader
+        title="Production Execution Dashboard"
+        description="Monitor active shop-floor batches, released work orders, and batch completion status."
+        actions={
+          <Link to="/production/batches">
+            <Button variant="outline" size="sm">
+              View All Batches
+            </Button>
+          </Link>
+        }
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">In Progress</CardTitle>
-            <PlayCircle className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-700">{summary.inProgressCount}</div>
-            <p className="mt-1 text-xs text-slate-500">Active batches on shop floor</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Paused</CardTitle>
-            <PauseCircle className="h-4 w-4 text-slate-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-700">{summary.pausedCount}</div>
-            <p className="mt-1 text-xs text-slate-500">Temporarily held batches</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Completed</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">{summary.completedCount}</div>
-            <p className="mt-1 text-xs text-slate-500">
-              {summary.releasedWorkOrdersCount} work orders open for execution
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="Total Batches"
+          value={summary.totalBatches}
+          sublabel={`${summary.createdCount} created · ${summary.cancelledCount} cancelled`}
+          icon={<Layers className="h-4 w-4" />}
+          tone="neutral"
+        />
+        <KpiCard
+          label="In Progress"
+          value={summary.inProgressCount}
+          sublabel="Active batches on shop floor"
+          icon={<PlayCircle className="h-4 w-4" />}
+          tone="warning"
+        />
+        <KpiCard
+          label="Paused"
+          value={summary.pausedCount}
+          sublabel="Temporarily held batches"
+          icon={<PauseCircle className="h-4 w-4" />}
+          tone="info"
+        />
+        <KpiCard
+          label="Completed"
+          value={summary.completedCount}
+          sublabel={`${summary.releasedWorkOrdersCount} work orders open for execution`}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          tone="success"
+        />
       </div>
 
       <Card>

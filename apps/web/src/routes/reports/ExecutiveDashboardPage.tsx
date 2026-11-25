@@ -1,12 +1,28 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Activity, AlertTriangle, BarChart3, IndianRupee, PackageCheck } from 'lucide-react';
+import {
+  Activity,
+  AlertTriangle,
+  Clock,
+  Factory,
+  IndianRupee,
+  PackageCheck,
+  ShieldCheck,
+  ShoppingCart,
+  Warehouse,
+} from 'lucide-react';
 import { reportsService } from '../../services/reports.service';
+import { PageHeader } from '../../components/common/PageHeader';
+import { KpiCard } from '../../components/common/KpiCard';
+import { ErrorState, LoadingState } from '../../components/common/StateViews';
+
+const formatInr = (val: string | number) =>
+  `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const ExecutiveDashboardPage: React.FC = () => {
   const [financialYear, setFinancialYear] = useState('');
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['reports', 'executive-dashboard', financialYear],
     queryFn: () =>
       reportsService.getExecutiveDashboard({
@@ -15,18 +31,16 @@ export const ExecutiveDashboardPage: React.FC = () => {
   });
 
   if (isLoading) {
-    return (
-      <div className="rounded-lg bg-white p-6 text-sm text-slate-500">
-        Loading executive dashboard KPIs...
-      </div>
-    );
+    return <LoadingState label="Loading executive dashboard KPIs..." />;
   }
 
   if (error || !data) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        Failed to load executive dashboard: {(error as Error)?.message || 'Unknown error'}
-      </div>
+      <ErrorState
+        title="Failed to load executive dashboard"
+        message={(error as Error)?.message || 'Unknown error'}
+        onRetry={() => refetch()}
+      />
     );
   }
 
@@ -34,124 +48,120 @@ export const ExecutiveDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <BarChart3 className="h-5 w-5 text-brand-navy" />
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Executive Management Dashboard</h2>
-            <p className="text-xs text-slate-500">
-              Live cross-module KPIs aggregated from PostgreSQL transactional records.
-            </p>
+      <PageHeader
+        title="Executive Management Dashboard"
+        description="Live cross-module KPIs aggregated from PostgreSQL transactional records."
+        actions={
+          <div className="flex items-center gap-2">
+            <label htmlFor="exec-fy-filter" className="text-xs font-medium text-slate-600">
+              Financial Year
+            </label>
+            <input
+              id="exec-fy-filter"
+              type="text"
+              placeholder="e.g. 2026-27"
+              value={financialYear}
+              onChange={e => setFinancialYear(e.target.value)}
+              className="h-8 w-36 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-800 placeholder:text-slate-400 focus:border-brand-blue focus:outline-none"
+            />
           </div>
-        </div>
-        <input
-          type="text"
-          placeholder="Filter FY (e.g. 2026-27)"
-          value={financialYear}
-          onChange={e => setFinancialYear(e.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs"
-        />
-      </div>
+        }
+      />
 
-      <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <section aria-labelledby="business-kpis-heading" className="space-y-3">
+        <h2
+          id="business-kpis-heading"
+          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500"
+        >
           <IndianRupee className="h-3.5 w-3.5" />
-          Business KPIs
-        </h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="text-xs text-slate-500">Issued Invoice Value</div>
-            <div className="mt-1 text-lg font-bold text-brand-navy">
-              ₹{businessKpis.issuedInvoiceValue}
-            </div>
-            <div className="text-[11px] text-slate-400">
-              {businessKpis.issuedInvoiceCount} issued invoices
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="text-xs text-slate-500">Sales Orders</div>
-            <div className="mt-1 text-lg font-bold text-slate-900">
-              {businessKpis.salesOrderCount}
-            </div>
-            <div className="text-[11px] text-slate-400">Active &amp; fulfilled orders</div>
-          </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="text-xs text-slate-500">Inventory Valuation</div>
-            <div className="mt-1 text-lg font-bold text-slate-900">
-              ₹{businessKpis.inventoryValue}
-            </div>
-            <div className="text-[11px] text-slate-400">MWAC / Batch Actual</div>
-          </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="text-xs text-slate-500">Finalized Prod Cost</div>
-            <div className="mt-1 text-lg font-bold text-slate-900">
-              ₹{businessKpis.finalizedProductionCost}
-            </div>
-            <div className="text-[11px] text-slate-400">
-              Rejection rate: {businessKpis.qualityRejectionRatePercent}%
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4 shadow-sm">
-            <div className="text-xs text-slate-500">Pending Approvals</div>
-            <div className="mt-1 text-lg font-bold text-amber-700">
-              {businessKpis.pendingApprovalsCount}
-            </div>
-            <div className="text-[11px] text-slate-400">SO / Plan / WO / Audit</div>
-          </div>
+          Financial &amp; Commercial KPIs
+        </h2>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+          <KpiCard
+            label="Issued Invoice Value"
+            value={formatInr(businessKpis.issuedInvoiceValue)}
+            sublabel={`${businessKpis.issuedInvoiceCount} issued invoices`}
+            icon={<IndianRupee className="h-4 w-4" />}
+            tone="info"
+          />
+          <KpiCard
+            label="Sales Orders"
+            value={businessKpis.salesOrderCount}
+            sublabel="Active & fulfilled orders"
+            icon={<ShoppingCart className="h-4 w-4" />}
+            tone="neutral"
+          />
+          <KpiCard
+            label="Inventory Valuation"
+            value={formatInr(businessKpis.inventoryValue)}
+            sublabel="MWAC / Batch Actual"
+            icon={<Warehouse className="h-4 w-4" />}
+            tone="success"
+          />
+          <KpiCard
+            label="Finalized Prod Cost"
+            value={formatInr(businessKpis.finalizedProductionCost)}
+            sublabel={`Rejection rate: ${businessKpis.qualityRejectionRatePercent}%`}
+            icon={<Factory className="h-4 w-4" />}
+            tone="neutral"
+          />
+          <KpiCard
+            label="Pending Approvals"
+            value={businessKpis.pendingApprovalsCount}
+            sublabel="SO / Plan / WO / Audit"
+            icon={<Clock className="h-4 w-4" />}
+            tone={Number(businessKpis.pendingApprovalsCount) > 0 ? 'warning' : 'neutral'}
+          />
         </div>
-      </div>
+      </section>
 
-      <div>
-        <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <section aria-labelledby="operational-kpis-heading" className="space-y-3">
+        <h2
+          id="operational-kpis-heading"
+          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500"
+        >
           <Activity className="h-3.5 w-3.5" />
-          Operational KPIs
-        </h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-6">
-          <div className="rounded-lg border bg-white p-4">
-            <div className="text-xs text-slate-500">Active Work Orders</div>
-            <div className="mt-1 text-lg font-bold text-slate-900">
-              {operationalKpis.activeWorkOrders}
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <div className="text-xs text-slate-500">Active Batches</div>
-            <div className="mt-1 text-lg font-bold text-slate-900">
-              {operationalKpis.activeProductionBatches}
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <div className="text-xs text-slate-500">Pending Inspections</div>
-            <div className="mt-1 text-lg font-bold text-amber-700">
-              {operationalKpis.pendingInspections}
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <div className="text-xs text-slate-500 flex items-center gap-1">
-              <AlertTriangle className="h-3 w-3 text-amber-600" />
-              Low Stock Items
-            </div>
-            <div className="mt-1 text-lg font-bold text-amber-700">
-              {operationalKpis.lowStockItemsCount}
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <div className="text-xs text-slate-500">Expiring (30d)</div>
-            <div className="mt-1 text-lg font-bold text-red-700">
-              {operationalKpis.expiringBatchesCount}
-            </div>
-          </div>
-          <div className="rounded-lg border bg-white p-4">
-            <div className="text-xs text-slate-500 flex items-center gap-1">
-              <PackageCheck className="h-3 w-3 text-slate-500" />
-              Delayed Plans
-            </div>
-            <div className="mt-1 text-lg font-bold text-slate-900">
-              {operationalKpis.delayedProductionPlans}
-            </div>
-          </div>
+          Plant &amp; Inventory Operations
+        </h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <KpiCard
+            label="Active Work Orders"
+            value={operationalKpis.activeWorkOrders}
+            icon={<Factory className="h-4 w-4" />}
+            tone="info"
+          />
+          <KpiCard
+            label="Active Batches"
+            value={operationalKpis.activeProductionBatches}
+            icon={<Activity className="h-4 w-4" />}
+            tone="info"
+          />
+          <KpiCard
+            label="Pending Inspections"
+            value={operationalKpis.pendingInspections}
+            icon={<ShieldCheck className="h-4 w-4" />}
+            tone={Number(operationalKpis.pendingInspections) > 0 ? 'warning' : 'neutral'}
+          />
+          <KpiCard
+            label="Low Stock Items"
+            value={operationalKpis.lowStockItemsCount}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            tone={Number(operationalKpis.lowStockItemsCount) > 0 ? 'warning' : 'success'}
+          />
+          <KpiCard
+            label="Expiring (30d)"
+            value={operationalKpis.expiringBatchesCount}
+            icon={<AlertTriangle className="h-4 w-4" />}
+            tone={Number(operationalKpis.expiringBatchesCount) > 0 ? 'danger' : 'success'}
+          />
+          <KpiCard
+            label="Delayed Plans"
+            value={operationalKpis.delayedProductionPlans}
+            icon={<PackageCheck className="h-4 w-4" />}
+            tone={Number(operationalKpis.delayedProductionPlans) > 0 ? 'danger' : 'neutral'}
+          />
         </div>
-      </div>
+      </section>
     </div>
   );
 };
-

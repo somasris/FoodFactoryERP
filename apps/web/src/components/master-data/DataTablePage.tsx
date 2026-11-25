@@ -1,8 +1,9 @@
 import React from 'react';
-import { Plus, Search, RefreshCw, Eye, Pencil, Power, AlertCircle } from 'lucide-react';
+import { Plus, Search, RefreshCw, Eye, Pencil, Power } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../common/Card';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
+import { EmptyState, ErrorState, LoadingState } from '../common/StateViews';
 import { PaginationMeta } from '../../types/master-data';
 
 export interface ColumnDef<T> {
@@ -116,21 +117,18 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
 
       <CardContent>
         {error && (
-          <div className="mb-4 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span>{error}</span>
+          <div className="mb-4">
+            <ErrorState message={error} onRetry={onRefresh} />
           </div>
         )}
 
         {isLoading ? (
-          <div className="py-12 text-center text-sm text-slate-500">Loading records...</div>
+          <LoadingState label="Loading records..." />
         ) : items.length === 0 ? (
-          <div className="rounded-md border border-dashed border-slate-200 py-12 text-center">
-            <p className="text-sm font-medium text-slate-600">No records found</p>
-            <p className="mt-1 text-xs text-slate-400">
-              Try adjusting your search or filters, or create a new entry.
-            </p>
-          </div>
+          <EmptyState
+            title="No records found"
+            description="Try adjusting your search or filters, or create a new entry."
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">

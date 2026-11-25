@@ -1,13 +1,16 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { Boxes, IndianRupee, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
+import { Boxes, IndianRupee, AlertTriangle, Clock } from 'lucide-react';
 import { inventoryService } from '../../services/inventory.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/common/Card';
 import { InventoryStatusBadge } from '../../components/inventory/InventoryStatusBadge';
+import { PageHeader } from '../../components/common/PageHeader';
+import { KpiCard } from '../../components/common/KpiCard';
+import { ErrorState, LoadingState } from '../../components/common/StateViews';
 
 export const InventoryDashboardPage: React.FC = () => {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['inventory', 'dashboard'],
     queryFn: () => inventoryService.dashboard(),
   });
@@ -15,78 +18,55 @@ export const InventoryDashboardPage: React.FC = () => {
   const summary = data?.data;
 
   if (isLoading) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
-        Loading inventory dashboard...
-      </div>
-    );
+    return <LoadingState label="Loading inventory dashboard..." />;
   }
 
   if (error || !summary) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        {error instanceof Error ? error.message : 'Failed to load inventory dashboard'}
-      </div>
+      <ErrorState
+        title="Failed to load inventory dashboard"
+        message={error instanceof Error ? error.message : 'Failed to load inventory dashboard'}
+        onRetry={() => refetch()}
+      />
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Total Stock Value</CardTitle>
-            <IndianRupee className="h-4 w-4 text-brand-navy" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-brand-navy">
-              ₹{Number(summary.totalStockValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-            <p className="mt-1 text-xs text-slate-500">
-              Across {summary.activeWarehouseCount} warehouse(s)
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+      <PageHeader
+        title="Inventory Overview"
+        description="Real-time warehouse stock valuation, expiry monitoring, and pending document queue."
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Active SKUs in Stock</CardTitle>
-            <Boxes className="h-4 w-4 text-teal-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-slate-900">{summary.activeSkuCount}</div>
-            <p className="mt-1 text-xs text-slate-500">
-              {summary.balanceRowCount} warehouse/batch balance rows
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Expiring Within 30 Days</CardTitle>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-700">{summary.expiringSoonCount}</div>
-            <Link
-              to="/inventory/batches"
-              className="mt-1 inline-flex items-center gap-1 text-xs text-brand-blue hover:underline"
-            >
-              Inspect batches <ArrowRight className="h-3 w-3" />
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Expired Batches with Stock</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">{summary.expiredStockCount}</div>
-            <p className="mt-1 text-xs text-slate-500">Blocked from FEFO/FIFO issue</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="Total Stock Value"
+          value={`₹${Number(summary.totalStockValue).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
+          sublabel={`Across ${summary.activeWarehouseCount} warehouse(s)`}
+          icon={<IndianRupee className="h-4 w-4" />}
+          tone="info"
+        />
+        <KpiCard
+          label="Active SKUs in Stock"
+          value={summary.activeSkuCount}
+          sublabel={`${summary.balanceRowCount} warehouse/batch balance rows`}
+          icon={<Boxes className="h-4 w-4" />}
+          tone="neutral"
+        />
+        <KpiCard
+          label="Expiring Within 30 Days"
+          value={summary.expiringSoonCount}
+          sublabel="Requires FEFO priority"
+          icon={<Clock className="h-4 w-4" />}
+          tone={summary.expiringSoonCount > 0 ? 'warning' : 'success'}
+        />
+        <KpiCard
+          label="Expired Batches with Stock"
+          value={summary.expiredStockCount}
+          sublabel="Blocked from FEFO/FIFO issue"
+          icon={<AlertTriangle className="h-4 w-4" />}
+          tone={summary.expiredStockCount > 0 ? 'danger' : 'success'}
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

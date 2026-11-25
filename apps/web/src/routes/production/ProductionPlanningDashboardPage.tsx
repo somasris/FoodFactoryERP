@@ -5,6 +5,9 @@ import { AlertTriangle, CalendarRange, Clock, Rocket } from 'lucide-react';
 import { productionService } from '../../services/production.service';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
+import { PageHeader } from '../../components/common/PageHeader';
+import { KpiCard } from '../../components/common/KpiCard';
+import { ErrorState, LoadingState } from '../../components/common/StateViews';
 
 const STATUS_BADGE: Record<string, 'default' | 'secondary' | 'teal' | 'warning' | 'outline' | 'success'> = {
   DRAFT: 'outline',
@@ -25,69 +28,54 @@ export const ProductionPlanningDashboardPage: React.FC = () => {
   const summary = data?.data;
 
   if (isLoading) {
-    return (
-      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">
-        Loading production planning dashboard...
-      </div>
-    );
+    return <LoadingState label="Loading production planning dashboard..." />;
   }
 
   if (error || !summary) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-700">
-        {error instanceof Error ? error.message : 'Failed to load planning dashboard'}
-      </div>
+      <ErrorState
+        title="Failed to load planning dashboard"
+        message={error instanceof Error ? error.message : 'Failed to load planning dashboard'}
+      />
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Total Plans</CardTitle>
-            <CalendarRange className="h-4 w-4 text-brand-navy" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-brand-navy">{summary.totalPlans}</div>
-            <p className="mt-1 text-xs text-slate-500">
-              {summary.draftPlans} draft · {summary.cancelledPlans} cancelled
-            </p>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+      <PageHeader
+        title="Production Planning Dashboard"
+        description="Material requirements, plan approval pipeline, and shortage alerts."
+      />
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Pending Approval</CardTitle>
-            <Clock className="h-4 w-4 text-amber-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-700">{summary.submittedPlans}</div>
-            <p className="mt-1 text-xs text-slate-500">{summary.approvedPlans} approved</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Released Plans</CardTitle>
-            <Rocket className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-700">{summary.releasedPlans}</div>
-            <p className="mt-1 text-xs text-slate-500">Ready for work orders</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-slate-500">Material Shortages</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-700">{summary.plansWithShortages}</div>
-            <p className="mt-1 text-xs text-slate-500">Active plans with shortages</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard
+          label="Total Plans"
+          value={summary.totalPlans}
+          sublabel={`${summary.draftPlans} draft · ${summary.cancelledPlans} cancelled`}
+          icon={<CalendarRange className="h-4 w-4" />}
+          tone="neutral"
+        />
+        <KpiCard
+          label="Pending Approval"
+          value={summary.submittedPlans}
+          sublabel={`${summary.approvedPlans} approved`}
+          icon={<Clock className="h-4 w-4" />}
+          tone={summary.submittedPlans > 0 ? 'warning' : 'neutral'}
+        />
+        <KpiCard
+          label="Released Plans"
+          value={summary.releasedPlans}
+          sublabel="Ready for work orders"
+          icon={<Rocket className="h-4 w-4" />}
+          tone="success"
+        />
+        <KpiCard
+          label="Material Shortages"
+          value={summary.plansWithShortages}
+          sublabel="Active plans with shortages"
+          icon={<AlertTriangle className="h-4 w-4" />}
+          tone={summary.plansWithShortages > 0 ? 'danger' : 'success'}
+        />
       </div>
 
       <Card>

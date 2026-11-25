@@ -4,6 +4,7 @@ import { Activity, CheckSquare, Download, FileClock, History, Search } from 'luc
 import { AuditLogEntry, governanceService } from '../../services/governance.service';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../../components/common/Badge';
+import { PageHeader } from '../../components/common/PageHeader';
 
 type GovTab = 'audit' | 'approvals' | 'activity' | 'transactions';
 
@@ -44,8 +45,26 @@ export const AuditGovernancePage: React.FC = () => {
   });
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="space-y-5">
+      <PageHeader
+        title="Audit & Governance"
+        description="Immutable audit trail, approval governance, user activity logs, and transaction history."
+        actions={
+          canExport &&
+          tab === 'audit' && (
+            <button
+              type="button"
+              onClick={() => governanceService.exportAuditCsv()}
+              className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Export Audit CSV
+            </button>
+          )
+        }
+      />
+
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white p-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex flex-wrap gap-1.5">
           {canAudit && (
             <button
@@ -98,16 +117,6 @@ export const AuditGovernancePage: React.FC = () => {
             </button>
           )}
         </div>
-
-        {canExport && tab === 'audit' && (
-          <button
-            onClick={() => governanceService.exportAuditCsv()}
-            className="inline-flex items-center gap-1.5 rounded border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Download className="h-3.5 w-3.5" />
-            Export Audit CSV
-          </button>
-        )}
       </div>
 
       {tab === 'audit' && (

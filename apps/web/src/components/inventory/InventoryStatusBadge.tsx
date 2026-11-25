@@ -1,24 +1,39 @@
 import React from 'react';
-import { Badge } from '../common/Badge';
+import { StatusBadge } from '../common/StatusBadge';
 
-const STATUS_MAP: Record<
-  string,
-  { label: string; variant: 'default' | 'secondary' | 'teal' | 'warning' | 'outline' | 'success' }
-> = {
-  DRAFT: { label: 'Draft', variant: 'outline' },
-  SUBMITTED: { label: 'Submitted', variant: 'secondary' },
-  APPROVED: { label: 'Approved', variant: 'teal' },
-  POSTED: { label: 'Posted', variant: 'success' },
-  IN_TRANSIT: { label: 'In Transit', variant: 'warning' },
-  RECEIVED: { label: 'Received', variant: 'success' },
-  CANCELLED: { label: 'Cancelled', variant: 'outline' },
-  VALID: { label: 'Valid', variant: 'success' },
-  EXPIRING_SOON: { label: 'Expiring Soon', variant: 'warning' },
-  EXPIRED: { label: 'Expired', variant: 'default' },
-  NO_EXPIRY: { label: 'No Expiry', variant: 'outline' },
+const LABEL_MAP: Record<string, string> = {
+  DRAFT: 'Draft',
+  SUBMITTED: 'Submitted',
+  APPROVED: 'Approved',
+  POSTED: 'Posted',
+  IN_TRANSIT: 'In Transit',
+  RECEIVED: 'Received',
+  CANCELLED: 'Cancelled',
+  VALID: 'Valid',
+  EXPIRING_SOON: 'Expiring Soon',
+  EXPIRED: 'Expired',
+  NO_EXPIRY: 'No Expiry',
+};
+
+const TONE_MAP: Record<string, 'neutral' | 'info' | 'success' | 'warning' | 'danger'> = {
+  DRAFT: 'neutral',
+  SUBMITTED: 'info',
+  APPROVED: 'info',
+  POSTED: 'success',
+  IN_TRANSIT: 'warning',
+  RECEIVED: 'success',
+  CANCELLED: 'danger',
+  VALID: 'success',
+  EXPIRING_SOON: 'warning',
+  EXPIRED: 'danger',
+  NO_EXPIRY: 'neutral',
 };
 
 export const InventoryStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-  const cfg = STATUS_MAP[status] || { label: status, variant: 'outline' as const };
-  return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
+  return (
+    <StatusBadge
+      status={LABEL_MAP[status] || status}
+      tone={TONE_MAP[status] || 'neutral'}
+    />
+  );
 };
