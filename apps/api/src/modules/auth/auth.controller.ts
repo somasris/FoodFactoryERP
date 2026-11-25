@@ -3,6 +3,7 @@ import { AuthService } from './auth.service';
 import { loginSchema, refreshSchema, registerSchema } from './auth.types';
 import { sendSuccess } from '../../utils/response';
 import { env } from '../../config/env';
+import { getDemoAccounts, isDemoModeEnabled } from '../../config/demo-accounts';
 
 const REFRESH_COOKIE_NAME = 'ff_refresh_token';
 
@@ -166,6 +167,30 @@ export class AuthController {
 
       const userProfile = await AuthService.getCurrentUser(req.user.userId);
       sendSuccess(res, 'User profile retrieved successfully', userProfile, 200);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/auth/demo-accounts
+   * Returns development/demo account credentials ONLY when demo mode is explicitly enabled
+   * in a non-production environment.
+   */
+  static async demoAccounts(_req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const enabled = isDemoModeEnabled();
+      const accounts = enabled
+        ? getDemoAccounts().map(a => ({
+            role: a.role,
+            label: a.label,
+            description: a.description,
+            email: a.email,
+            password: a.password,
+          }))
+        : [];
+
+      sendSuccess(res, 'Demo account configuration retrieved', { enabled, accounts }, 200);
     } catch (error) {
       next(error);
     }

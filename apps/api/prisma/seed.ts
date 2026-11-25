@@ -1,5 +1,6 @@
 import { PrismaClient, WarehouseType } from '@prisma/client';
 import { env } from '../src/config/env';
+import { getDemoAccounts, isDemoModeEnabled } from '../src/config/demo-accounts';
 import { hashPassword, validatePasswordPolicy } from '../src/utils/password';
 
 const prisma = new PrismaClient();
@@ -1436,6 +1437,70 @@ async function main() {
     console.info(
       '  ℹ️ INITIAL_OWNER_EMAIL and INITIAL_OWNER_PASSWORD not set. Skipping owner user creation.',
     );
+  }
+
+  // 5b. Provision Development Demo Accounts (STRICTLY non-production + DEMO_MODE_ENABLED=true)
+  if (isDemoModeEnabled()) {
+    const demoAccounts = getDemoAccounts();
+    for (const demo of demoAccounts) {
+      const role = await prisma.role.findUnique({ where: { code: demo.role } });
+      if (!role) continue;
+
+      const existingDemo = await prisma.user.findFirst({
+        where: {
+          OR: [{ email: demo.email.toLowerCase() }, { username: demo.username.toLowerCase() }],
+        },
+      });
+
+      // Never overwrite an existing real user's password or role
+      if (!existingDemo) {
+        const demoHash = await hashPassword(demo.password);
+        const createdDemo = await prisma.user.create({
+          data: {
+            companyId: company.id,
+            email: demo.email.toLowerCase(),
+            username: demo.username.toLowerCase(),
+            passwordHash: demoHash,
+            fullName: demo.fullName,
+            isActive: true,
+            registrationStatus: 'APPROVED',
+            userRoles: {
+              create: { roleId: role.id },
+            },
+          },
+        });
+
+        const warehousesForRole =
+          demo.role === 'SALESMAN'
+            ? [{ wh: whFG, level: 'READ' as const }]
+            : demo.role === 'AUDITOR'
+              ? [
+                  { wh: whRM, level: 'READ' as const },
+                  { wh: whPKG, level: 'READ' as const },
+                  { wh: whFG, level: 'READ' as const },
+                ]
+              : [
+                  { wh: whRM, level: 'READ_WRITE' as const },
+                  { wh: whPKG, level: 'READ_WRITE' as const },
+                  { wh: whFG, level: 'READ_WRITE' as const },
+                ];
+
+        for (const item of warehousesForRole) {
+          await prisma.userWarehouseAccess.upsert({
+            where: {
+              userId_warehouseId: { userId: createdDemo.id, warehouseId: item.wh.id },
+            },
+            update: {},
+            create: {
+              userId: createdDemo.id,
+              warehouseId: item.wh.id,
+              accessLevel: item.level,
+            },
+          });
+        }
+        console.info(`  ✅ Demo ${demo.role} account created: ${demo.email}`);
+      }
+    }
   }
 
   console.info('✅ Phase 1.3 database seed completed successfully!');

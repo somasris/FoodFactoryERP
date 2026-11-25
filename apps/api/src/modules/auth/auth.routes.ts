@@ -48,6 +48,7 @@ const registerLimiter = rateLimit({
   },
 });
 
+authRouter.get('/demo-accounts', AuthController.demoAccounts);
 authRouter.post('/register', registerLimiter, AuthController.register);
 authRouter.post('/login', loginLimiter, AuthController.login);
 authRouter.post('/refresh', refreshLimiter, validateCsrfProtection, AuthController.refresh);

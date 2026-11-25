@@ -30,6 +30,16 @@ const envSchema = z.object({
   INITIAL_OWNER_USERNAME: z.string().min(3).optional(),
   INITIAL_OWNER_PASSWORD: z.string().min(8).optional(),
   INITIAL_OWNER_FULLNAME: z.string().optional(),
+  DEMO_MODE_ENABLED: z
+    .string()
+    .transform(v => v === 'true')
+    .optional(),
+  DEMO_DEFAULT_PASSWORD: z.string().min(8).optional(),
+  DEMO_OWNER_EMAIL: z.string().email().optional(),
+  DEMO_ADMIN_EMAIL: z.string().email().optional(),
+  DEMO_SALESMAN_EMAIL: z.string().email().optional(),
+  DEMO_PRODUCTION_EMAIL: z.string().email().optional(),
+  DEMO_AUDITOR_EMAIL: z.string().email().optional(),
 });
 
 const parseEnv = () => {
