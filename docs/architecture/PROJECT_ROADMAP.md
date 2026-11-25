@@ -63,7 +63,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.3** | Work Order Management | `TESTED` | Yes (`WorkOrder`, `WorkOrderStatusHistory`, `WorkOrderNumberSequence`, `/production/work-orders`) | 6 API (`work-orders.test.ts`) + 5 Web (`work-orders.test.tsx`) | Pending manual browser UI verification |
 | **3.4** | Batch Production Execution | `TESTED` | Yes (`ProductionBatch`, consumption/output/yield, FG receipt, `/production/execution`) | 5 API (`production-batches.test.ts`) + 4 Web (`production-batches.test.tsx`) | Pending manual browser UI verification |
 | **3.5** | Material Consumption & Finished Goods | `TESTED` | Yes (`ProductionBatchReturn`, `VarianceApproval`, `QualityInspection`, `/production/reconciliation`, `/production/quality`, `/production/traceability`) | 3 API (`material-fg.test.ts`) + 4 Web (`material-fg.test.tsx`) | Pending manual browser UI verification |
-| **3.6** | Production Costing | `PLANNED` | No (`ProductionOverhead`, `ProductionVariance` in draft) | None | Not started |
+| **3.6** | Production Costing | `TESTED` | Yes (`ProductionBatchCosting`, `ProductionCostEntry`, `ProductionOverheadAllocation`, `ProductionCostingHistory`) | `apps/api/src/modules/production/production-costing.*` | `/production/costing/*` pages; API + Web tests passing |
 | **3.7** | Production Reports | `PLANNED` | No (`apps/api/src/modules/reports/.gitkeep` placeholder) | None | Not started |
 | **4.1** | System Administration | `PLANNED` | Partial (Backend `/api/v1/users` exists; `/admin` UI is placeholder) | User/RBAC tests in 1.3 | Admin UI not started |
 | **4.2** | Financial & Compliance Management | `PLANNED` | No (`Payment`, `Expense`, GST ledgers in draft schema) | None | Not started |
@@ -326,16 +326,16 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Current Status:** `TESTED` (Implemented with reconciliation, returns, variance approvals, quality inspections, quarantine gating, shelf-life, recall lookup, RBAC, frontend pages, 3 API tests, and 4 frontend tests passing; manual browser UI verification pending; see [PHASE_3_5_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_5_VERIFICATION_REPORT.md)).
 
 #### 3.6 Production Costing
-- **Purpose:** Compute true batch production cost and unit cost per packet by combining net material cost and direct overheads.
-- **Functional Scope:** `ProductionOverhead` (`LABOUR`, `UTILITY`, `MACHINE_DEPRECIATION`, `DIRECT_OVERHEAD`), `ProductionVariance`, and `ProductionRun` cost fields.
-- **Key Features:** Exact `Decimal(14,2)` / `Decimal(18,4)` unit cost calculation (`(MaterialCost + OverheadCost) / GoodOutput`), yield and usage variance analysis.
-- **Database Dependencies:** `ProductionRun`, `ProductionOverhead`, `ProductionVariance` (draft schema).
-- **Backend Dependencies:** `apps/api/src/modules/production/` (placeholder).
-- **Frontend Components:** `/production` and `/reports` (placeholders).
-- **Integration Dependencies:** Phase 3.4 Batch Execution, Phase 3.5 Material Consumption & MWAC.
-- **Testing Requirements:** Benchmark costing verification (material + overhead / good output, zero scrap double-counting).
-- **Completion Criteria:** Unit production cost blends accurately into finished goods warehouse MWAC.
-- **Current Status:** `PLANNED`
+- **Purpose:** Compute true batch production cost and unit cost per accepted good unit by combining net material cost, labour, machine, and allocated overheads.
+- **Functional Scope:** `ProductionBatchCosting` (`DRAFT` → `CALCULATED` → `REVIEWED` → `FINALIZED`), `ProductionCostEntry` (`DIRECT_LABOUR`, `MACHINE_COST`, `OTHER_DIRECT_EXPENSE`), `ProductionOverheadAllocation` (`PER_BATCH`, `PER_UNIT`, `PERCENT_OF_MATERIAL`, `PER_LABOUR_HOUR`), `ProductionCostingHistory`, and FG MWAC revaluation.
+- **Key Features:** Exact `Prisma.Decimal` calculation, historical transaction material costing with return deductions, wastage/rejection cost separation, safe zero-output handling, variance analysis, idempotent FG valuation integration, and RBAC (`OWNER`, `ADMIN`, `PRODUCTION`, `AUDITOR`).
+- **Database Dependencies:** `ProductionBatchCosting`, `ProductionCostEntry`, `ProductionOverheadAllocation`, `ProductionCostingHistory` (`20261125083914_production_costing_phase_3_6`).
+- **Backend Dependencies:** `apps/api/src/modules/production/production-costing.{types,service,controller}.ts`.
+- **Frontend Components:** `/production/costing`, `/production/costing/batches/:batchId`, `/production/costing/variance-report`.
+- **Integration Dependencies:** Phase 3.4 Batch Execution, Phase 3.5 Material Returns & Quality Inspection, Inventory MWAC Ledger.
+- **Testing Requirements:** Material/return/labour/machine/overhead/variance math, zero accepted output, immutability, FG valuation, and RBAC tests.
+- **Completion Criteria:** Unit production cost blends accurately into finished goods warehouse MWAC without double-counting.
+- **Current Status:** `TESTED` (Implemented with schema/migration, Decimal costing service, RBAC, frontend pages, 2 API tests in `test/production-costing.test.ts`, and 3 frontend tests in `src/test/production-costing.test.tsx` passing; manual browser UI verification pending; see [PHASE_3_6_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_6_VERIFICATION_REPORT.md)).
 
 #### 3.7 Production Reports
 - **Purpose:** Surface batch yield, material usage variance, scrap loss, and unit cost analytics for `PRODUCTION`, `OWNER`, and `AUDITOR` roles.
