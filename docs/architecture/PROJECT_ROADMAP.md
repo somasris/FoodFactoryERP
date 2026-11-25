@@ -48,7 +48,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1.1** | Project Foundation *(provisional)* | `TESTED` | Yes (`apps/api`, `apps/web`, DB, `AppShell`) | Covered by build/typecheck/suite | Pending formal E2E sign-off |
 | **1.2** | Core Infrastructure *(provisional)* | `TESTED` | Yes (`env.ts`, `/health`, logger, error handler) | Covered by API suite | Pending formal E2E sign-off |
-| **1.3** | Authentication & RBAC | `TESTED` | Yes (`auth`, `users`, `AuditService`, `ProtectedRoute`) | 35 API (`auth`, `users`, `rbac`) + 4 Web | Reported completed; E2E UI sign-off not logged |
+| **1.3** | Authentication & RBAC | `TESTED` | Yes (`auth`, `users`, `AuditService`, `ProtectedRoute`, public `/signup` + pending approval workflow) | 43 API (`auth`, `users`, `rbac`, `signup-rbac`) + 9 Web (`auth`, `signup`) | Automated tests pass (`SIGNUP_RBAC_VERIFICATION_REPORT.md`); manual E2E UI sign-off pending |
 | **1.4** | Master Data Management | `TESTED` | Yes (16 models, 15 route groups, 12 UI pages) | 5 API + 3 Web | Reported completed; E2E UI sign-off not logged |
 | **1.5** | Inventory Management | `TESTED` | Yes (12 models, ledger, reservation, 9 UI pages) | 6 API (`inventory.test.ts`) + 3 Web *(46 API / 10 Web in prior stage report)* | Pending manual E2E UI verification |
 | **2.1** | Sales Order Foundation | `IN_PROGRESS` | Yes (`SalesOrder`, `SalesOrderLine`, CRUD) | Covered in `sales.test.ts` (5 API) & `sales.test.tsx` (5 Web) | Pending Phase 2 completion & verification |
