@@ -129,7 +129,7 @@ export class ReportsService {
         b.inventoryItem.valuationMethod === 'BATCH_ACTUAL' && b.batch
           ? b.batch.unitCost
           : b.inventoryItem.movingAverageCost;
-      inventoryValue = inventoryValue.add(b.quantityOnHand.mul(unitCost));
+      inventoryValue = inventoryValue.add(b.quantityOnHand.mul(unitCost).toDecimalPlaces(2));
       if (b.quantityOnHand.lte(lowStockThreshold)) {
         lowStockCount += 1;
       }
