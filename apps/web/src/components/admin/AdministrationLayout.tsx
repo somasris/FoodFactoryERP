@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Warehouse,
   Sliders,
+  FileSearch,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
@@ -50,6 +51,12 @@ export const AdministrationLayout: React.FC = () => {
       to: '/admin/settings',
       icon: Sliders,
       permission: 'administration.settings.read',
+    },
+    {
+      label: 'Audit & Governance',
+      to: '/admin/governance',
+      icon: FileSearch,
+      permission: 'governance.audit.read',
     },
   ].filter(t => hasPermission(t.permission));
 

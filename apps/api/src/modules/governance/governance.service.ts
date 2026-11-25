@@ -566,7 +566,7 @@ export class GovernanceService {
         amountOrQty: '-',
         timestamp: q.inspectedAt,
       })),
-    ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    ].sort((a, b) => new Date(b.timestamp ?? 0).getTime() - new Date(a.timestamp ?? 0).getTime());
 
     return { items: items.slice(0, 100) };
   }

@@ -69,6 +69,7 @@ import { UsersAdminPage } from './admin/UsersAdminPage';
 import { RolesPermissionsPage } from './admin/RolesPermissionsPage';
 import { WarehouseAccessPage } from './admin/WarehouseAccessPage';
 import { SystemSettingsPage } from './admin/SystemSettingsPage';
+import { AuditGovernancePage } from './admin/AuditGovernancePage';
 import { ReportsComplianceLayout } from '../components/reports/ReportsComplianceLayout';
 import { FinancialCompliancePage } from './compliance/FinancialCompliancePage';
 import { StockAuditPage } from './compliance/StockAuditPage';
@@ -223,6 +224,7 @@ export const router = createBrowserRouter([
           { path: 'roles', element: <RolesPermissionsPage /> },
           { path: 'warehouse-access', element: <WarehouseAccessPage /> },
           { path: 'settings', element: <SystemSettingsPage /> },
+          { path: 'governance', element: <AuditGovernancePage /> },
         ],
       },
       {
