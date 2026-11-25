@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
-import { loginSchema, refreshSchema } from './auth.types';
+import { loginSchema, refreshSchema, registerSchema } from './auth.types';
 import { sendSuccess } from '../../utils/response';
 import { env } from '../../config/env';
 
@@ -28,6 +28,28 @@ const getClearCookieOptions = () => {
 };
 
 export class AuthController {
+  /**
+   * POST /api/v1/auth/register
+   */
+  static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const validatedInput = registerSchema.parse(req.body);
+      const ipAddress = req.ip || req.socket.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+
+      const user = await AuthService.register(validatedInput, ipAddress, userAgent);
+
+      sendSuccess(
+        res,
+        'Registration submitted successfully. Your account is pending administrator approval.',
+        user,
+        201,
+      );
+    } catch (error) {
+      next(error);
+    }
+  }
+
   /**
    * POST /api/v1/auth/login
    */

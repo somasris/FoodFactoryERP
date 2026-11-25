@@ -282,6 +282,12 @@ enum RestoreRequestStatus {
   REJECTED
 }
 
+enum UserRegistrationStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
 // ------------------------------------------------------------------------------
 // 0. FOUNDATION & CONFIG
 // ------------------------------------------------------------------------------
@@ -403,9 +409,10 @@ model User {
   username     String    @unique @db.VarChar(50)
   passwordHash String    @map("password_hash") @db.VarChar(255)
   fullName     String    @map("full_name") @db.VarChar(100)
-  phone        String?   @db.VarChar(20)
-  isActive     Boolean   @default(true) @map("is_active")
-  lastLoginAt  DateTime? @map("last_login_at")
+  phone              String?                @db.VarChar(20)
+  isActive           Boolean                @default(true) @map("is_active")
+  registrationStatus UserRegistrationStatus @default(APPROVED) @map("registration_status")
+  lastLoginAt        DateTime?              @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 

@@ -34,6 +34,21 @@ const refreshLimiter = rateLimit({
   },
 });
 
+// Strict rate limiter for public registration: 10 attempts per 15 minutes
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: req => process.env.NODE_ENV === 'test' && req.headers['x-enable-rate-limit-test'] !== 'true',
+  message: {
+    success: false,
+    message: 'Too many registration attempts. Please try again after 15 minutes.',
+    timestamp: new Date().toISOString(),
+  },
+});
+
+authRouter.post('/register', registerLimiter, AuthController.register);
 authRouter.post('/login', loginLimiter, AuthController.login);
 authRouter.post('/refresh', refreshLimiter, validateCsrfProtection, AuthController.refresh);
 authRouter.post('/logout', validateCsrfProtection, AuthController.logout);

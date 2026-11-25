@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
 import { env } from '../../config/env';
-import { hashPassword, verifyPassword } from '../../utils/password';
+import { hashPassword, validatePasswordPolicy, verifyPassword } from '../../utils/password';
 import {
   generateAccessToken,
   generateRefreshToken,
@@ -10,7 +10,7 @@ import {
   TokenPayload,
 } from '../../utils/token';
 import { AuditService } from '../../services/audit.service';
-import { AuthResult, AuthUserData, LoginInput } from './auth.types';
+import { AuthResult, AuthUserData, LoginInput, RegisterInput } from './auth.types';
 
 // Dummy hash for timing attack mitigation when user is not found
 let dummyHash = '';
@@ -21,6 +21,81 @@ hashPassword('dummy_timing_mitigation_password').then(h => (dummyHash = h));
 const REFRESH_CONCURRENCY_GRACE_WINDOW_MS = 5000;
 
 export class AuthService {
+  /**
+   * Public user registration.
+   * Creates an inactive account in PENDING_APPROVAL state with zero roles or permissions.
+   * An authorized OWNER or ADMIN must approve and assign a role before the user can sign in.
+   */
+  static async register(input: RegisterInput, ipAddress?: string, userAgent?: string) {
+    const normalizedEmail = input.email.trim().toLowerCase();
+
+    const policyCheck = validatePasswordPolicy(input.password);
+    if (!policyCheck.isValid) {
+      throw new AppError(policyCheck.reason || 'Password does not meet security policy', 400);
+    }
+
+    const existing = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new AppError('An account with this email address already exists', 409);
+    }
+
+    const emailPrefix =
+      normalizedEmail.split('@')[0].replace(/[^a-z0-9_]/g, '').slice(0, 18) || 'user';
+    let username = `${emailPrefix}_${crypto.randomBytes(3).toString('hex')}`;
+    while (await prisma.user.findUnique({ where: { username }, select: { id: true } })) {
+      username = `${emailPrefix}_${crypto.randomBytes(4).toString('hex')}`;
+    }
+
+    const passwordHash = await hashPassword(input.password);
+
+    const createdUser = await prisma.$transaction(async tx => {
+      const user = await tx.user.create({
+        data: {
+          email: normalizedEmail,
+          username,
+          fullName: input.name.trim(),
+          phone: input.phoneNumber?.trim() || null,
+          passwordHash,
+          isActive: false,
+          registrationStatus: 'PENDING_APPROVAL',
+        },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          isActive: true,
+          registrationStatus: true,
+          createdAt: true,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: user.id,
+          action: 'CREATE',
+          entityType: 'UserRegistration',
+          entityId: user.id,
+          newState: {
+            email: user.email,
+            fullName: user.fullName,
+            isActive: user.isActive,
+            registrationStatus: user.registrationStatus,
+          },
+          ipAddress: ipAddress || null,
+          userAgent: userAgent || null,
+          remarks: 'Public user registration submitted (pending administrator approval)',
+        },
+      });
+
+      return user;
+    });
+
+    return createdUser;
+  }
+
   /**
    * Authenticate user with username or email and password.
    */
@@ -90,7 +165,36 @@ export class AuthService {
       throw new AppError('Invalid email/username or password', 401);
     }
 
-    // Check account active status
+    // Check registration approval & account active status
+    if (user.registrationStatus === 'PENDING_APPROVAL') {
+      await AuditService.log({
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        entityType: 'User',
+        entityId: user.id,
+        remarks: 'Login blocked: registration pending administrator approval',
+        ipAddress,
+        userAgent,
+      });
+      throw new AppError('Your registration is pending administrator approval.', 403);
+    }
+
+    if (user.registrationStatus === 'REJECTED') {
+      await AuditService.log({
+        userId: user.id,
+        action: 'LOGIN_FAILED',
+        entityType: 'User',
+        entityId: user.id,
+        remarks: 'Login blocked: registration rejected',
+        ipAddress,
+        userAgent,
+      });
+      throw new AppError(
+        'Your registration request was rejected. Please contact an administrator.',
+        403,
+      );
+    }
+
     if (!user.isActive) {
       await AuditService.log({
         userId: user.id,
