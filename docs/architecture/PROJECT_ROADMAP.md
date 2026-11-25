@@ -65,7 +65,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.5** | Material Consumption & Finished Goods | `TESTED` | Yes (`ProductionBatchReturn`, `VarianceApproval`, `QualityInspection`, `/production/reconciliation`, `/production/quality`, `/production/traceability`) | 3 API (`material-fg.test.ts`) + 4 Web (`material-fg.test.tsx`) | Pending manual browser UI verification |
 | **3.6** | Production Costing | `TESTED` | Yes (`ProductionBatchCosting`, `ProductionCostEntry`, `ProductionOverheadAllocation`, `ProductionCostingHistory`) | `apps/api/src/modules/production/production-costing.*` | `/production/costing/*` pages; API + Web tests passing |
 | **3.7** | Production Reports | `TESTED` | Yes (`production-reports.*`, `production-reports-export.service.ts`) | 3 API (`production-reports.test.ts`) + 3 Web (`production-reports.test.tsx`) | `/production/reports/*` pages + CSV/Excel/PDF export; pending manual browser UI verification |
-| **4.1** | System Administration | `PLANNED` | Partial (Backend `/api/v1/users` exists; `/admin` UI is placeholder) | User/RBAC tests in 1.3 | Admin UI not started |
+| **4.1** | System Administration | `TESTED` | Yes (`apps/api/src/modules/admin/*`, `AdministrationLayout`, 6 `/admin/*` pages) | 7 API (`admin-phase4-1.test.ts`) + 4 Web (`admin.test.tsx`) | Pending manual browser UI verification |
 | **4.2** | Financial & Compliance Management | `PLANNED` | No (`Payment`, `Expense`, GST ledgers in draft schema) | None | Not started |
 | **4.3** | Business Intelligence & Reports | `PLANNED` | No (`/reports` UI is placeholder) | None | Not started |
 | **4.4** | Audit & Governance | `PLANNED` | Partial (`AuditLog` + `AuditService` active; no Audit UI/viewer) | Audited via auth/RBAC tests | Audit viewer UI not started |
@@ -363,7 +363,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Phase 1.3 Auth & RBAC.
 - **Testing Requirements:** Admin UI workflows, last-owner protection UI handling, and RBAC guards (`ADMIN`, `OWNER`).
 - **Completion Criteria:** All user/role/facility administration tasks can be performed through `/admin` without direct DB access.
-- **Current Status:** `PLANNED` (Backend user APIs exist from Phase 1.3; Admin UI not started).
+- **Current Status:** `TESTED` (Implemented with migration `20261125121620_system_administration_phase_4_1`, `/api/v1/admin/*`, `AdministrationLayout`, 6 UI pages, 7 API tests, and 4 frontend tests passing; manual browser UI verification pending; see [PHASE_4_1_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_4_1_VERIFICATION_REPORT.md)).
 
 #### 4.2 Financial & Compliance Management
 - **Purpose:** Deliver GST compliance (GSTR-1, GSTR-3B), purchase/supplier billing, payment collections/disbursements, and expense tracking.
