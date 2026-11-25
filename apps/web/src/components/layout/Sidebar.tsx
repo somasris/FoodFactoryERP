@@ -57,11 +57,11 @@ const navItems = [
     badgeVariant: 'outline' as const,
   },
   {
-    name: 'Costing & Reports',
+    name: 'Compliance & BI',
     path: '/reports',
     icon: BarChart3,
-    badge: 'Phase 3',
-    badgeVariant: 'outline' as const,
+    badge: 'Phase 4.2',
+    badgeVariant: 'teal' as const,
   },
   {
     name: 'System Admin',

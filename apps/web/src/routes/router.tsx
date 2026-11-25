@@ -4,7 +4,6 @@ import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { LoginPage } from './LoginPage';
 import { UnauthorizedPage } from './UnauthorizedPage';
 import { DashboardPlaceholder } from './DashboardPlaceholder';
-import { ModulePlaceholder } from './ModulePlaceholder';
 import { NotFoundPage } from './NotFoundPage';
 import { MasterDataLayout } from '../components/master-data/MasterDataLayout';
 import { ProductsPage } from './master-data/ProductsPage';
@@ -70,6 +69,9 @@ import { UsersAdminPage } from './admin/UsersAdminPage';
 import { RolesPermissionsPage } from './admin/RolesPermissionsPage';
 import { WarehouseAccessPage } from './admin/WarehouseAccessPage';
 import { SystemSettingsPage } from './admin/SystemSettingsPage';
+import { ReportsComplianceLayout } from '../components/reports/ReportsComplianceLayout';
+import { FinancialCompliancePage } from './compliance/FinancialCompliancePage';
+import { StockAuditPage } from './compliance/StockAuditPage';
 
 export const router = createBrowserRouter([
   {
@@ -192,20 +194,15 @@ export const router = createBrowserRouter([
       {
         path: 'reports',
         element: (
-          <ProtectedRoute requiredRoles={['OWNER', 'ADMIN', 'AUDITOR']}>
-            <ModulePlaceholder
-              moduleName="Costing & Audit Reports"
-              phase="Phase 3 Implementation"
-              summary="Comprehensive unit economics, overhead absorption, GST reconciliation summaries, and financial audit reports."
-              scopePoints={[
-                'True unit cost of finished goods (Raw Material + Packaging + Overhead)',
-                'Gross profit and contribution margin analysis per SKU',
-                'Monthly GSTR-1 and GSTR-3B audit-ready transaction ledgers',
-                'Stock valuation and inventory movement audit reports',
-              ]}
-            />
+          <ProtectedRoute requiredRoles={['OWNER', 'ADMIN', 'AUDITOR', 'PRODUCTION']}>
+            <ReportsComplianceLayout />
           </ProtectedRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/reports/compliance" replace /> },
+          { path: 'compliance', element: <FinancialCompliancePage /> },
+          { path: 'stock-audit', element: <StockAuditPage /> },
+        ],
       },
       {
         path: 'admin',
