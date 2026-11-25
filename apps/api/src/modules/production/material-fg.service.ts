@@ -30,6 +30,7 @@ import {
   ZERO,
 } from '../inventory/inventory.utils';
 import { InventoryReservationService } from '../inventory/inventory-reservation.service';
+import { ProductionCostingService } from './production-costing.service';
 import {
   InspectQualityInput,
   ReturnMaterialsInput,
@@ -456,6 +457,13 @@ export class MaterialFgService {
           });
         }
       }
+
+      await ProductionCostingService.recordPostFinalizationEventInTx(
+        tx,
+        batchId,
+        `Material return recorded (${input.lines.length} line(s))`,
+        user.userId,
+      );
     });
 
     await AuditService.log({
@@ -887,6 +895,13 @@ export class MaterialFgService {
         },
       });
 
+      await ProductionCostingService.recordPostFinalizationEventInTx(
+        tx,
+        qi.productionBatchId,
+        `Quality inspection ${qi.inspectionNumber} decided: ${input.decision} (good: ${goodQty.toFixed(4)}, rejected: ${rejectedQty.toFixed(4)})`,
+        user.userId,
+      );
+
       return saved;
     });
 
@@ -962,6 +977,13 @@ export class MaterialFgService {
           recordedById: user.userId,
         },
       });
+
+      await ProductionCostingService.recordPostFinalizationEventInTx(
+        tx,
+        qi.productionBatchId,
+        `Quarantine ${action === 'RELEASE' ? 'released to ACCEPTED' : 'dispositioned as REJECTED'} (${qi.inspectionNumber})`,
+        user.userId,
+      );
 
       return saved;
     });
