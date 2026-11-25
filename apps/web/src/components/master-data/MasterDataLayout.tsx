@@ -37,8 +37,7 @@ export const MasterDataLayout: React.FC = () => {
 
   return (
     <ModuleLayoutHeader
-      title="Master Data Management"
-      description="Centralized source of truth for products, raw materials, partners, units, taxes, warehouses, and recipes."
+      title="Master Data"
       tabs={visibleTabs}
       ariaLabel="Master data navigation"
     />

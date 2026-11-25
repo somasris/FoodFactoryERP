@@ -57,10 +57,7 @@ export const StockAuditPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <ClipboardCheck className="h-5 w-5 text-brand-navy" />
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Physical Stock Audit Sessions</h2>
-            <p className="text-xs text-slate-500">
-              Counts are reviewed and posted exclusively through the authorized InventoryAdjustment ledger.
-            </p>
+            <h2 className="text-base font-semibold text-[#24352A]">Physical Stock Audits</h2>
           </div>
         </div>
       </div>

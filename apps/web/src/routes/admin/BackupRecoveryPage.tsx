@@ -53,9 +53,9 @@ export const BackupRecoveryPage: React.FC = () => {
         <div className="flex items-center gap-2">
           <HardDriveDownload className="h-5 w-5 text-brand-navy" />
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Backup &amp; Controlled Recovery</h2>
-            <p className="text-xs text-slate-500">
-              Safe backup triggers and approval-gated restore requests (never auto-overwrites active DB).
+            <h2 className="text-base font-semibold text-[#24352A]">Backup &amp; Recovery</h2>
+            <p className="text-xs text-[#66756A]">
+              Manual backup triggers and approval-gated restore requests.
             </p>
           </div>
         </div>
@@ -79,8 +79,7 @@ export const BackupRecoveryPage: React.FC = () => {
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 flex items-center gap-2">
         <ShieldAlert className="h-4 w-4 shrink-0" />
         <span>
-          Restore execution requires explicit administrator approval and manual execution in an isolated recovery environment per{' '}
-          <code>docs/operations/DISASTER_RECOVERY_RUNBOOK.md</code>.
+          Restore execution requires administrator approval and manual execution in an isolated recovery environment.
         </span>
       </div>
 

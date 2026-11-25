@@ -43,9 +43,9 @@ export const MaintenancePage: React.FC = () => {
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-900">Controlled Maintenance Mode</h2>
-            <p className="text-xs text-slate-500">
-              Regular users receive HTTP 503 during maintenance while OWNER and ADMIN retain full bypass access.
+            <h2 className="text-base font-semibold text-[#24352A]">Maintenance Mode</h2>
+            <p className="text-xs text-[#66756A]">
+              Standard users are temporarily blocked during maintenance while OWNER and ADMIN retain access.
             </p>
           </div>
           <Badge variant={maintQuery.data?.enabled ? 'warning' : 'success'}>

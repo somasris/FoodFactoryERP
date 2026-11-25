@@ -42,10 +42,7 @@ export const ProductionPlanningDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Production Planning Dashboard"
-        description="Material requirements, plan approval pipeline, and shortage alerts."
-      />
+      <PageHeader title="Production Planning" />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard

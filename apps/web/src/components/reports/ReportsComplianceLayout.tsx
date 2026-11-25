@@ -43,8 +43,7 @@ export const ReportsComplianceLayout: React.FC = () => {
 
   return (
     <ModuleLayoutHeader
-      title="Compliance, BI & Reports"
-      description="GST compliance summaries, inventory valuation, physical stock audits, and executive analytics."
+      title="Compliance & Reports"
       tabs={tabs}
       ariaLabel="Reports and compliance sections"
     />

@@ -48,7 +48,6 @@ export const AuditGovernancePage: React.FC = () => {
     <div className="space-y-5">
       <PageHeader
         title="Audit & Governance"
-        description="Immutable audit trail, approval governance, user activity logs, and transaction history."
         actions={
           canExport &&
           tab === 'audit' && (

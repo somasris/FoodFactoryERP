@@ -33,10 +33,7 @@ export const InventoryDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Inventory Overview"
-        description="Real-time warehouse stock valuation, expiry monitoring, and pending document queue."
-      />
+      <PageHeader title="Inventory Overview" />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard

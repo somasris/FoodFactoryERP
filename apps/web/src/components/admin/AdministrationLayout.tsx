@@ -32,8 +32,7 @@ export const AdministrationLayout: React.FC = () => {
 
   return (
     <ModuleLayoutHeader
-      title="System Administration"
-      description="Organization profile, factory locations, user security, RBAC governance, system health, and operations."
+      title="Administration"
       tabs={tabs}
       ariaLabel="Administration sections"
     />

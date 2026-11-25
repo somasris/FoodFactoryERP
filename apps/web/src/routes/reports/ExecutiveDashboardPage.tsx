@@ -48,8 +48,7 @@ export const ExecutiveDashboardPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Executive Management Dashboard"
-        description="Live cross-module KPIs aggregated from PostgreSQL transactional records."
+        title="Executive Dashboard"
         actions={
           <div className="flex items-center gap-2">
             <label htmlFor="exec-fy-filter" className="text-xs font-medium text-slate-600">

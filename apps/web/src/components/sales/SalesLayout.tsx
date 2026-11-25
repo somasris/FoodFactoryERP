@@ -26,7 +26,6 @@ export const SalesLayout: React.FC = () => {
   return (
     <ModuleLayoutHeader
       title="Sales & Orders"
-      description="Customer order intake, approval workflow, stock reservation, fulfillment, and GST invoicing."
       tabs={visibleTabs}
       ariaLabel="Sales navigation"
     />

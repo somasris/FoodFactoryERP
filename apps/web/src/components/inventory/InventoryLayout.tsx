@@ -31,8 +31,7 @@ export const InventoryLayout: React.FC = () => {
 
   return (
     <ModuleLayoutHeader
-      title="Inventory Management"
-      description="Warehouse-wise stock balances, receipts, FEFO/FIFO issues, transfers, adjustments, batch expiry, and MWAC valuation."
+      title="Inventory"
       tabs={visibleTabs}
       ariaLabel="Inventory navigation"
     />

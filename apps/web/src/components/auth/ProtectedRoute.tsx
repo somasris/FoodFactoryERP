@@ -23,14 +23,11 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F8F2]">
         <div className="flex items-center gap-3 text-[#24352A]">
-          <Loader2 className="w-8 h-8 animate-spin text-[#245C3A]" />
-          <span className="font-semibold text-lg tracking-wide">
-            Verifying FoodFactory Session...
+          <Loader2 className="w-6 h-6 animate-spin text-[#245C3A]" />
+          <span className="font-medium text-sm tracking-wide">
+            Verifying session...
           </span>
         </div>
-        <p className="text-xs text-slate-400 mt-2">
-          Checking cryptographic credentials and access privileges
-        </p>
       </div>
     );
   }

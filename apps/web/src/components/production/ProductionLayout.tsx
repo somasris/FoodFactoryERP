@@ -38,8 +38,7 @@ export const ProductionLayout: React.FC = () => {
 
   return (
     <ModuleLayoutHeader
-      title="BOM & Production"
-      description="Recipe formulations, demand-driven production planning, batch execution, quality inspection, and costing."
+      title="Production"
       tabs={tabs}
       ariaLabel="Production navigation"
     />

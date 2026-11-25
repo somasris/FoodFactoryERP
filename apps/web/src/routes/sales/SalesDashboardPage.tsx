@@ -28,7 +28,6 @@ export const SalesDashboardPage: React.FC = () => {
     <div className="space-y-5">
       <PageHeader
         title="Sales Overview"
-        description="Order booking, approval pipeline, fulfillment status, and GST invoice metrics."
         actions={
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <input

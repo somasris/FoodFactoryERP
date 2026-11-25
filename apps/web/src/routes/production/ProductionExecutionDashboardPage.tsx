@@ -98,8 +98,7 @@ export const ProductionExecutionDashboardPage: React.FC = () => {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Production Execution Dashboard"
-        description="Monitor active shop-floor batches, released work orders, and batch completion status."
+        title="Production Execution"
         actions={
           <Link to="/production/batches">
             <Button variant="outline" size="sm">

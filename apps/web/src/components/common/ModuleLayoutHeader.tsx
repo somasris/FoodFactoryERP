@@ -11,7 +11,7 @@ export interface ModuleTab {
 
 export interface ModuleLayoutHeaderProps {
   title: string;
-  description: string;
+  description?: string;
   tabs: ModuleTab[];
   ariaLabel: string;
 }
@@ -30,7 +30,7 @@ export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
       <div className="rounded-lg border border-[#E1E7DD] bg-white px-5 pt-4 shadow-[0_1px_2px_rgba(16,59,40,0.04)]">
         <div className="pb-3">
           <h1 className="text-lg font-semibold tracking-tight text-[#24352A]">{title}</h1>
-          <p className="mt-0.5 text-xs text-[#66756A]">{description}</p>
+          {description && <p className="mt-0.5 text-xs text-[#66756A]">{description}</p>}
         </div>
         <nav
           aria-label={ariaLabel}
