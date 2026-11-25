@@ -351,7 +351,8 @@ describe('Phase 4.1 System Administration Integration Suite', () => {
       });
     expect(badValRes.status).toBe(400);
 
-    // Valid update with expectedVersion
+    // Valid update with expectedVersion (always choose a different value so version increments)
+    const nextVal = varianceSetting.value === '7' ? '8' : '7';
     const updRes = await request(app)
       .put('/api/v1/admin/settings')
       .set('Authorization', `Bearer ${adminToken}`)
@@ -359,13 +360,13 @@ describe('Phase 4.1 System Administration Integration Suite', () => {
         settings: [
           {
             key: 'PRODUCTION_VARIANCE_THRESHOLD_PERCENT',
-            value: '7',
+            value: nextVal,
             expectedVersion: varianceSetting.version,
           },
         ],
       });
     expect(updRes.status).toBe(200);
-    expect(updRes.body.data[0].value).toBe('7');
+    expect(updRes.body.data[0].value).toBe(nextVal);
 
     // Stale expectedVersion triggers 409 conflict
     const staleRes = await request(app)

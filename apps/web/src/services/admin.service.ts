@@ -1,4 +1,8 @@
 import { apiClient } from './api-client';
+import { ApiResponse } from '../types/api';
+
+const unwrap = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
+  promise.then(res => res.data as T);
 
 export interface OrganizationProfile {
   id: string;
@@ -123,15 +127,19 @@ export interface PaginatedResponse<T> {
 
 export const adminService = {
   // Organization
-  getOrganization: () => apiClient<OrganizationProfile>('/admin/organization'),
+  getOrganization: () => unwrap(apiClient<OrganizationProfile>('/admin/organization')),
   updateOrganization: (data: Partial<OrganizationProfile>) =>
-    apiClient<OrganizationProfile>('/admin/organization', {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<OrganizationProfile>('/admin/organization', {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    ),
   getOrganizationHistory: (page = 1, limit = 10) =>
-    apiClient<PaginatedResponse<Record<string, unknown>>>(
-      `/admin/organization/history?page=${page}&limit=${limit}`,
+    unwrap(
+      apiClient<PaginatedResponse<Record<string, unknown>>>(
+        `/admin/organization/history?page=${page}&limit=${limit}`,
+      ),
     ),
 
   // Factories
@@ -141,23 +149,29 @@ export const adminService = {
     if (params?.isActive) qs.set('isActive', params.isActive);
     if (params?.page) qs.set('page', String(params.page));
     if (params?.limit) qs.set('limit', String(params.limit));
-    return apiClient<PaginatedResponse<FactoryRecord>>(`/admin/factories?${qs.toString()}`);
+    return unwrap(apiClient<PaginatedResponse<FactoryRecord>>(`/admin/factories?${qs.toString()}`));
   },
   createFactory: (data: Record<string, unknown>) =>
-    apiClient<FactoryRecord>('/admin/factories', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<FactoryRecord>('/admin/factories', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    ),
   updateFactory: (id: string, data: Record<string, unknown>) =>
-    apiClient<FactoryRecord>(`/admin/factories/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<FactoryRecord>(`/admin/factories/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    ),
   setFactoryStatus: (id: string, isActive: boolean) =>
-    apiClient<FactoryRecord>(`/admin/factories/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ isActive }),
-    }),
+    unwrap(
+      apiClient<FactoryRecord>(`/admin/factories/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive }),
+      }),
+    ),
 
   // Users
   listUsers: (params?: { search?: string; role?: string; isActive?: string; page?: number; limit?: number }) => {
@@ -167,100 +181,132 @@ export const adminService = {
     if (params?.isActive) qs.set('isActive', params.isActive);
     if (params?.page) qs.set('page', String(params.page));
     if (params?.limit) qs.set('limit', String(params.limit));
-    return apiClient<PaginatedResponse<AdminUserRecord>>(`/admin/users?${qs.toString()}`);
+    return unwrap(apiClient<PaginatedResponse<AdminUserRecord>>(`/admin/users?${qs.toString()}`));
   },
   createUser: (data: Record<string, unknown>) =>
-    apiClient<AdminUserRecord>('/users', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<AdminUserRecord>('/users', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    ),
   updateUser: (id: string, data: Record<string, unknown>) =>
-    apiClient<AdminUserRecord>(`/users/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<AdminUserRecord>(`/users/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    ),
   assignUserRoles: (id: string, roleCodes: string[]) =>
-    apiClient<{ userId: string; roles: string[] }>(`/users/${id}/roles`, {
-      method: 'PUT',
-      body: JSON.stringify({ roleCodes }),
-    }),
+    unwrap(
+      apiClient<{ userId: string; roles: string[] }>(`/users/${id}/roles`, {
+        method: 'PUT',
+        body: JSON.stringify({ roleCodes }),
+      }),
+    ),
   setUserStatus: (id: string, isActive: boolean) =>
-    apiClient<{ id: string; isActive: boolean }>(`/users/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ isActive }),
-    }),
+    unwrap(
+      apiClient<{ id: string; isActive: boolean }>(`/users/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ isActive }),
+      }),
+    ),
   resetUserPassword: (id: string, newPassword: string, reason?: string) =>
-    apiClient<{ userId: string; sessionsRevoked: boolean }>(`/admin/users/${id}/reset-password`, {
-      method: 'POST',
-      body: JSON.stringify({ newPassword, reason }),
-    }),
+    unwrap(
+      apiClient<{ userId: string; sessionsRevoked: boolean }>(`/admin/users/${id}/reset-password`, {
+        method: 'POST',
+        body: JSON.stringify({ newPassword, reason }),
+      }),
+    ),
   revokeUserSessions: (id: string) =>
-    apiClient(`/users/${id}/revoke-sessions`, { method: 'POST', body: JSON.stringify({}) }),
+    unwrap(apiClient(`/users/${id}/revoke-sessions`, { method: 'POST', body: JSON.stringify({}) })),
   getUserActivity: (id: string, page = 1) =>
-    apiClient<{ user: AdminUserRecord; items: Array<Record<string, unknown>> }>(
-      `/admin/users/${id}/activity?page=${page}&limit=15`,
+    unwrap(
+      apiClient<{ user: AdminUserRecord; items: Array<Record<string, unknown>> }>(
+        `/admin/users/${id}/activity?page=${page}&limit=15`,
+      ),
     ),
 
   // Roles & Permissions
-  listRoles: () => apiClient<RoleRecord[]>('/admin/roles'),
+  listRoles: () => unwrap(apiClient<RoleRecord[]>('/admin/roles')),
   listPermissions: () =>
-    apiClient<{ items: PermissionRecord[]; grouped: Record<string, PermissionRecord[]> }>(
-      '/admin/permissions',
+    unwrap(
+      apiClient<{ items: PermissionRecord[]; grouped: Record<string, PermissionRecord[]> }>(
+        '/admin/permissions',
+      ),
     ),
   createRole: (data: { code: string; name: string; description?: string; permissionCodes: string[] }) =>
-    apiClient<RoleRecord>('/admin/roles', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<RoleRecord>('/admin/roles', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    ),
   updateRole: (id: string, data: { name?: string; description?: string | null; isActive?: boolean }) =>
-    apiClient<RoleRecord>(`/admin/roles/${id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
+    unwrap(
+      apiClient<RoleRecord>(`/admin/roles/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    ),
   updateRolePermissions: (id: string, permissionCodes: string[]) =>
-    apiClient<{ roleId: string; permissions: string[] }>(`/admin/roles/${id}/permissions`, {
-      method: 'PUT',
-      body: JSON.stringify({ permissionCodes }),
-    }),
+    unwrap(
+      apiClient<{ roleId: string; permissions: string[] }>(`/admin/roles/${id}/permissions`, {
+        method: 'PUT',
+        body: JSON.stringify({ permissionCodes }),
+      }),
+    ),
 
   // Warehouse Access
   listWarehouseAccess: (params?: { userId?: string; warehouseId?: string }) => {
     const qs = new URLSearchParams();
     if (params?.userId) qs.set('userId', params.userId);
     if (params?.warehouseId) qs.set('warehouseId', params.warehouseId);
-    return apiClient<WarehouseAccessRecord[]>(`/admin/warehouse-access?${qs.toString()}`);
+    return unwrap(apiClient<WarehouseAccessRecord[]>(`/admin/warehouse-access?${qs.toString()}`));
   },
   assignUserWarehouseAccess: (
     userId: string,
     assignments: Array<{ warehouseId: string; accessLevel: 'READ' | 'READ_WRITE' }>,
   ) =>
-    apiClient<WarehouseAccessRecord[]>(`/admin/warehouse-access/users/${userId}`, {
-      method: 'PUT',
-      body: JSON.stringify({ assignments }),
-    }),
+    unwrap(
+      apiClient<WarehouseAccessRecord[]>(`/admin/warehouse-access/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ assignments }),
+      }),
+    ),
   revokeWarehouseAccess: (userId: string, warehouseId: string) =>
-    apiClient(`/admin/warehouse-access/users/${userId}/warehouses/${warehouseId}`, {
-      method: 'DELETE',
-    }),
+    unwrap(
+      apiClient(`/admin/warehouse-access/users/${userId}/warehouses/${warehouseId}`, {
+        method: 'DELETE',
+      }),
+    ),
   listAllWarehouses: () =>
-    apiClient<{ items: Array<{ id: string; code: string; name: string; warehouseType: string }> }>(
-      '/master-data/warehouses?limit=100',
+    unwrap(
+      apiClient<{ items: Array<{ id: string; code: string; name: string; warehouseType: string }> }>(
+        '/master-data/warehouses?limit=100',
+      ),
     ),
 
   // System Settings
   listSettings: (category?: string) =>
-    apiClient<{ items: SystemSettingRecord[]; grouped: Record<string, SystemSettingRecord[]> }>(
-      category ? `/admin/settings?category=${category}` : '/admin/settings',
+    unwrap(
+      apiClient<{ items: SystemSettingRecord[]; grouped: Record<string, SystemSettingRecord[]> }>(
+        category ? `/admin/settings?category=${category}` : '/admin/settings',
+      ),
     ),
   updateSettings: (
     settings: Array<{ key: string; value: string; expectedVersion?: number }>,
   ) =>
-    apiClient<SystemSettingRecord[]>('/admin/settings', {
-      method: 'PUT',
-      body: JSON.stringify({ settings }),
-    }),
+    unwrap(
+      apiClient<SystemSettingRecord[]>('/admin/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ settings }),
+      }),
+    ),
   getSettingsHistory: (page = 1) =>
-    apiClient<PaginatedResponse<Record<string, unknown>>>(
-      `/admin/settings/history?page=${page}&limit=15`,
+    unwrap(
+      apiClient<PaginatedResponse<Record<string, unknown>>>(
+        `/admin/settings/history?page=${page}&limit=15`,
+      ),
     ),
 };
