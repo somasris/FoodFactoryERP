@@ -373,4 +373,115 @@ describe('Phase 1.3 Authentication, CSRF & Concurrency Suite', () => {
     expect(refreshRes.status).toBe(401);
     expect(refreshRes.body.message).toContain('expired');
   });
+
+  // ============================================================================
+  // 15-19. DATABASE-DRIVEN ROLE RESOLUTION & SECURITY HARDENING
+  // ============================================================================
+
+  it('15. Resolves actual database roles for all five ERP roles on login', async () => {
+    const roleCodes = ['OWNER', 'ADMIN', 'SALESMAN', 'PRODUCTION', 'AUDITOR'] as const;
+    const createdUserIds: string[] = [];
+
+    try {
+      const hashedPassword = await hashPassword(testUserPassword);
+
+      for (const code of roleCodes) {
+        const role = await prisma.role.findUnique({ where: { code } });
+        expect(role).toBeTruthy();
+
+        const username = `role_verify_${code.toLowerCase()}`;
+        await prisma.user.deleteMany({ where: { username } });
+
+        const u = await prisma.user.create({
+          data: {
+            email: `${username}@foodfactory.com`,
+            username,
+            passwordHash: hashedPassword,
+            fullName: `Verify ${code}`,
+            isActive: true,
+            registrationStatus: 'APPROVED',
+            userRoles: { create: { roleId: role!.id } },
+          },
+        });
+        createdUserIds.push(u.id);
+
+        const res = await request(app).post('/api/v1/auth/login').send({
+          usernameOrEmail: u.email,
+          password: testUserPassword,
+        });
+
+        expect(res.status).toBe(200);
+        expect(res.body.data.user.roles).toEqual([code]);
+        expect(res.body.data.user.passwordHash).toBeUndefined();
+      }
+    } finally {
+      if (createdUserIds.length > 0) {
+        await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+      }
+    }
+  });
+
+  it('16. Rejects login when user has no active role assignment', async () => {
+    const hashedPassword = await hashPassword(testUserPassword);
+    await prisma.user.deleteMany({ where: { username: 'authtest_norole' } });
+    const noRoleUser = await prisma.user.create({
+      data: {
+        email: 'authtest_norole@foodfactory.com',
+        username: 'authtest_norole',
+        passwordHash: hashedPassword,
+        fullName: 'No Role User',
+        isActive: true,
+        registrationStatus: 'APPROVED',
+      },
+    });
+
+    try {
+      const res = await request(app).post('/api/v1/auth/login').send({
+        usernameOrEmail: noRoleUser.email,
+        password: testUserPassword,
+      });
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('active role');
+    } finally {
+      await prisma.user.deleteMany({ where: { id: noRoleUser.id } });
+    }
+  });
+
+  it('17. Ignores forged role fields in login request body and returns DB role', async () => {
+    const res = await request(app).post('/api/v1/auth/login').send({
+      usernameOrEmail: 'authtest_active@foodfactory.com',
+      password: testUserPassword,
+      role: 'OWNER',
+      roles: ['OWNER', 'ADMIN'],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.roles).toEqual(['SALESMAN']);
+  });
+
+  it('18. Rejects manipulated JWT claims by resolving current DB roles on protected endpoints', async () => {
+    // Sign a valid JWT claiming OWNER for a user whose DB role is SALESMAN
+    const forgedClaimsToken = jwt.sign(
+      {
+        userId: activeUserId,
+        username: 'authtest_active',
+        email: 'authtest_active@foodfactory.com',
+        roles: ['OWNER'],
+        permissions: ['users.read', 'users.create'],
+      },
+      env.JWT_ACCESS_SECRET,
+      {
+        expiresIn: '5m',
+        issuer: TOKEN_ISSUER,
+        audience: TOKEN_AUDIENCE,
+      },
+    );
+
+    const res = await request(app)
+      .get('/api/v1/users')
+      .set('Authorization', `Bearer ${forgedClaimsToken}`);
+
+    expect(res.status).toBe(403);
+  });
 });

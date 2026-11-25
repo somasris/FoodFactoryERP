@@ -7,12 +7,14 @@ interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRoles?: string[];
   requiredPermissions?: string[];
+  anyPermission?: string[];
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRoles,
   requiredPermissions,
+  anyPermission,
 }) => {
   const { isAuthenticated, isLoading, hasRole, hasPermission } = useAuth();
   const location = useLocation();
@@ -47,6 +49,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (requiredPermissions && requiredPermissions.length > 0) {
     const hasAllPermissions = requiredPermissions.every(perm => hasPermission(perm));
     if (!hasAllPermissions) {
+      return <Navigate to="/unauthorized" replace />;
+    }
+  }
+
+  if (anyPermission && anyPermission.length > 0) {
+    const hasSomePermission = anyPermission.some(perm => hasPermission(perm));
+    if (!hasSomePermission) {
       return <Navigate to="/unauthorized" replace />;
     }
   }

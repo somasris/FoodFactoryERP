@@ -1,9 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '../components/layout/AppShell';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
+import { RoleDashboardRedirect } from '../components/auth/RoleDashboardRedirect';
 import { LoginPage } from './LoginPage';
 import { UnauthorizedPage } from './UnauthorizedPage';
-import { DashboardPlaceholder } from './DashboardPlaceholder';
 import { NotFoundPage } from './NotFoundPage';
 import { MasterDataLayout } from '../components/master-data/MasterDataLayout';
 import { ProductsPage } from './master-data/ProductsPage';
@@ -102,11 +102,27 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <DashboardPlaceholder />,
+        element: <RoleDashboardRedirect />,
+      },
+      {
+        path: 'dashboard',
+        element: <RoleDashboardRedirect />,
       },
       {
         path: 'master-data',
-        element: <MasterDataLayout />,
+        element: (
+          <ProtectedRoute
+            anyPermission={[
+              'master_data.read',
+              'customers.read',
+              'suppliers.read',
+              'warehouses.read',
+              'bom.read',
+            ]}
+          >
+            <MasterDataLayout />
+          </ProtectedRoute>
+        ),
         children: [
           { index: true, element: <Navigate to="/master-data/products" replace /> },
           { path: 'products', element: <ProductsPage /> },
@@ -134,11 +150,39 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="/sales/dashboard" replace /> },
           { path: 'dashboard', element: <SalesDashboardPage /> },
           { path: 'orders', element: <SalesOrdersPage /> },
-          { path: 'orders/new', element: <SalesOrderFormPage /> },
+          {
+            path: 'orders/new',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.orders.create']}>
+                <SalesOrderFormPage />
+              </ProtectedRoute>
+            ),
+          },
           { path: 'orders/:id', element: <SalesOrderDetailPage /> },
-          { path: 'orders/:id/edit', element: <SalesOrderFormPage /> },
-          { path: 'approvals', element: <PendingApprovalsPage /> },
-          { path: 'fulfillment', element: <OrderFulfillmentPage /> },
+          {
+            path: 'orders/:id/edit',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.orders.update']}>
+                <SalesOrderFormPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'approvals',
+            element: (
+              <ProtectedRoute anyPermission={['sales.orders.approve', 'sales.orders.reject']}>
+                <PendingApprovalsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'fulfillment',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.orders.fulfill']}>
+                <OrderFulfillmentPage />
+              </ProtectedRoute>
+            ),
+          },
           { path: 'invoices', element: <SalesInvoicesPage /> },
           { path: 'invoices/:id', element: <SalesInvoiceDetailPage /> },
           { path: 'invoices/:id/edit', element: <SalesInvoiceFormPage /> },
@@ -234,7 +278,14 @@ export const router = createBrowserRouter([
           { path: 'governance', element: <AuditGovernancePage /> },
           { path: 'health', element: <SystemHealthPage /> },
           { path: 'backups', element: <BackupRecoveryPage /> },
-          { path: 'maintenance', element: <MaintenancePage /> },
+          {
+            path: 'maintenance',
+            element: (
+              <ProtectedRoute requiredPermissions={['operations.maintenance.manage']}>
+                <MaintenancePage />
+              </ProtectedRoute>
+            ),
+          },
         ],
       },
       {

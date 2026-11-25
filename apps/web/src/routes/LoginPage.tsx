@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Factory, Loader2 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { authService } from '../services/auth.service';
+import { authService, UserProfile } from '../services/auth.service';
+import { canAccessPath, getDefaultDashboardPath } from '../config/navigation';
 
 const loginSchema = z.object({
   usernameOrEmail: z.string().trim().min(1, 'Username or email is required'),
@@ -41,7 +42,22 @@ export interface LoginPageProps {
 
 export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) => {
   const navigate = useNavigate();
-  const { login, isAuthenticated } = useAuth();
+  const location = useLocation();
+  const { login, isAuthenticated, user } = useAuth();
+
+  const resolvePostLoginDestination = (targetUser: UserProfile | null): string => {
+    const state = location.state as { from?: { pathname?: string; search?: string } } | null;
+    const requestedPath = state?.from?.pathname;
+    if (
+      requestedPath &&
+      requestedPath !== '/login' &&
+      requestedPath !== '/signup' &&
+      canAccessPath(targetUser, requestedPath)
+    ) {
+      return `${requestedPath}${state?.from?.search || ''}`;
+    }
+    return getDefaultDashboardPath(targetUser);
+  };
 
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
 
@@ -70,10 +86,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   }, [initialMode]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate('/', { replace: true });
+    if (isAuthenticated && user) {
+      navigate(resolvePostLoginDestination(user), { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
   const switchMode = (nextMode: 'signin' | 'signup') => {
     setMode(nextMode);
@@ -103,8 +119,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
 
     setIsSubmitting(true);
     try {
-      await login(parsed.data.usernameOrEmail, parsed.data.password);
-      navigate('/', { replace: true });
+      const authenticatedUser = await login(parsed.data.usernameOrEmail, parsed.data.password);
+      navigate(resolvePostLoginDestination(authenticatedUser), { replace: true });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
     } finally {

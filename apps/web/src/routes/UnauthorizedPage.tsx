@@ -2,10 +2,12 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, Home } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { getDefaultDashboardPath } from '../config/navigation';
 
 export const UnauthorizedPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const homePath = getDefaultDashboardPath(user);
 
   return (
     <div className="min-h-[70vh] flex items-center justify-center p-6">
@@ -49,11 +51,11 @@ export const UnauthorizedPage: React.FC = () => {
             <span>Go Back</span>
           </button>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(homePath)}
             className="px-4 py-2 bg-[#172F50] hover:bg-[#1f3f6b] text-white font-medium text-xs rounded-lg transition-colors flex items-center justify-center gap-1.5"
           >
             <Home className="w-3.5 h-3.5" />
-            <span>ERP Dashboard</span>
+            <span>My Dashboard</span>
           </button>
         </div>
       </div>

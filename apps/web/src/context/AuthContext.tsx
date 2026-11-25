@@ -7,7 +7,7 @@ export interface AuthContextType {
   user: UserProfile | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (usernameOrEmail: string, password: string) => Promise<void>;
+  login: (usernameOrEmail: string, password: string) => Promise<UserProfile>;
   logout: () => Promise<void>;
   hasRole: (roleCode: string) => boolean;
   hasPermission: (permissionCode: string) => boolean;
@@ -56,9 +56,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
-  const login = async (usernameOrEmail: string, password: string): Promise<void> => {
+  const login = async (usernameOrEmail: string, password: string): Promise<UserProfile> => {
     const userProfile = await authService.login(usernameOrEmail, password);
     setUser(userProfile);
+    return userProfile;
   };
 
   const logout = async (): Promise<void> => {
