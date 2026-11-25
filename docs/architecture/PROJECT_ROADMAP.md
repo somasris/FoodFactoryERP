@@ -466,6 +466,11 @@ Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 - All module index routes use `ModuleIndexRedirect` (`getModuleIndexPath`), and all child routes enforce granular `ProtectedRoute` permission checks.
 - **Audit Status:** `TESTED` (21 web test files / 85 tests passing; `MANUAL_UI_VERIFIED` pending live browser walkthrough — see `PRODUCTION_READINESS_AUDIT_REPORT.md`).
 
+### Enterprise Notification System (Cross-Cutting)
+- **Status:** `TESTED` (2026-11-25)
+- **Scope:** Persistent PostgreSQL models (`Notification`, `UserNotification`, `NotificationPreference`, `NotificationOutbox`, `NotificationAlertState`), `/api/v1/notifications` REST + authenticated SSE stream, ERP business event integrations (Sales, Invoicing, Inventory/Low-Stock, Production, Quality, Administration, Operations), header `NotificationBell`, `/notifications` center, and `/notifications/preferences`.
+- **Verification:** `23` API test files (`132` tests) and `22` Web test files (`90` tests) passing; `MANUAL_UI_VERIFIED` pending live browser walkthrough (see `NOTIFICATION_SYSTEM_VERIFICATION_REPORT.md`).
+
 ---
 
 ## 8. Roadmap Governance Rules
