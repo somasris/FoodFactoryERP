@@ -64,7 +64,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **3.4** | Batch Production Execution | `TESTED` | Yes (`ProductionBatch`, consumption/output/yield, FG receipt, `/production/execution`) | 5 API (`production-batches.test.ts`) + 4 Web (`production-batches.test.tsx`) | Pending manual browser UI verification |
 | **3.5** | Material Consumption & Finished Goods | `TESTED` | Yes (`ProductionBatchReturn`, `VarianceApproval`, `QualityInspection`, `/production/reconciliation`, `/production/quality`, `/production/traceability`) | 3 API (`material-fg.test.ts`) + 4 Web (`material-fg.test.tsx`) | Pending manual browser UI verification |
 | **3.6** | Production Costing | `TESTED` | Yes (`ProductionBatchCosting`, `ProductionCostEntry`, `ProductionOverheadAllocation`, `ProductionCostingHistory`) | `apps/api/src/modules/production/production-costing.*` | `/production/costing/*` pages; API + Web tests passing |
-| **3.7** | Production Reports | `PLANNED` | No (`apps/api/src/modules/reports/.gitkeep` placeholder) | None | Not started |
+| **3.7** | Production Reports | `TESTED` | Yes (`production-reports.*`, `production-reports-export.service.ts`) | 3 API (`production-reports.test.ts`) + 3 Web (`production-reports.test.tsx`) | `/production/reports/*` pages + CSV/Excel/PDF export; pending manual browser UI verification |
 | **4.1** | System Administration | `PLANNED` | Partial (Backend `/api/v1/users` exists; `/admin` UI is placeholder) | User/RBAC tests in 1.3 | Admin UI not started |
 | **4.2** | Financial & Compliance Management | `PLANNED` | No (`Payment`, `Expense`, GST ledgers in draft schema) | None | Not started |
 | **4.3** | Business Intelligence & Reports | `PLANNED` | No (`/reports` UI is placeholder) | None | Not started |
@@ -338,16 +338,16 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Current Status:** `TESTED` (Implemented with schema/migration, Decimal costing service, RBAC, frontend pages, 2 API tests in `test/production-costing.test.ts`, and 3 frontend tests in `src/test/production-costing.test.tsx` passing; manual browser UI verification pending; see [PHASE_3_6_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_6_VERIFICATION_REPORT.md)).
 
 #### 3.7 Production Reports
-- **Purpose:** Surface batch yield, material usage variance, scrap loss, and unit cost analytics for `PRODUCTION`, `OWNER`, and `AUDITOR` roles.
-- **Functional Scope:** Production summary, variance reports, scrap analytics, and batch cost breakdowns.
-- **Key Features:** Read-only analytical endpoints under `/api/v1/reports` (or `/api/v1/production/reports`).
-- **Database Dependencies:** `ProductionRun`, `ProductionVariance`, `ProductionScrap`, `InventoryTransactionLine`.
-- **Backend Dependencies:** `apps/api/src/modules/reports/` (currently `.gitkeep` placeholder).
-- **Frontend Components:** `/reports` (`ModulePlaceholder`).
-- **Integration Dependencies:** Phase 3.4–3.6 Production data.
-- **Testing Requirements:** Aggregation accuracy and `AUDITOR`/`OWNER` RBAC tests.
-- **Completion Criteria:** Reports match underlying ledger and production run totals with zero mock data.
-- **Current Status:** `PLANNED`
+- **Purpose:** Surface production KPIs, plan vs actual, work order performance, batch yield, material consumption/wastage, quality, costing variance, and time-series trends for `PRODUCTION`, `OWNER`, `ADMIN`, and `AUDITOR` roles.
+- **Functional Scope:** Read-only analytics dashboard, 6 operational & costing reports, daily/weekly/monthly trends, and CSV/Excel/PDF exports.
+- **Key Features:** Read-only endpoints under `/api/v1/production/reports/*`, Indian FY date boundaries, `Prisma.Decimal` precision, granular RBAC (`production.reports.costing.read` separated from operational `production.reports.read`).
+- **Database Dependencies:** Reuses Phase 3.1–3.6 tables (`ProductionPlan`, `WorkOrder`, `ProductionBatch`, `ProductionBatchConsumption`, `ProductionBatchReturn`, `QualityInspection`, `ProductionBatchCosting`).
+- **Backend Dependencies:** `apps/api/src/modules/production/production-reports.{types,service,controller}.ts`, `production-reports-export.service.ts`.
+- **Frontend Components:** `/production/reports`, `/production/reports/{plan-vs-actual,work-order-performance,batch-yield,material-consumption,quality,costing}`.
+- **Integration Dependencies:** Phase 3.4–3.6 Production & Costing data.
+- **Testing Requirements:** KPI/report accuracy, RBAC isolation, export formats, and read-only guarantees.
+- **Completion Criteria:** Reports match underlying ledger and production records with zero mock data.
+- **Current Status:** `TESTED` (Implemented with 9 read-only endpoints, CSV/Excel/PDF export, RBAC, 7 frontend pages + trend charts, 3 API tests in `test/production-reports.test.ts`, and 3 frontend tests in `src/test/production-reports.test.tsx` passing; manual browser UI verification pending; see [PHASE_3_7_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_7_VERIFICATION_REPORT.md)).
 
 ---
 
