@@ -40,7 +40,13 @@ export const NAV_GROUPS: NavGroupConfig[] = [
       {
         label: 'Business Intelligence',
         path: '/reports/bi',
-        requiredPermissions: ['analytics.dashboard.read'],
+        anyPermission: [
+          'analytics.sales.read',
+          'analytics.inventory.read',
+          'analytics.production.read',
+          'analytics.profitability.read',
+          'analytics.factory.read',
+        ],
       },
     ],
   },
