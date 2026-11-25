@@ -239,11 +239,20 @@ describe('Public Sign Up UI Suite', () => {
     renderLoginPage('signin', makeUnauthenticatedAuth(loginMock));
 
     await waitFor(() => {
-      expect(screen.getByText('Try Demo Accounts')).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'OWNER' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'ADMIN' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'SALESMAN' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'PRODUCTION' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'AUDITOR' })).toBeTruthy();
     });
 
+    expect(screen.queryByText(/Try Demo Accounts/i)).toBeNull();
+    expect(screen.queryByText(/evaluation purposes/i)).toBeNull();
+
     for (const demo of demoAccounts) {
-      fireEvent.click(screen.getByRole('button', { name: new RegExp(demo.label, 'i') }));
+      const btn = screen.getByRole('button', { name: demo.role });
+      fireEvent.click(btn);
+      expect(btn.getAttribute('aria-pressed')).toBe('true');
       expect((screen.getByLabelText('Username or Email') as HTMLInputElement).value).toBe(
         demo.email,
       );
@@ -259,7 +268,7 @@ describe('Public Sign Up UI Suite', () => {
     renderLoginPage('signin', makeUnauthenticatedAuth(loginMock));
 
     await waitFor(() => {
-      expect(screen.queryByText('Try Demo Accounts')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'OWNER' })).toBeNull();
     });
   });
 
@@ -273,7 +282,6 @@ describe('Public Sign Up UI Suite', () => {
     renderLoginPage('signin', makeUnauthenticatedAuth(vi.fn()));
 
     await waitFor(() => {
-      expect(screen.getByText('Try Demo Accounts')).toBeTruthy();
       expect(
         screen.getByText(/Demo mode is enabled, but demo credentials are not configured/i),
       ).toBeTruthy();

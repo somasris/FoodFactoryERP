@@ -413,15 +413,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
               </form>
 
               {demoConfig.enabled && (
-                <div className="border-t border-slate-200 pt-4 space-y-2.5">
-                  <div>
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
-                      Try Demo Accounts
-                    </h3>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      Demo accounts are provided for evaluation purposes.
-                    </p>
-                  </div>
+                <div className="border-t border-[#E1E7DD] pt-4">
                   {demoConfig.configError || demoConfig.accounts.length === 0 ? (
                     <div
                       role="status"
@@ -431,7 +423,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                       unavailable.
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div
+                      className="grid grid-cols-1 sm:grid-cols-2 gap-2"
+                      role="group"
+                      aria-label="Quick role sign-in"
+                    >
                       {demoConfig.accounts.map((demo, idx) => {
                         const Icon = DEMO_ROLE_ICONS[demo.role];
                         const isSelected = selectedDemoRole === demo.role;
@@ -456,34 +452,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                               setServerError(null);
                             }}
                             aria-pressed={isSelected}
-                            className={`flex items-start gap-2.5 rounded-md border px-3 py-2 text-left transition-colors ${
+                            className={`flex h-11 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245C3A] ${
                               isLastOdd ? 'sm:col-span-2' : ''
                             } ${
                               isSelected
-                                ? 'border-[#245C3A] bg-[#245C3A]/5 ring-1 ring-[#245C3A]'
-                                : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/70'
+                                ? 'border-[#245C3A] bg-[#EAF1E8] text-[#17452C] ring-1 ring-[#245C3A]'
+                                : 'border-[#E1E7DD] bg-[#FAFBF8] text-[#24352A] hover:border-[#245C3A]/40 hover:bg-[#EAF1E8]/60'
                             }`}
                           >
                             <Icon
-                              className={`mt-0.5 h-4 w-4 shrink-0 ${
-                                isSelected ? 'text-[#245C3A]' : 'text-slate-500'
+                              className={`h-4 w-4 shrink-0 ${
+                                isSelected ? 'text-[#17452C]' : 'text-[#245C3A]'
                               }`}
+                              aria-hidden="true"
                             />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs font-semibold text-slate-900">
-                                  {demo.label}
-                                </span>
-                                {isSelected && (
-                                  <span className="text-[10px] font-semibold text-[#245C3A]">
-                                    Selected
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-[11px] text-slate-500 line-clamp-2">
-                                {demo.description}
-                              </p>
-                            </div>
+                            <span>{demo.role}</span>
                           </button>
                         );
                       })}
