@@ -41,3 +41,4 @@ reportsRouter.get(
   requirePermissions('analytics.export'),
   ReportsController.exportAnalytics,
 );
+

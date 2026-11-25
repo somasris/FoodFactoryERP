@@ -51,3 +51,4 @@ Implemented centralized Financial & Compliance Management under `/api/v1/complia
 
 - `e6dfb97` – `feat(compliance): implement phase 4.2 GST, stock audit, valuation, and traceability backend`
 - *(Current frontend & docs commits appended)*
+

@@ -11,3 +11,4 @@ export const analyticsFilterSchema = z.object({
 });
 
 export type AnalyticsFilter = z.infer<typeof analyticsFilterSchema>;
+
