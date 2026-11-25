@@ -12,6 +12,9 @@ export const refreshSchema = z.object({
   refreshToken: z.string().optional(),
 });
 
+export const ALLOWED_SIGNUP_ROLES = ['ADMIN', 'SALESMAN', 'PRODUCTION', 'AUDITOR'] as const;
+export type AllowedSignupRole = (typeof ALLOWED_SIGNUP_ROLES)[number];
+
 export const registerSchema = z
   .object({
     name: z
@@ -30,6 +33,11 @@ export const registerSchema = z
       .min(8, 'Password must be at least 8 characters long')
       .max(128, 'Password must not exceed 128 characters'),
     phoneNumber: z.string().trim().max(20).optional().nullable(),
+    requestedRole: z.enum(ALLOWED_SIGNUP_ROLES, {
+      errorMap: () => ({
+        message: 'Please select a valid role (ADMIN, SALESMAN, PRODUCTION, or AUDITOR)',
+      }),
+    }),
   })
   .strict();
 

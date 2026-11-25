@@ -91,6 +91,7 @@ export class AuthService {
           passwordHash,
           isActive: false,
           registrationStatus: 'PENDING_APPROVAL',
+          requestedRole: input.requestedRole,
         },
         select: {
           id: true,
@@ -98,6 +99,7 @@ export class AuthService {
           fullName: true,
           isActive: true,
           registrationStatus: true,
+          requestedRole: true,
           createdAt: true,
         },
       });
@@ -113,10 +115,11 @@ export class AuthService {
             fullName: user.fullName,
             isActive: user.isActive,
             registrationStatus: user.registrationStatus,
+            requestedRole: user.requestedRole,
           },
           ipAddress: ipAddress || null,
           userAgent: userAgent || null,
-          remarks: 'Public user registration submitted (pending administrator approval)',
+          remarks: `Public user registration submitted requesting role '${input.requestedRole}' (pending administrator approval)`,
         },
       });
 

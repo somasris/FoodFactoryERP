@@ -412,6 +412,7 @@ model User {
   phone              String?                @db.VarChar(20)
   isActive           Boolean                @default(true) @map("is_active")
   registrationStatus UserRegistrationStatus @default(APPROVED) @map("registration_status")
+  requestedRole      String?                @map("requested_role") @db.VarChar(30)
   lastLoginAt        DateTime?              @map("last_login_at")
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
