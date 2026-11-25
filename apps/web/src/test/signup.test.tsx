@@ -72,13 +72,15 @@ describe('Public Sign Up UI Suite', () => {
     expect(registerSpy).not.toHaveBeenCalled();
   });
 
-  it('3. Submits valid registration and displays pending approval confirmation', async () => {
+  it('3. Submits valid registration, redirects to Sign In with prefilled email, and shows success banner', async () => {
     const registerSpy = vi.spyOn(authService, 'register').mockResolvedValue({
       id: 'user-123',
       email: 'jane.doe@foodfactory.com',
       fullName: 'Jane Doe',
-      isActive: false,
-      registrationStatus: 'PENDING_APPROVAL',
+      isActive: true,
+      registrationStatus: 'APPROVED',
+      requestedRole: 'SALESMAN',
+      roles: ['SALESMAN'],
       createdAt: new Date().toISOString(),
     });
 
@@ -107,8 +109,11 @@ describe('Public Sign Up UI Suite', () => {
         phoneNumber: '+91 9876543210',
         requestedRole: 'SALESMAN',
       });
-      expect(screen.getByText('Registration Submitted')).toBeTruthy();
-      expect(screen.getByText(/pending administrator approval/i)).toBeTruthy();
+      expect(screen.getByText('Account created successfully. You can now sign in.')).toBeTruthy();
+      expect((screen.getByLabelText('Username or Email') as HTMLInputElement).value).toBe(
+        'jane.doe@foodfactory.com',
+      );
+      expect(screen.queryByText(/pending administrator approval/i)).toBeNull();
     });
   });
 

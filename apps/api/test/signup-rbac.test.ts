@@ -111,7 +111,7 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
     await prisma.$disconnect();
   });
 
-  it('1. Registers a new user as inactive PENDING_APPROVAL with Argon2id hash, zero roles, and clean audit log', async () => {
+  it('1. Registers a new user as immediately active APPROVED with Argon2id hash, requested role, and clean audit log', async () => {
     const res = await request(app).post('/api/v1/auth/register').send({
       name: '  Pending Applicant  ',
       email: '  Pending.Applicant@FoodFactory.com  ',
@@ -122,11 +122,13 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
 
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
+    expect(res.body.message).toBe('Account created successfully. You can now sign in.');
     expect(res.body.data.email).toBe('pending.applicant@foodfactory.com');
     expect(res.body.data.fullName).toBe('Pending Applicant');
-    expect(res.body.data.isActive).toBe(false);
-    expect(res.body.data.registrationStatus).toBe('PENDING_APPROVAL');
+    expect(res.body.data.isActive).toBe(true);
+    expect(res.body.data.registrationStatus).toBe('APPROVED');
     expect(res.body.data.requestedRole).toBe('SALESMAN');
+    expect(res.body.data.roles).toEqual(['SALESMAN']);
     expect(res.body.data.passwordHash).toBeUndefined();
     expect(res.body.data.accessToken).toBeUndefined();
     expect(res.body.data.refreshToken).toBeUndefined();
@@ -136,13 +138,13 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
 
     const dbUser = await prisma.user.findUnique({
       where: { id: userId },
-      include: { userRoles: true, warehouseAccess: true },
+      include: { userRoles: { include: { role: true } }, warehouseAccess: true },
     });
     expect(dbUser).not.toBeNull();
     expect(dbUser!.passwordHash).toMatch(/^\$argon2id\$/);
-    expect(dbUser!.isActive).toBe(false);
-    expect(dbUser!.registrationStatus).toBe('PENDING_APPROVAL');
-    expect(dbUser!.userRoles).toHaveLength(0);
+    expect(dbUser!.isActive).toBe(true);
+    expect(dbUser!.registrationStatus).toBe('APPROVED');
+    expect(dbUser!.userRoles.map(ur => ur.role.code)).toEqual(['SALESMAN']);
     expect(dbUser!.warehouseAccess).toHaveLength(0);
 
     const audit = await prisma.auditLog.findFirst({
@@ -190,20 +192,37 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
     expect(tamperedRoleRes.status).toBe(400);
   });
 
-  it('4. Blocks pending user from signing in until approved', async () => {
+  it('4. Newly registered user can sign in immediately without approval and enforces RBAC', async () => {
     const loginRes = await request(app).post('/api/v1/auth/login').send({
       usernameOrEmail: 'pending.applicant@foodfactory.com',
       password: testPassword,
     });
 
-    expect(loginRes.status).toBe(403);
-    expect(loginRes.body.message).toMatch(/pending administrator approval/i);
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.data.user.roles).toEqual(['SALESMAN']);
+    const token = loginRes.body.data.accessToken as string;
+
+    const adminListRes = await request(app)
+      .get('/api/v1/admin/users')
+      .set('Authorization', `Bearer ${token}`);
+    expect(adminListRes.status).toBe(403);
   });
 
-  it('5. Enforces RBAC on registration approval and blocks ADMIN from assigning OWNER', async () => {
-    const pendingUser = await prisma.user.findUniqueOrThrow({
-      where: { email: 'pending.applicant@foodfactory.com' },
+  it('5. Enforces RBAC on registration review endpoint and blocks ADMIN from assigning OWNER', async () => {
+    const pwHash = await hashPassword(testPassword);
+    await prisma.user.deleteMany({ where: { email: 'legacy.pending@foodfactory.com' } });
+    const pendingUser = await prisma.user.create({
+      data: {
+        email: 'legacy.pending@foodfactory.com',
+        username: 'legacy_pending_user',
+        fullName: 'Legacy Pending User',
+        passwordHash: pwHash,
+        isActive: false,
+        registrationStatus: 'PENDING_APPROVAL',
+        requestedRole: 'SALESMAN',
+      },
     });
+    createdUserIds.push(pendingUser.id);
 
     // SALESMAN cannot approve
     const salesmanRes = await request(app)
@@ -227,9 +246,9 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
     expect(ownerEscalateRes.status).toBe(403);
   });
 
-  it('6. Allows ADMIN to approve pending user with SALESMAN role, enabling login with restricted access', async () => {
+  it('6. Allows ADMIN to approve a legacy pending user with SALESMAN role', async () => {
     const pendingUser = await prisma.user.findUniqueOrThrow({
-      where: { email: 'pending.applicant@foodfactory.com' },
+      where: { email: 'legacy.pending@foodfactory.com' },
     });
 
     const approveRes = await request(app)
@@ -242,31 +261,25 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
     expect(approveRes.body.data.isActive).toBe(true);
     expect(approveRes.body.data.roles).toEqual(['SALESMAN']);
 
-    const audit = await prisma.auditLog.findFirst({
-      where: { entityType: 'UserRegistration', entityId: pendingUser.id, action: 'APPROVE' },
-    });
-    expect(audit).not.toBeNull();
-
-    // Now approved user can log in
-    const approvedToken = await loginAs('pending.applicant@foodfactory.com', testPassword);
+    const approvedToken = await loginAs('legacy.pending@foodfactory.com', testPassword);
     expect(approvedToken).toBeTruthy();
-
-    // Approved SALESMAN still cannot access admin users list
-    const adminListRes = await request(app)
-      .get('/api/v1/admin/users')
-      .set('Authorization', `Bearer ${approvedToken}`);
-    expect(adminListRes.status).toBe(403);
   });
 
-  it('7. Allows ADMIN to reject a pending registration and keeps account locked', async () => {
-    const regRes = await request(app).post('/api/v1/auth/register').send({
-      name: 'Rejected Applicant',
-      email: 'rejected.applicant@foodfactory.com',
-      password: testPassword,
-      requestedRole: 'AUDITOR',
+  it('7. Allows ADMIN to reject a legacy pending registration and keeps account locked', async () => {
+    const pwHash = await hashPassword(testPassword);
+    await prisma.user.deleteMany({ where: { email: 'rejected.applicant@foodfactory.com' } });
+    const rejectedUser = await prisma.user.create({
+      data: {
+        email: 'rejected.applicant@foodfactory.com',
+        username: 'rejected_applicant_user',
+        fullName: 'Rejected Applicant',
+        passwordHash: pwHash,
+        isActive: false,
+        registrationStatus: 'PENDING_APPROVAL',
+        requestedRole: 'AUDITOR',
+      },
     });
-    expect(regRes.status).toBe(201);
-    const rejectedId = regRes.body.data.id as string;
+    const rejectedId = rejectedUser.id;
     createdUserIds.push(rejectedId);
 
     const rejectRes = await request(app)
@@ -342,7 +355,7 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
     });
     expect(manipulated.status).toBe(400);
 
-    // All 4 allowed roles succeed as inactive PENDING_APPROVAL with zero granted roles
+    // All 4 allowed roles succeed as immediately active APPROVED and can sign in immediately
     for (const role of ['ADMIN', 'SALESMAN', 'PRODUCTION', 'AUDITOR'] as const) {
       const email = `signup_${role.toLowerCase()}_role@foodfactory.com`;
       await prisma.user.deleteMany({ where: { email } });
@@ -354,9 +367,17 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
       });
       expect(ok.status).toBe(201);
       expect(ok.body.data.requestedRole).toBe(role);
-      expect(ok.body.data.isActive).toBe(false);
-      expect(ok.body.data.registrationStatus).toBe('PENDING_APPROVAL');
+      expect(ok.body.data.roles).toEqual([role]);
+      expect(ok.body.data.isActive).toBe(true);
+      expect(ok.body.data.registrationStatus).toBe('APPROVED');
       createdUserIds.push(ok.body.data.id as string);
+
+      const loginRes = await request(app).post('/api/v1/auth/login').send({
+        usernameOrEmail: email,
+        password: testPassword,
+      });
+      expect(loginRes.status).toBe(200);
+      expect(loginRes.body.data.user.roles).toEqual([role]);
     }
   });
 
