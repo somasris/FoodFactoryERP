@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { KeyRound, Plus, Search, Shield, UserCheck, UserX } from 'lucide-react';
+import { ClipboardCheck, KeyRound, Plus, Search, Shield, UserCheck, UserX } from 'lucide-react';
 import { adminService, AdminUserRecord } from '../../services/admin.service';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../../components/common/Badge';
 
 export const UsersAdminPage: React.FC = () => {
   const queryClient = useQueryClient();
-  const { user: currentUser, hasPermission } = useAuth();
+  const { user: currentUser, hasPermission, hasRole } = useAuth();
   const canCreate = hasPermission('users.create');
   const canManage = hasPermission('administration.users.manage');
   const canDisable = hasPermission('users.disable');
@@ -15,11 +15,17 @@ export const UsersAdminPage: React.FC = () => {
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
+  const [registrationStatusFilter, setRegistrationStatusFilter] = useState<
+    '' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED'
+  >('');
   const [page, setPage] = useState(1);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [resetTarget, setResetTarget] = useState<AdminUserRecord | null>(null);
   const [rolesTarget, setRolesTarget] = useState<AdminUserRecord | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<AdminUserRecord | null>(null);
+  const [reviewRole, setReviewRole] = useState('SALESMAN');
+  const [reviewReason, setReviewReason] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [newPassword, setNewPassword] = useState('');
   const [resetReason, setResetReason] = useState('');
@@ -37,11 +43,12 @@ export const UsersAdminPage: React.FC = () => {
   });
 
   const { data, isLoading } = useQuery({
-    queryKey: ['admin', 'users', search, roleFilter, page],
+    queryKey: ['admin', 'users', search, roleFilter, registrationStatusFilter, page],
     queryFn: () =>
       adminService.listUsers({
         search: search || undefined,
         role: roleFilter || undefined,
+        registrationStatus: registrationStatusFilter || undefined,
         page,
         limit: 15,
       }),
@@ -107,6 +114,29 @@ export const UsersAdminPage: React.FC = () => {
     onError: (err: Error) => setFeedback({ type: 'error', message: err.message }),
   });
 
+  const reviewMutation = useMutation({
+    mutationFn: (decision: 'APPROVED' | 'REJECTED') =>
+      adminService.reviewRegistration(reviewTarget!.id, {
+        decision,
+        roleCodes: decision === 'APPROVED' ? [reviewRole] : [],
+        reason: reviewReason.trim() || undefined,
+      }),
+    onSuccess: res => {
+      setReviewTarget(null);
+      setReviewReason('');
+      setReviewRole('SALESMAN');
+      setFeedback({
+        type: 'success',
+        message:
+          res.registrationStatus === 'APPROVED'
+            ? `Registration approved and activated with role ${res.roles.join(', ')}.`
+            : 'Registration rejected.',
+      });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
+    },
+    onError: (err: Error) => setFeedback({ type: 'error', message: err.message }),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -138,6 +168,22 @@ export const UsersAdminPage: React.FC = () => {
                 {r.code}
               </option>
             ))}
+          </select>
+          <select
+            value={registrationStatusFilter}
+            onChange={e => {
+              setRegistrationStatusFilter(
+                e.target.value as '' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED',
+              );
+              setPage(1);
+            }}
+            aria-label="Filter by registration status"
+            className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
+          >
+            <option value="">All Registrations</option>
+            <option value="PENDING_APPROVAL">Pending Approval</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
           </select>
         </div>
 
@@ -214,9 +260,15 @@ export const UsersAdminPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        <Badge variant={u.isActive ? 'success' : 'outline'}>
-                          {u.isActive ? 'Active' : 'Disabled'}
-                        </Badge>
+                        {u.registrationStatus === 'PENDING_APPROVAL' ? (
+                          <Badge variant="warning">Pending Approval</Badge>
+                        ) : u.registrationStatus === 'REJECTED' ? (
+                          <Badge variant="outline">Rejected</Badge>
+                        ) : (
+                          <Badge variant={u.isActive ? 'success' : 'outline'}>
+                            {u.isActive ? 'Active' : 'Disabled'}
+                          </Badge>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-slate-500">
                         {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-IN') : 'Never'}
@@ -224,6 +276,20 @@ export const UsersAdminPage: React.FC = () => {
                       <td className="px-4 py-3 text-slate-600">{u.activeSessions}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex items-center gap-1.5">
+                          {canManage && u.registrationStatus === 'PENDING_APPROVAL' && (
+                            <button
+                              onClick={() => {
+                                setReviewTarget(u);
+                                setReviewRole('SALESMAN');
+                                setReviewReason('');
+                              }}
+                              title="Review Registration"
+                              className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                            >
+                              <ClipboardCheck className="h-3.5 w-3.5" />
+                              Review
+                            </button>
+                          )}
                           {canAssignRoles && (
                             <button
                               onClick={() => {
@@ -464,6 +530,75 @@ export const UsersAdminPage: React.FC = () => {
                 className="rounded bg-brand-navy px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
               >
                 Save Roles
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Review Pending Registration Modal */}
+      {reviewTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">Review Registration</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              {reviewTarget.fullName} ({reviewTarget.email})
+            </p>
+            <div className="mt-4 space-y-3 text-sm">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">
+                  Assign Role (for approval)
+                </label>
+                <select
+                  value={reviewRole}
+                  onChange={e => setReviewRole(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm"
+                >
+                  {(rolesQuery.data ?? [])
+                    .filter(r => r.isActive && (r.code !== 'OWNER' || hasRole('OWNER')))
+                    .map(r => (
+                      <option key={r.id} value={r.code}>
+                        {r.code} — {r.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">
+                  Remarks / Reason (optional)
+                </label>
+                <input
+                  placeholder="Optional approval or rejection note"
+                  value={reviewReason}
+                  onChange={e => setReviewReason(e.target.value)}
+                  className="w-full rounded border border-slate-300 px-3 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setReviewTarget(null)}
+                disabled={reviewMutation.isPending}
+                className="rounded border px-3 py-1.5 text-xs"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => reviewMutation.mutate('REJECTED')}
+                disabled={reviewMutation.isPending}
+                className="rounded border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100 disabled:opacity-50"
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                onClick={() => reviewMutation.mutate('APPROVED')}
+                disabled={reviewMutation.isPending}
+                className="rounded bg-brand-navy px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                {reviewMutation.isPending ? 'Processing...' : 'Approve & Activate'}
               </button>
             </div>
           </div>

@@ -55,6 +55,7 @@ export interface AdminUserRecord {
   fullName: string;
   phone: string | null;
   isActive: boolean;
+  registrationStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   lastLoginAt: string | null;
   activeSessions: number;
   roles: string[];
@@ -174,11 +175,19 @@ export const adminService = {
     ),
 
   // Users
-  listUsers: (params?: { search?: string; role?: string; isActive?: string; page?: number; limit?: number }) => {
+  listUsers: (params?: {
+    search?: string;
+    role?: string;
+    isActive?: string;
+    registrationStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+    page?: number;
+    limit?: number;
+  }) => {
     const qs = new URLSearchParams();
     if (params?.search) qs.set('search', params.search);
     if (params?.role) qs.set('role', params.role);
     if (params?.isActive) qs.set('isActive', params.isActive);
+    if (params?.registrationStatus) qs.set('registrationStatus', params.registrationStatus);
     if (params?.page) qs.set('page', String(params.page));
     if (params?.limit) qs.set('limit', String(params.limit));
     return unwrap(apiClient<PaginatedResponse<AdminUserRecord>>(`/admin/users?${qs.toString()}`));
@@ -216,6 +225,21 @@ export const adminService = {
       apiClient<{ userId: string; sessionsRevoked: boolean }>(`/admin/users/${id}/reset-password`, {
         method: 'POST',
         body: JSON.stringify({ newPassword, reason }),
+      }),
+    ),
+  reviewRegistration: (
+    id: string,
+    data: { decision: 'APPROVED' | 'REJECTED'; roleCodes?: string[]; reason?: string },
+  ) =>
+    unwrap(
+      apiClient<{
+        userId: string;
+        registrationStatus: 'APPROVED' | 'REJECTED';
+        isActive: boolean;
+        roles: string[];
+      }>(`/admin/users/${id}/review-registration`, {
+        method: 'POST',
+        body: JSON.stringify(data),
       }),
     ),
   revokeUserSessions: (id: string) =>

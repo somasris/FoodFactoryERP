@@ -64,6 +64,7 @@ export const adminListUsersQuerySchema = z.object({
     .enum(['true', 'false'])
     .transform(v => v === 'true')
     .optional(),
+  registrationStatus: z.enum(['PENDING_APPROVAL', 'APPROVED', 'REJECTED']).optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -71,6 +72,12 @@ export const adminListUsersQuerySchema = z.object({
 export const resetUserPasswordSchema = z.object({
   newPassword: z.string().min(8).max(128),
   reason: z.string().min(3).max(255).optional(),
+});
+
+export const reviewRegistrationSchema = z.object({
+  decision: z.enum(['APPROVED', 'REJECTED']),
+  roleCodes: z.array(z.string().min(1)).default(['SALESMAN']),
+  reason: z.string().max(255).optional(),
 });
 
 export const createRoleSchema = z.object({
@@ -120,6 +127,7 @@ export type CreateFactoryInput = z.infer<typeof createFactorySchema>;
 export type UpdateFactoryInput = z.infer<typeof updateFactorySchema>;
 export type AdminListUsersQuery = z.infer<typeof adminListUsersQuerySchema>;
 export type ResetUserPasswordInput = z.infer<typeof resetUserPasswordSchema>;
+export type ReviewRegistrationInput = z.infer<typeof reviewRegistrationSchema>;
 export type CreateRoleInput = z.infer<typeof createRoleSchema>;
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
 export type UpdateRolePermissionsInput = z.infer<typeof updateRolePermissionsSchema>;

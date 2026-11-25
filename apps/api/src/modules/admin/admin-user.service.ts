@@ -2,7 +2,11 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { AppError } from '../../middleware/error.middleware';
 import { hashPassword, validatePasswordPolicy } from '../../utils/password';
-import { AdminListUsersQuery, ResetUserPasswordInput } from './admin.types';
+import {
+  AdminListUsersQuery,
+  ResetUserPasswordInput,
+  ReviewRegistrationInput,
+} from './admin.types';
 import { AdminActorMeta } from './organization.service';
 
 export class AdminUserService {
@@ -11,11 +15,12 @@ export class AdminUserService {
    * Never exposes passwordHash or secrets.
    */
   static async listUsersPaginated(query: AdminListUsersQuery) {
-    const { page, limit, search, role, isActive } = query;
+    const { page, limit, search, role, isActive, registrationStatus } = query;
     const skip = (page - 1) * limit;
 
     const where: Prisma.UserWhereInput = {};
     if (isActive !== undefined) where.isActive = isActive;
+    if (registrationStatus) where.registrationStatus = registrationStatus;
     if (role) {
       where.userRoles = {
         some: {
@@ -41,6 +46,7 @@ export class AdminUserService {
           fullName: true,
           phone: true,
           isActive: true,
+          registrationStatus: true,
           lastLoginAt: true,
           companyId: true,
           createdAt: true,
@@ -80,6 +86,7 @@ export class AdminUserService {
         fullName: u.fullName,
         phone: u.phone,
         isActive: u.isActive,
+        registrationStatus: u.registrationStatus,
         lastLoginAt: u.lastLoginAt,
         activeSessions: u._count.refreshTokens,
         companyId: u.companyId,
@@ -99,6 +106,139 @@ export class AdminUserService {
         total,
         totalPages: Math.ceil(total / limit) || 1,
       },
+    };
+  }
+
+  /**
+   * Review a pending public user registration (approve with role assignment or reject).
+   */
+  static async reviewRegistration(
+    targetUserId: string,
+    input: ReviewRegistrationInput,
+    actor: AdminActorMeta,
+  ) {
+    if (targetUserId === actor.userId) {
+      throw new AppError('You cannot review your own registration.', 400);
+    }
+
+    const target = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        fullName: true,
+        isActive: true,
+        registrationStatus: true,
+      },
+    });
+    if (!target) {
+      throw new AppError('User not found.', 404);
+    }
+
+    if (target.registrationStatus !== 'PENDING_APPROVAL') {
+      throw new AppError('Only pending registrations can be reviewed.', 400);
+    }
+
+    if (input.decision === 'APPROVED') {
+      const requestedRoleCodes = Array.from(new Set(input.roleCodes));
+      if (requestedRoleCodes.length === 0) {
+        throw new AppError('At least one role must be assigned when approving a registration.', 400);
+      }
+
+      const isActorOwner = actor.roles.includes('OWNER');
+      if (requestedRoleCodes.includes('OWNER') && !isActorOwner) {
+        throw new AppError('Forbidden: ADMIN cannot assign the OWNER role.', 403);
+      }
+
+      const roles = await prisma.role.findMany({
+        where: { code: { in: requestedRoleCodes }, isActive: true },
+        select: { id: true, code: true },
+      });
+
+      if (roles.length !== requestedRoleCodes.length) {
+        throw new AppError('One or more selected roles are invalid or inactive.', 400);
+      }
+
+      await prisma.$transaction(async tx => {
+        await tx.user.update({
+          where: { id: targetUserId },
+          data: {
+            isActive: true,
+            registrationStatus: 'APPROVED',
+          },
+        });
+
+        await tx.userRole.createMany({
+          data: roles.map(r => ({ userId: targetUserId, roleId: r.id })),
+          skipDuplicates: true,
+        });
+
+        await tx.auditLog.create({
+          data: {
+            userId: actor.userId,
+            action: 'APPROVE',
+            entityType: 'UserRegistration',
+            entityId: targetUserId,
+            previousState: {
+              isActive: target.isActive,
+              registrationStatus: target.registrationStatus,
+            },
+            newState: {
+              isActive: true,
+              registrationStatus: 'APPROVED',
+              roles: roles.map(r => r.code),
+            },
+            remarks: `Registration approved for '${target.email}' with roles [${roles.map(r => r.code).join(', ')}] by ${actor.username}${input.reason ? ` (${input.reason})` : ''}`,
+            ipAddress: actor.ipAddress || null,
+            userAgent: actor.userAgent || null,
+          },
+        });
+      });
+
+      return {
+        userId: targetUserId,
+        registrationStatus: 'APPROVED' as const,
+        isActive: true,
+        roles: roles.map(r => r.code),
+      };
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.user.update({
+        where: { id: targetUserId },
+        data: {
+          isActive: false,
+          registrationStatus: 'REJECTED',
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: actor.userId,
+          action: 'REJECT',
+          entityType: 'UserRegistration',
+          entityId: targetUserId,
+          previousState: {
+            isActive: target.isActive,
+            registrationStatus: target.registrationStatus,
+          },
+          newState: {
+            isActive: false,
+            registrationStatus: 'REJECTED',
+          },
+          remarks: `Registration rejected for '${target.email}' by ${actor.username}${input.reason ? ` (${input.reason})` : ''}`,
+          ipAddress: actor.ipAddress || null,
+          userAgent: actor.userAgent || null,
+        },
+      });
+    });
+
+    return {
+      userId: targetUserId,
+      registrationStatus: 'REJECTED' as const,
+      isActive: false,
+      roles: [] as string[],
     };
   }
 

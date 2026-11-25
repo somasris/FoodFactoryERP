@@ -61,6 +61,11 @@ adminRouter.post(
   requirePermissions('administration.users.manage'),
   AdminController.resetUserPassword,
 );
+adminRouter.post(
+  '/users/:id/review-registration',
+  requirePermissions('administration.users.manage'),
+  AdminController.reviewRegistration,
+);
 adminRouter.get(
   '/users/:id/activity',
   requirePermissions('administration.users.read'),

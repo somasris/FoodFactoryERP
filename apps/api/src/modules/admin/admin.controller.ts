@@ -8,6 +8,7 @@ import {
   createRoleSchema,
   factoryStatusSchema,
   resetUserPasswordSchema,
+  reviewRegistrationSchema,
   updateFactorySchema,
   updateOrganizationSchema,
   updateRolePermissionsSchema,
@@ -160,6 +161,26 @@ export class AdminController {
         getActor(req),
       );
       sendSuccess(res, 'User password reset successfully and active sessions revoked', result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async reviewRegistration(req: Request, res: Response, next: NextFunction) {
+    try {
+      const input = reviewRegistrationSchema.parse(req.body);
+      const result = await AdminUserService.reviewRegistration(
+        String(req.params.id),
+        input,
+        getActor(req),
+      );
+      sendSuccess(
+        res,
+        input.decision === 'APPROVED'
+          ? 'User registration approved successfully'
+          : 'User registration rejected',
+        result,
+      );
     } catch (err) {
       next(err);
     }
