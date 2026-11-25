@@ -38,6 +38,15 @@ import { OrderFulfillmentPage } from './sales/OrderFulfillmentPage';
 import { SalesInvoicesPage } from './sales/SalesInvoicesPage';
 import { SalesInvoiceDetailPage } from './sales/SalesInvoiceDetailPage';
 import { SalesInvoiceFormPage } from './sales/SalesInvoiceFormPage';
+import { ProductionLayout } from '../components/production/ProductionLayout';
+import { ProductionPlanningDashboardPage } from './production/ProductionPlanningDashboardPage';
+import { ProductionDemandPage } from './production/ProductionDemandPage';
+import { ProductionPlansPage } from './production/ProductionPlansPage';
+import { ProductionPlanDetailPage } from './production/ProductionPlanDetailPage';
+import { WorkOrdersDashboardPage } from './production/WorkOrdersDashboardPage';
+import { WorkOrdersPage } from './production/WorkOrdersPage';
+import { WorkOrderFormPage } from './production/WorkOrderFormPage';
+import { WorkOrderDetailPage } from './production/WorkOrderDetailPage';
 
 export const router = createBrowserRouter([
   {
@@ -124,20 +133,22 @@ export const router = createBrowserRouter([
       {
         path: 'production',
         element: (
-          <ProtectedRoute requiredRoles={['PRODUCTION', 'ADMIN', 'OWNER']}>
-            <ModulePlaceholder
-              moduleName="BOM & Production Processing"
-              phase="Phase 3 Implementation"
-              summary="Standardized recipes, batch mixing/baking/frying conversions, machine yield tracking, and finished food batch packaging."
-              scopePoints={[
-                'Multi-ingredient Bill of Materials (BOM) with precise weight tolerances',
-                'Production batch planning and work order issuance',
-                'Processing stages (Mixing, Processing, Quality Check, Packaging)',
-                'Scrap, wastage, and yield variance tracking against standard recipes',
-              ]}
-            />
+          <ProtectedRoute requiredRoles={['PRODUCTION', 'ADMIN', 'OWNER', 'AUDITOR']}>
+            <ProductionLayout />
           </ProtectedRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/production/planning" replace /> },
+          { path: 'planning', element: <ProductionPlanningDashboardPage /> },
+          { path: 'demand', element: <ProductionDemandPage /> },
+          { path: 'plans', element: <ProductionPlansPage /> },
+          { path: 'plans/:id', element: <ProductionPlanDetailPage /> },
+          { path: 'plans/:planId/work-orders/new', element: <WorkOrderFormPage /> },
+          { path: 'work-orders/dashboard', element: <WorkOrdersDashboardPage /> },
+          { path: 'work-orders', element: <WorkOrdersPage /> },
+          { path: 'work-orders/:id', element: <WorkOrderDetailPage /> },
+          { path: 'boms', element: <BomsPage /> },
+        ],
       },
       {
         path: 'reports',

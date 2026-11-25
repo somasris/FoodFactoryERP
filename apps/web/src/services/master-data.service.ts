@@ -1,6 +1,8 @@
 import { apiClient } from './api-client';
 import {
   BOM,
+  BOMAuditLogEntry,
+  BOMCostEstimate,
   BOMVersion,
   CategoryEntity,
   Customer,
@@ -112,5 +114,18 @@ export const masterDataService = {
         method: 'POST',
         body: JSON.stringify({}),
       }),
+    obsoleteVersion: (bomId: string, versionId: string, reason?: string) =>
+      apiClient<BOMVersion>(`/master-data/boms/${bomId}/versions/${versionId}/obsolete`, {
+        method: 'POST',
+        body: JSON.stringify(reason ? { reason } : {}),
+      }),
+    getCostEstimate: (bomId: string, versionId: string, batchQuantity?: string) =>
+      apiClient<BOMCostEstimate>(
+        `/master-data/boms/${bomId}/versions/${versionId}/cost-estimate${
+          batchQuantity ? `?batchQuantity=${encodeURIComponent(batchQuantity)}` : ''
+        }`,
+      ),
+    getHistory: (bomId: string) =>
+      apiClient<BOMAuditLogEntry[]>(`/master-data/boms/${bomId}/history`),
   },
 };

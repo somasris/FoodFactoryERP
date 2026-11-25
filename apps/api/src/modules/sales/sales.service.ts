@@ -17,6 +17,7 @@ import {
   ZERO,
 } from '../inventory/inventory.utils';
 import { InventoryReservationService } from '../inventory/inventory-reservation.service';
+import { buildDateRangeFilter, resolveApplicableTaxRate } from './sales.utils';
 import {
   CreateSalesOrderInput,
   FulfillSalesOrderInput,
@@ -70,10 +71,9 @@ export class SalesService {
       ? { warehouseId: { in: allowedWh } }
       : {};
 
-    if (filters.fromDate || filters.toDate) {
-      baseWhere.orderDate = {};
-      if (filters.fromDate) baseWhere.orderDate.gte = new Date(filters.fromDate);
-      if (filters.toDate) baseWhere.orderDate.lte = new Date(filters.toDate);
+    const dateFilter = buildDateRangeFilter(filters.fromDate, filters.toDate);
+    if (dateFilter) {
+      baseWhere.orderDate = dateFilter;
     }
 
     const [
@@ -120,10 +120,8 @@ export class SalesService {
     const invWhere: Prisma.SalesInvoiceWhereInput = allowedWh
       ? { warehouseId: { in: allowedWh } }
       : {};
-    if (filters.fromDate || filters.toDate) {
-      invWhere.invoiceDate = {};
-      if (filters.fromDate) invWhere.invoiceDate.gte = new Date(filters.fromDate);
-      if (filters.toDate) invWhere.invoiceDate.lte = new Date(filters.toDate);
+    if (dateFilter) {
+      invWhere.invoiceDate = dateFilter;
     }
 
     const [
@@ -216,10 +214,9 @@ export class SalesService {
 
     if (filters.status) where.status = filters.status as SalesOrderStatus;
     if (filters.customerId) where.customerId = filters.customerId;
-    if (filters.fromDate || filters.toDate) {
-      where.orderDate = {};
-      if (filters.fromDate) where.orderDate.gte = new Date(filters.fromDate);
-      if (filters.toDate) where.orderDate.lte = new Date(filters.toDate);
+    const listDateFilter = buildDateRangeFilter(filters.fromDate, filters.toDate);
+    if (listDateFilter) {
+      where.orderDate = listDateFilter;
     }
     if (params.search) {
       where.OR = [
@@ -286,6 +283,7 @@ export class SalesService {
   private static async buildOrderLines(
     tx: Prisma.TransactionClient,
     lines: CreateSalesOrderInput['lines'],
+    effectiveDate: Date,
   ) {
     const preparedLines: Prisma.SalesOrderLineCreateWithoutSalesOrderInput[] = [];
     let orderSubtotal = ZERO;
@@ -330,7 +328,12 @@ export class SalesService {
       const lineDiscount = grossAmount.mul(discountPct).div(HUNDRED).toDecimalPlaces(2);
       const taxableAmount = grossAmount.sub(lineDiscount);
 
-      const taxRate = variant.product.taxRate;
+      const taxRate = await resolveApplicableTaxRate(
+        tx,
+        variant.product.hsnCode,
+        effectiveDate,
+        variant.product.taxRate,
+      );
       const taxPct = new Prisma.Decimal(taxRate.ratePercentage);
       const taxAmount = taxableAmount.mul(taxPct).div(HUNDRED).toDecimalPlaces(2);
       const lineTotal = taxableAmount.add(taxAmount);
@@ -387,7 +390,8 @@ export class SalesService {
     }
 
     const created = await prisma.$transaction(async tx => {
-      const computed = await this.buildOrderLines(tx, input.lines);
+      const orderDate = input.orderDate ? new Date(input.orderDate) : new Date();
+      const computed = await this.buildOrderLines(tx, input.lines, orderDate);
 
       const order = await tx.salesOrder.create({
         data: {
@@ -396,7 +400,7 @@ export class SalesService {
           shippingAddressId: input.shippingAddressId ?? null,
           warehouseId: warehouse.id,
           salesmanId: user.userId,
-          orderDate: input.orderDate ? new Date(input.orderDate) : new Date(),
+          orderDate,
           expectedDeliveryDate: input.expectedDeliveryDate
             ? new Date(input.expectedDeliveryDate)
             : null,
@@ -485,7 +489,7 @@ export class SalesService {
 
       if (input.lines) {
         await tx.salesOrderLine.deleteMany({ where: { salesOrderId: id } });
-        const computed = await this.buildOrderLines(tx, input.lines);
+        const computed = await this.buildOrderLines(tx, input.lines, existing.orderDate);
         lineUpdateData = {
           subtotal: computed.subtotal,
           discountAmount: computed.discountAmount,

@@ -56,11 +56,11 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **2.3** | Order Lifecycle Management | `IN_PROGRESS` | Yes (Draft→Submit→Approve/Reject→Confirm→Fulfill/Cancel) | Covered in `sales.test.ts` & `sales.test.tsx` | Pending Phase 2 completion & verification |
 | **2.4** | Stock Reservation | `IN_PROGRESS` | Yes (`InventoryReservationService` + `FOR UPDATE`) | Covered in `sales.test.ts` & `inventory.test.ts` | Pending Phase 2 completion & verification |
 | **2.5** | Order Fulfillment | `IN_PROGRESS` | Yes (`SalesOrderFulfillment` + `InventoryIssue`) | Covered in `sales.test.ts` | Pending Phase 2 completion & verification |
-| **2.6** | Sales Invoicing | `TESTED` | Yes (`SalesInvoice`, `SalesInvoiceLine`, PDFKit, UI pages) | 5 API (`sales-invoices.test.ts`) + 4 Web (`sales-invoices.test.tsx`) | Pending manual UI & E2E verification |
+| **2.6** | Sales Invoicing | `TESTED` | Yes (`SalesInvoice`, `SalesInvoiceLine`, PDFKit, UI pages) | 7 API (`sales-invoices.test.ts`) + 4 Web (`sales-invoices.test.tsx`) | Pending manual UI & E2E verification |
 | **2.7** | Sales Dashboard & Reports | `IN_PROGRESS` | Yes (`GET /api/v1/sales/dashboard`, `SalesDashboardPage`) | Covered in `sales.test.tsx` | Pending Phase 2 completion & verification |
-| **3.1** | BOM & Recipe Management | `IN_PROGRESS` | Partial (`BOM`/`BOMVersion`/`BOMItem`/`BOMOverhead` in 1.4; recipe execution pending) | Master data BOM tests in 1.4 | Pending Phase 3 execution |
-| **3.2** | Production Planning | `PLANNED` | No (`ProductionOrder` in draft schema only) | None | Not started |
-| **3.3** | Work Order Management | `PLANNED` | No (`ProductionOrder`/`ProductionRun` in draft schema) | None | Not started |
+| **3.1** | BOM & Recipe Management | `TESTED` | Yes (`BOM`, `BOMVersion` yield/wastage, cost estimate, `/production/boms`) | 3 API (`bom-phase3.test.ts`) + 3 Web (`boms.test.tsx`) | Pending manual browser UI verification |
+| **3.2** | Production Planning | `TESTED` | Yes (`ProductionPlan`, demand MRP, shortages, `/production/planning`) | 3 API (`production-planning.test.ts`) + 4 Web (`production-planning.test.tsx`) | Pending manual browser UI verification |
+| **3.3** | Work Order Management | `TESTED` | Yes (`WorkOrder`, `WorkOrderStatusHistory`, `WorkOrderNumberSequence`, `/production/work-orders`) | 6 API (`work-orders.test.ts`) + 5 Web (`work-orders.test.tsx`) | Pending manual browser UI verification |
 | **3.4** | Batch Production Execution | `PLANNED` | No (`ProductionRun` in draft schema) | None | Not started |
 | **3.5** | Material Consumption & Finished Goods | `PLANNED` | No (`MaterialIssue`, `MaterialReturn`, `ProductionScrap` in draft) | None | Not started |
 | **3.6** | Production Costing | `PLANNED` | No (`ProductionOverhead`, `ProductionVariance` in draft) | None | Not started |
@@ -247,7 +247,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Phase 2.5 Order Fulfillment (`fulfilledBaseQuantity`), Phase 1.4 Tax/Customer/Company Master Data, Phase 1.3 RBAC (`sales.invoices.*`).
 - **Testing Requirements:** GST CGST/SGST & IGST math, partial/multiple fulfillment invoicing, concurrent numbering, snapshot preservation, lifecycle transitions, RBAC, and PDF generation tests.
 - **Completion Criteria:** Invoices post with immutable GST snapshots, prevent duplicate/over-invoicing, generate valid PDFs, and pass manual UI verification.
-- **Current Status:** `TESTED` (Implemented with 5 API integration tests in `sales-invoices.test.ts` and 4 frontend tests in `sales-invoices.test.tsx` passing; manual UI & E2E verification pending). Note: `SalesReturn`, `CreditNote`, and `Payment`/`PaymentAllocation` remain out of scope for Phase 2.6.
+- **Current Status:** `TESTED` (Implemented with 7 API integration tests in `sales-invoices.test.ts` and 4 frontend tests in `sales-invoices.test.tsx` passing; manual UI & E2E verification pending). Note: `SalesReturn`, `CreditNote`, and `Payment`/`PaymentAllocation` remain out of scope for Phase 2.6.
 
 #### 2.7 Sales Dashboard & Reports
 - **Purpose:** Provide real-time visibility into order volumes, revenue summaries, pending approvals, and fulfillment backlogs.
@@ -275,7 +275,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Phase 1.4 Raw Materials, Products, UOMs.
 - **Testing Requirements:** BOM version locking and recipe quantity explosion tests.
 - **Completion Criteria:** Active BOM versions can be exploded into exact material requirements for any batch size.
-- **Current Status:** `IN_PROGRESS` (Master data BOM CRUD implemented in Phase 1.4; production consumption integration `PLANNED`).
+- **Current Status:** `TESTED` (Implemented with `yieldPercentage`/`expectedWastagePercent`, UOM conversion validation, Decimal cost estimation & recipe explosion, explicit `obsolete` lifecycle, audit history, `/production/boms` UI, 3 API tests in `bom-phase3.test.ts`, and 3 frontend tests in `boms.test.tsx` passing; manual browser UI verification pending).
 
 #### 3.2 Production Planning
 - **Purpose:** Schedule manufacturing batches based on confirmed sales orders, reorder levels, and factory capacity.
@@ -287,19 +287,19 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 - **Integration Dependencies:** Phase 1.5 Inventory Balances, Phase 2 Sales Orders, Phase 3.1 BOM.
 - **Testing Requirements:** Material availability calculation and scheduling validation tests.
 - **Completion Criteria:** Production orders reserve/check required raw materials and schedule target batches.
-- **Current Status:** `PLANNED`
+- **Current Status:** `TESTED` (Implemented with `ProductionPlan` models, demand MRP, BOM yield/UOM explosion, read-only material availability, `DRAFT→SUBMITTED→APPROVED/REJECTED→RELEASED/CANCELLED` lifecycle, RBAC, frontend pages, 3 API tests, and 4 frontend tests passing; manual browser UI verification pending).
 
 #### 3.3 Work Order Management
-- **Purpose:** Issue, track, and close shop-floor work orders / production runs against approved production orders.
-- **Functional Scope:** `ProductionRun` lifecycle (`PLANNED` → `IN_PROGRESS` → `COMPLETED` / `CANCELLED`), batch number assignment.
-- **Key Features:** Locking `bomVersionId` at run start, tracking operator/supervisor actions via `AuditService`.
-- **Database Dependencies:** `ProductionOrder`, `ProductionRun` (draft schema).
-- **Backend Dependencies:** `apps/api/src/modules/production/` (placeholder).
-- **Frontend Components:** `/production` (placeholder).
+- **Purpose:** Issue, schedule, approve, release, and cancel shop-floor work orders against `APPROVED`/`RELEASED` production plans.
+- **Functional Scope:** `WorkOrder` lifecycle (`DRAFT` → `SUBMITTED` → `APPROVED`/`REJECTED` → `RELEASED` → `CANCELLED`, with `IN_PROGRESS`/`COMPLETED` reserved for Phase 3.4), partial allocation/splitting against `ProductionPlanItem.workOrderedQuantity`, FY-aware numbering (`WO/YYYY-YY/00001`).
+- **Key Features:** Atomic `SELECT ... FOR UPDATE` plan allocation, locked `bomId`/`bomVersionId`, read-only BOM material requirements & shortage visibility, schedule conflict detection, `AuditService` & status history tracking.
+- **Database Dependencies:** `WorkOrder`, `WorkOrderStatusHistory`, `WorkOrderNumberSequence`, `ProductionPlanItem.workOrderedQuantity`.
+- **Backend Dependencies:** `apps/api/src/modules/production/work-order.{service,controller,types}.ts`.
+- **Frontend Components:** `/production/work-orders`, `/production/work-orders/dashboard`, `/production/work-orders/:id`, `/production/plans/:planId/work-orders/new`.
 - **Integration Dependencies:** Phase 3.1 BOM, Phase 3.2 Production Planning.
-- **Testing Requirements:** Work order state machine and RBAC (`PRODUCTION`, `ADMIN`, `OWNER`) tests.
+- **Testing Requirements:** Work order state machine, concurrency, read-only inventory invariant, schedule conflicts, and RBAC (`PRODUCTION`, `ADMIN`, `OWNER`, `AUDITOR`, `SALESMAN`) tests.
 - **Completion Criteria:** Work orders enforce valid lifecycle transitions and lock recipe versions.
-- **Current Status:** `PLANNED`
+- **Current Status:** `TESTED` (Implemented with `WorkOrder` models, `WO/YYYY-YY/00001` numbering, partial allocation, read-only material requirements, schedule conflict warnings, RBAC, frontend pages, 6 API tests, and 5 frontend tests passing; manual browser UI verification pending; see [PHASE_3_3_VERIFICATION_REPORT.md](file:///d:/somasri/projects/FoodFactoryERP/docs/verification/PHASE_3_3_VERIFICATION_REPORT.md)).
 
 #### 3.4 Batch Production Execution
 - **Purpose:** Record shop-floor processing stages (mixing, frying/roasting, quality check, packaging) and actual batch yields.

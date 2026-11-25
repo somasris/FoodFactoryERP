@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Calculator, Archive } from 'lucide-react';
 import { DataTablePage, StatusBadge } from '../../components/master-data/DataTablePage';
 import {
   ConfirmDialog,
@@ -71,6 +71,8 @@ export const BomsPage: React.FC = () => {
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   const [editingVersion, setEditingVersion] = useState<BOMVersion | null>(null);
   const [expectedGoodOutput, setExpectedGoodOutput] = useState('100');
+  const [yieldPercentage, setYieldPercentage] = useState('100');
+  const [expectedWastagePercent, setExpectedWastagePercent] = useState('0');
   const [verOutputUomId, setVerOutputUomId] = useState('');
   const [effectiveFrom, setEffectiveFrom] = useState(new Date().toISOString().slice(0, 10));
   const [remarks, setRemarks] = useState('');
@@ -80,6 +82,28 @@ export const BomsPage: React.FC = () => {
 
   const [toggling, setToggling] = useState<BOM | null>(null);
   const [activatingVer, setActivatingVer] = useState<BOMVersion | null>(null);
+  const [obsoletingVer, setObsoletingVer] = useState<BOMVersion | null>(null);
+  const [costVerId, setCostVerId] = useState<string | null>(null);
+  const [batchQtyInput, setBatchQtyInput] = useState('');
+
+  const { data: costEstimate, isLoading: costLoading } = useQuery({
+    queryKey: ['bom-cost', detailBomId, costVerId, batchQtyInput],
+    enabled: !!detailBomId && !!costVerId,
+    queryFn: async () =>
+      (
+        await masterDataService.boms.getCostEstimate(
+          detailBomId!,
+          costVerId!,
+          batchQtyInput.trim() || undefined,
+        )
+      ).data!,
+  });
+
+  const { data: bomHistory } = useQuery({
+    queryKey: ['bom-history', detailBomId],
+    enabled: !!detailBomId,
+    queryFn: async () => (await masterDataService.boms.getHistory(detailBomId!)).data!,
+  });
 
   const openCreateBom = () => {
     setBomCode('');
@@ -127,6 +151,8 @@ export const BomsPage: React.FC = () => {
   const openNewVersion = (bom: BOM) => {
     setEditingVersion(null);
     setExpectedGoodOutput(bom.baseOutputQuantity);
+    setYieldPercentage('100');
+    setExpectedWastagePercent('0');
     setVerOutputUomId(bom.outputUomId);
     setEffectiveFrom(new Date().toISOString().slice(0, 10));
     setRemarks('');
@@ -146,6 +172,8 @@ export const BomsPage: React.FC = () => {
   const openEditDraftVersion = (ver: BOMVersion) => {
     setEditingVersion(ver);
     setExpectedGoodOutput(ver.expectedGoodOutput);
+    setYieldPercentage(ver.yieldPercentage || '100');
+    setExpectedWastagePercent(ver.expectedWastagePercent || '0');
     setVerOutputUomId(ver.outputUomId);
     setEffectiveFrom(ver.effectiveFrom.slice(0, 10));
     setRemarks(ver.remarks || '');
@@ -175,6 +203,8 @@ export const BomsPage: React.FC = () => {
     try {
       const payload = {
         expectedGoodOutput,
+        yieldPercentage,
+        expectedWastagePercent,
         outputUomId: verOutputUomId,
         effectiveFrom,
         remarks: remarks.trim() || null,
@@ -200,6 +230,16 @@ export const BomsPage: React.FC = () => {
     setActivatingVer(null);
     await refetchDetail();
     await queryClient.invalidateQueries({ queryKey: ['boms'] });
+    await queryClient.invalidateQueries({ queryKey: ['bom-history', detailBomId] });
+  };
+
+  const handleObsoleteVersion = async () => {
+    if (!detailBomId || !obsoletingVer) return;
+    await masterDataService.boms.obsoleteVersion(detailBomId, obsoletingVer.id);
+    setObsoletingVer(null);
+    await refetchDetail();
+    await queryClient.invalidateQueries({ queryKey: ['boms'] });
+    await queryClient.invalidateQueries({ queryKey: ['bom-history', detailBomId] });
   };
 
   const renderItemsEditor = () => (
@@ -560,6 +600,17 @@ export const BomsPage: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setCostVerId(costVerId === ver.id ? null : ver.id);
+                          setBatchQtyInput('');
+                        }}
+                      >
+                        <Calculator className="mr-1 h-3.5 w-3.5" /> Cost Estimate
+                      </Button>
                       {ver.status === 'DRAFT' && canUpdate && (
                         <Button
                           type="button"
@@ -580,13 +631,31 @@ export const BomsPage: React.FC = () => {
                           <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> Activate
                         </Button>
                       )}
+                      {(ver.status === 'DRAFT' || ver.status === 'ACTIVE') && canApprove && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setObsoletingVer(ver)}
+                        >
+                          <Archive className="mr-1 h-3.5 w-3.5" /> Obsolete
+                        </Button>
+                      )}
                     </div>
                   </div>
 
-                  <div className="mt-2 text-xs text-slate-600">
-                    Expected Good Output: <strong>{ver.expectedGoodOutput}</strong>{' '}
-                    {ver.outputUom?.code}
-                    {ver.remarks && <span className="ml-3 text-slate-500">({ver.remarks})</span>}
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-600">
+                    <span>
+                      Expected Good Output: <strong>{ver.expectedGoodOutput}</strong>{' '}
+                      {ver.outputUom?.code}
+                    </span>
+                    <span>
+                      Yield: <strong>{ver.yieldPercentage ?? '100.00'}%</strong>
+                    </span>
+                    <span>
+                      Expected Wastage: <strong>{ver.expectedWastagePercent ?? '0.00'}%</strong>
+                    </span>
+                    {ver.remarks && <span className="text-slate-500">({ver.remarks})</span>}
                   </div>
 
                   {ver.items && ver.items.length > 0 && (
@@ -622,9 +691,78 @@ export const BomsPage: React.FC = () => {
                         .join(' | ')}
                     </div>
                   )}
+
+                  {costVerId === ver.id && (
+                    <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs space-y-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="font-semibold text-brand-navy">
+                          Recipe Explosion &amp; Estimated Cost (v{ver.versionNumber})
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <label className="text-slate-600">Target Batch Qty:</label>
+                          <input
+                            type="number"
+                            step="0.0001"
+                            placeholder={ver.expectedGoodOutput}
+                            value={batchQtyInput}
+                            onChange={e => setBatchQtyInput(e.target.value)}
+                            className="w-28 rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                          />
+                        </div>
+                      </div>
+                      {costLoading || !costEstimate ? (
+                        <div className="text-slate-500">Calculating recipe cost...</div>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            <div>
+                              <span className="text-slate-500">Material (Std):</span>{' '}
+                              <strong>₹{costEstimate.totalStandardMaterialCost}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Material (+Scrap):</span>{' '}
+                              <strong>₹{costEstimate.totalEffectiveMaterialCost}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Overheads:</span>{' '}
+                              <strong>₹{costEstimate.totalOverheadCost}</strong>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Est. Unit Cost:</span>{' '}
+                              <strong className="text-brand-navy">
+                                ₹{costEstimate.estimatedUnitCost} / {costEstimate.outputUomSymbol}
+                              </strong>
+                            </div>
+                          </div>
+                          <div className="text-right font-semibold text-brand-navy">
+                            Total Estimated Batch Cost: ₹{costEstimate.totalEstimatedCost}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
+
+            {bomHistory && bomHistory.length > 0 && (
+              <div className="rounded-lg border border-slate-200 p-3 text-xs space-y-1.5">
+                <h4 className="font-semibold text-brand-navy">Audit History</h4>
+                {bomHistory.slice(0, 10).map(h => (
+                  <div key={h.id} className="flex justify-between border-b border-slate-100 pb-1">
+                    <div>
+                      <span className="font-semibold text-slate-800">{h.action}</span>{' '}
+                      <span className="text-slate-500">({h.entityType})</span>
+                      {h.remarks && <span className="ml-2 text-slate-600">– {h.remarks}</span>}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      {h.user?.fullName || 'System'} ·{' '}
+                      {new Date(h.createdAt).toLocaleString('en-IN')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </Modal>
@@ -654,6 +792,30 @@ export const BomsPage: React.FC = () => {
                 onChange={e => setExpectedGoodOutput(e.target.value)}
               />
             </FormField>
+            <FormField label="Yield %" required>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="100"
+                className={inputClassName}
+                value={yieldPercentage}
+                onChange={e => setYieldPercentage(e.target.value)}
+              />
+            </FormField>
+            <FormField label="Expected Wastage %">
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="99.99"
+                className={inputClassName}
+                value={expectedWastagePercent}
+                onChange={e => setExpectedWastagePercent(e.target.value)}
+              />
+            </FormField>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <FormField label="Output UoM" required>
               <select
                 className={inputClassName}
@@ -700,6 +862,15 @@ export const BomsPage: React.FC = () => {
         title="Activate BOM Version"
         message={`Activating v${activatingVer?.versionNumber} will mark any currently active version as OBSOLETE while preserving historical records. Continue?`}
         confirmLabel="Activate Version"
+      />
+
+      <ConfirmDialog
+        isOpen={!!obsoletingVer}
+        onClose={() => setObsoletingVer(null)}
+        onConfirm={handleObsoleteVersion}
+        title="Mark BOM Version Obsolete"
+        message={`Mark v${obsoletingVer?.versionNumber} as OBSOLETE? Obsolete versions cannot be edited or re-activated.`}
+        confirmLabel="Mark Obsolete"
       />
 
       <ConfirmDialog

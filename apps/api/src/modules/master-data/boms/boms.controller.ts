@@ -6,6 +6,7 @@ import { BomsService } from './boms.service';
 import {
   createBomSchema,
   createBomVersionBodySchema,
+  obsoleteBomVersionSchema,
   updateBomHeaderSchema,
   updateBomVersionSchema,
 } from './boms.types';
@@ -118,6 +119,47 @@ export class BomsController {
         getAuditMeta(req),
       );
       sendSuccess(res, 'BOM version activated successfully', activated);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async obsoleteVersion(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { reason } = obsoleteBomVersionSchema.parse(req.body || {});
+      const obsoleted = await BomsService.obsoleteVersion(
+        String(req.params.id),
+        String(req.params.versionId),
+        reason,
+        getAuditMeta(req),
+      );
+      sendSuccess(res, 'BOM version marked obsolete successfully', obsoleted);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getVersionCostEstimate(req: Request, res: Response, next: NextFunction) {
+    try {
+      const batchQuantity =
+        typeof req.query.batchQuantity === 'string' && req.query.batchQuantity.trim()
+          ? req.query.batchQuantity.trim()
+          : undefined;
+      const estimate = await BomsService.getVersionCostEstimate(
+        String(req.params.id),
+        String(req.params.versionId),
+        batchQuantity,
+      );
+      sendSuccess(res, 'BOM cost estimate calculated successfully', estimate);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getHistory(req: Request, res: Response, next: NextFunction) {
+    try {
+      const history = await BomsService.getBomAuditHistory(String(req.params.id));
+      sendSuccess(res, 'BOM audit history retrieved successfully', history);
     } catch (error) {
       next(error);
     }

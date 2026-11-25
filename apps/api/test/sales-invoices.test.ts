@@ -502,4 +502,153 @@ describe('Phase 2.6: Sales Invoicing Suite', () => {
     });
     expect(auditCount).toBeGreaterThanOrEqual(4); // CREATE, UPDATE, ISSUE, DOWNLOAD, CANCEL
   });
+
+  it('6. Normalizes toDate calendar filter to 23:59:59.999Z across orders, invoices, and dashboard', async () => {
+    const targetDay = '2026-08-15';
+    const startRes = await request(app)
+      .post('/api/v1/sales/orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set(CSRF)
+      .send({
+        customerId: tnCustomerId,
+        shippingAddressId: tnAddressId,
+        warehouseId: whFGId,
+        orderDate: `${targetDay}T00:00:00.000Z`,
+        lines: [{ productVariantId: variantId, uomId: pcsUomId, orderedQuantity: '2' }],
+      });
+    expect(startRes.status).toBe(201);
+    createdOrderIds.push(startRes.body.data.id);
+
+    const endRes = await request(app)
+      .post('/api/v1/sales/orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set(CSRF)
+      .send({
+        customerId: tnCustomerId,
+        shippingAddressId: tnAddressId,
+        warehouseId: whFGId,
+        orderDate: `${targetDay}T23:59:59.999Z`,
+        lines: [{ productVariantId: variantId, uomId: pcsUomId, orderedQuantity: '2' }],
+      });
+    expect(endRes.status).toBe(201);
+    createdOrderIds.push(endRes.body.data.id);
+
+    const nextDayRes = await request(app)
+      .post('/api/v1/sales/orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set(CSRF)
+      .send({
+        customerId: tnCustomerId,
+        shippingAddressId: tnAddressId,
+        warehouseId: whFGId,
+        orderDate: '2026-08-16T00:00:00.000Z',
+        lines: [{ productVariantId: variantId, uomId: pcsUomId, orderedQuantity: '2' }],
+      });
+    expect(nextDayRes.status).toBe(201);
+    createdOrderIds.push(nextDayRes.body.data.id);
+
+    const listRes = await request(app)
+      .get(`/api/v1/sales/orders?fromDate=${targetDay}&toDate=${targetDay}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(listRes.status).toBe(200);
+    const ids = (listRes.body.data.items as Array<{ id: string }>).map(o => o.id);
+    expect(ids).toContain(startRes.body.data.id);
+    expect(ids).toContain(endRes.body.data.id);
+    expect(ids).not.toContain(nextDayRes.body.data.id);
+
+    const dashRes = await request(app)
+      .get(`/api/v1/sales/dashboard?fromDate=${targetDay}&toDate=${targetDay}`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(dashRes.status).toBe(200);
+    expect(dashRes.body.data.totalOrders).toBeGreaterThanOrEqual(2);
+  });
+
+  it('7. Resolves active TaxConfiguration by HSN code on sales orders and rejects conflicting configs', async () => {
+    const hsn = `99${suffix.slice(0, 6)}`;
+    const cfgProduct = await prisma.product.create({
+      data: {
+        categoryId: prodCatId,
+        code: `TCFG-PRD-${suffix}`,
+        name: 'Tax Config Test Item',
+        baseUomId: pcsUomId,
+        hsnCode: hsn,
+        taxRateId: taxRate5Id,
+      },
+    });
+    const cfgVariant = await prisma.productVariant.create({
+      data: {
+        productId: cfgProduct.id,
+        sku: `TCFG-SKU-${suffix}`,
+        name: 'Standard',
+        netWeightGrams: new Prisma.Decimal('100.00'),
+        uomId: pcsUomId,
+        defaultSellingPrice: new Prisma.Decimal('100.00'),
+      },
+    });
+    const cfgInvItem = await prisma.inventoryItem.create({
+      data: {
+        itemType: 'FINISHED_GOODS',
+        productVariantId: cfgVariant.id,
+        code: `TCFG-INV-${suffix}`,
+        name: 'Tax Config Inv Item',
+        uomId: pcsUomId,
+      },
+    });
+
+    const tc1 = await prisma.taxConfiguration.create({
+      data: {
+        hsnCode: hsn,
+        taxRateId: taxRate12Id,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        isActive: true,
+      },
+    });
+
+    // Order should resolve 12% from TaxConfiguration instead of 5% fallback on product
+    const orderRes = await request(app)
+      .post('/api/v1/sales/orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set(CSRF)
+      .send({
+        customerId: tnCustomerId,
+        shippingAddressId: tnAddressId,
+        warehouseId: whFGId,
+        orderDate: '2026-09-01T15:30:00.000Z',
+        lines: [{ productVariantId: cfgVariant.id, uomId: pcsUomId, orderedQuantity: '1' }],
+      });
+    expect(orderRes.status).toBe(201);
+    createdOrderIds.push(orderRes.body.data.id);
+    expect(Number(orderRes.body.data.lines[0].taxPercentage)).toBe(12);
+    expect(Number(orderRes.body.data.taxAmount)).toBe(12);
+
+    // Add conflicting TaxConfiguration with same effectiveFrom
+    const tc2 = await prisma.taxConfiguration.create({
+      data: {
+        hsnCode: hsn,
+        taxRateId: taxRate5Id,
+        effectiveFrom: new Date('2026-01-01T00:00:00.000Z'),
+        isActive: true,
+      },
+    });
+
+    const conflictRes = await request(app)
+      .post('/api/v1/sales/orders')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .set(CSRF)
+      .send({
+        customerId: tnCustomerId,
+        shippingAddressId: tnAddressId,
+        warehouseId: whFGId,
+        orderDate: '2026-09-01T15:30:00.000Z',
+        lines: [{ productVariantId: cfgVariant.id, uomId: pcsUomId, orderedQuantity: '1' }],
+      });
+    expect(conflictRes.status).toBe(400);
+
+    // Cleanup isolated test records
+    await prisma.salesOrder.deleteMany({ where: { id: orderRes.body.data.id } });
+    await prisma.taxConfiguration.deleteMany({ where: { id: { in: [tc1.id, tc2.id] } } });
+    await prisma.inventoryItem.deleteMany({ where: { id: cfgInvItem.id } });
+    await prisma.productVariant.deleteMany({ where: { id: cfgVariant.id } });
+    await prisma.product.deleteMany({ where: { id: cfgProduct.id } });
+  });
 });

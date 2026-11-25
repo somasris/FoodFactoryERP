@@ -234,6 +234,8 @@ export interface BOMVersion {
   effectiveFrom: string;
   effectiveTo?: string | null;
   expectedGoodOutput: string;
+  yieldPercentage?: string;
+  expectedWastagePercent?: string;
   outputUomId: string;
   approvedById?: string | null;
   approvedAt?: string | null;
@@ -244,6 +246,54 @@ export interface BOMVersion {
   _count?: { items: number; overheads: number };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BOMCostEstimate {
+  bomId: string;
+  versionId: string;
+  versionNumber: number;
+  status: string;
+  targetOutputQuantity: string;
+  outputUomSymbol: string;
+  yieldPercentage: string;
+  expectedWastagePercent: string;
+  totalStandardMaterialCost: string;
+  totalEffectiveMaterialCost: string;
+  totalOverheadCost: string;
+  totalEstimatedCost: string;
+  estimatedUnitCost: string;
+  items: Array<{
+    id: string;
+    inventoryItemId: string;
+    itemCode: string;
+    itemName: string;
+    itemType: string;
+    recipeUomSymbol: string;
+    baseUomSymbol: string;
+    standardQuantity: string;
+    scrapTolerancePercent: string;
+    effectiveQuantity: string;
+    effectiveBaseQuantity: string;
+    unitMwacCost: string;
+    standardCost: string;
+    effectiveCost: string;
+  }>;
+  overheads: Array<{
+    id: string;
+    costType: string;
+    description: string;
+    standardAmount: string;
+  }>;
+}
+
+export interface BOMAuditLogEntry {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  remarks?: string | null;
+  createdAt: string;
+  user?: { id: string; fullName: string; username: string } | null;
 }
 
 export interface BOM {

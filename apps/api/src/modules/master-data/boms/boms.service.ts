@@ -2,6 +2,7 @@ import { ItemType, Prisma } from '@prisma/client';
 import { prisma } from '../../../services/prisma.service';
 import { AuditService } from '../../../services/audit.service';
 import { AppError } from '../../../middleware/error.middleware';
+import { convertQuantityDecimal, ZERO } from '../../inventory/inventory.utils';
 import {
   AuditMeta,
   handlePrismaError,
@@ -125,6 +126,8 @@ export class BomsService {
       if (inv.productVariantId) {
         componentVariantIds.push(inv.productVariantId);
       }
+      // Verify a valid UOM conversion path exists between recipe UOM and inventory base UOM
+      await convertQuantityDecimal(prisma, new Prisma.Decimal(1), item.uomId, inv.uomId);
     }
 
     await this.checkCircularBom(productVariantId, componentVariantIds);
@@ -228,6 +231,10 @@ export class BomsService {
               effectiveFrom: input.initialVersion.effectiveFrom ?? new Date(),
               effectiveTo: input.initialVersion.effectiveTo ?? null,
               expectedGoodOutput: new Prisma.Decimal(input.initialVersion.expectedGoodOutput),
+              yieldPercentage: new Prisma.Decimal(input.initialVersion.yieldPercentage ?? '100'),
+              expectedWastagePercent: new Prisma.Decimal(
+                input.initialVersion.expectedWastagePercent ?? '0',
+              ),
               outputUomId: input.initialVersion.outputUomId,
               remarks: input.initialVersion.remarks ?? null,
               items: {
@@ -378,6 +385,8 @@ export class BomsService {
           effectiveFrom: input.effectiveFrom ?? new Date(),
           effectiveTo: input.effectiveTo ?? null,
           expectedGoodOutput: new Prisma.Decimal(input.expectedGoodOutput),
+          yieldPercentage: new Prisma.Decimal(input.yieldPercentage ?? '100'),
+          expectedWastagePercent: new Prisma.Decimal(input.expectedWastagePercent ?? '0'),
           outputUomId: input.outputUomId,
           remarks: input.remarks ?? null,
           items: {
@@ -460,6 +469,8 @@ export class BomsService {
             effectiveFrom: input.effectiveFrom ?? version.effectiveFrom,
             effectiveTo: input.effectiveTo ?? null,
             expectedGoodOutput: new Prisma.Decimal(input.expectedGoodOutput),
+            yieldPercentage: new Prisma.Decimal(input.yieldPercentage ?? '100'),
+            expectedWastagePercent: new Prisma.Decimal(input.expectedWastagePercent ?? '0'),
             outputUomId: input.outputUomId,
             remarks: input.remarks ?? null,
             items: {
@@ -511,7 +522,7 @@ export class BomsService {
     try {
       const version = await prisma.bOMVersion.findFirst({
         where: { id: versionId, bomId },
-        include: { items: true },
+        include: { bom: true, items: true },
       });
       if (!version) throw new AppError('BOM version not found.', 404);
       if (version.status === 'ACTIVE') {
@@ -523,6 +534,18 @@ export class BomsService {
       if (version.items.length === 0) {
         throw new AppError('Cannot activate a BOM version without component items.', 400);
       }
+
+      // Re-validate active ingredients, UOM conversions, and non-circularity at activation time
+      await this.validateVersionItems(
+        version.bom.productVariantId,
+        version.outputUomId,
+        version.items.map(i => ({
+          inventoryItemId: i.inventoryItemId,
+          standardQuantity: i.standardQuantity.toString(),
+          uomId: i.uomId,
+          scrapTolerancePercent: i.scrapTolerancePercent.toString(),
+        })),
+      );
 
       const now = new Date();
 
@@ -563,5 +586,185 @@ export class BomsService {
     } catch (error) {
       return handlePrismaError(error, 'BOM version');
     }
+  }
+
+  static async obsoleteVersion(
+    bomId: string,
+    versionId: string,
+    reason: string | undefined,
+    meta: AuditMeta,
+  ) {
+    try {
+      const version = await prisma.bOMVersion.findFirst({
+        where: { id: versionId, bomId },
+      });
+      if (!version) throw new AppError('BOM version not found.', 404);
+      if (version.status === 'OBSOLETE') {
+        throw new AppError('BOM version is already obsolete.', 400);
+      }
+
+      const now = new Date();
+      const updated = await prisma.bOMVersion.update({
+        where: { id: versionId },
+        data: {
+          status: 'OBSOLETE',
+          effectiveTo: now,
+          ...(reason ? { remarks: reason } : {}),
+        },
+        include: {
+          outputUom: true,
+          items: { include: { inventoryItem: true, uom: true } },
+          overheads: true,
+        },
+      });
+
+      await AuditService.log({
+        userId: meta.userId,
+        action: 'UPDATE',
+        entityType: 'BOMVersion',
+        entityId: updated.id,
+        previousState: { status: version.status },
+        newState: { status: updated.status },
+        ipAddress: meta.ipAddress,
+        userAgent: meta.userAgent,
+        remarks: reason || `Marked BOM version v${updated.versionNumber} obsolete`,
+      });
+
+      return updated;
+    } catch (error) {
+      return handlePrismaError(error, 'BOM version');
+    }
+  }
+
+  static async getVersionCostEstimate(
+    bomId: string,
+    versionId: string,
+    batchQuantityStr?: string,
+  ) {
+    const version = await prisma.bOMVersion.findFirst({
+      where: { id: versionId, bomId },
+      include: {
+        bom: { include: { productVariant: true } },
+        outputUom: true,
+        items: { include: { inventoryItem: { include: { uom: true } }, uom: true } },
+        overheads: true,
+      },
+    });
+    if (!version) throw new AppError('BOM version not found.', 404);
+
+    const baseGoodOutput = new Prisma.Decimal(version.expectedGoodOutput);
+    const targetOutput = batchQuantityStr ? new Prisma.Decimal(batchQuantityStr) : baseGoodOutput;
+    if (targetOutput.lte(ZERO)) {
+      throw new AppError('Target batch quantity must be greater than zero.', 400);
+    }
+
+    const scaleFactor = targetOutput.div(baseGoodOutput);
+    const HUNDRED = new Prisma.Decimal(100);
+
+    let totalStandardMaterialCost = ZERO;
+    let totalEffectiveMaterialCost = ZERO;
+    const itemBreakdown = [];
+
+    for (const item of version.items) {
+      const scaledQty = new Prisma.Decimal(item.standardQuantity).mul(scaleFactor).toDecimalPlaces(4);
+      const scrapPct = new Prisma.Decimal(item.scrapTolerancePercent);
+      const effectiveQty = scaledQty
+        .mul(HUNDRED.add(scrapPct))
+        .div(HUNDRED)
+        .toDecimalPlaces(4);
+
+      const { converted: baseQty } = await convertQuantityDecimal(
+        prisma,
+        scaledQty,
+        item.uomId,
+        item.inventoryItem.uomId,
+      );
+      const { converted: effectiveBaseQty } = await convertQuantityDecimal(
+        prisma,
+        effectiveQty,
+        item.uomId,
+        item.inventoryItem.uomId,
+      );
+
+      const unitCost = new Prisma.Decimal(item.inventoryItem.movingAverageCost);
+      const standardCost = baseQty.mul(unitCost).toDecimalPlaces(2);
+      const effectiveCost = effectiveBaseQty.mul(unitCost).toDecimalPlaces(2);
+
+      totalStandardMaterialCost = totalStandardMaterialCost.add(standardCost);
+      totalEffectiveMaterialCost = totalEffectiveMaterialCost.add(effectiveCost);
+
+      itemBreakdown.push({
+        id: item.id,
+        inventoryItemId: item.inventoryItemId,
+        itemCode: item.inventoryItem.code,
+        itemName: item.inventoryItem.name,
+        itemType: item.itemType,
+        recipeUomSymbol: item.uom.symbol,
+        baseUomSymbol: item.inventoryItem.uom.symbol,
+        standardQuantity: scaledQty.toFixed(4),
+        scrapTolerancePercent: scrapPct.toFixed(2),
+        effectiveQuantity: effectiveQty.toFixed(4),
+        effectiveBaseQuantity: effectiveBaseQty.toFixed(4),
+        unitMwacCost: unitCost.toFixed(4),
+        standardCost: standardCost.toFixed(2),
+        effectiveCost: effectiveCost.toFixed(2),
+      });
+    }
+
+    let totalOverheadCost = ZERO;
+    const overheadBreakdown = version.overheads.map(oh => {
+      const scaled = new Prisma.Decimal(oh.standardAmount).mul(scaleFactor).toDecimalPlaces(2);
+      totalOverheadCost = totalOverheadCost.add(scaled);
+      return {
+        id: oh.id,
+        costType: oh.costType,
+        description: oh.description,
+        standardAmount: scaled.toFixed(2),
+      };
+    });
+
+    const totalEstimatedCost = totalEffectiveMaterialCost.add(totalOverheadCost).toDecimalPlaces(2);
+    const estimatedUnitCost = totalEstimatedCost.div(targetOutput).toDecimalPlaces(4);
+
+    return {
+      bomId,
+      versionId,
+      versionNumber: version.versionNumber,
+      status: version.status,
+      targetOutputQuantity: targetOutput.toFixed(4),
+      outputUomSymbol: version.outputUom.symbol,
+      yieldPercentage: new Prisma.Decimal(version.yieldPercentage).toFixed(2),
+      expectedWastagePercent: new Prisma.Decimal(version.expectedWastagePercent).toFixed(2),
+      totalStandardMaterialCost: totalStandardMaterialCost.toFixed(2),
+      totalEffectiveMaterialCost: totalEffectiveMaterialCost.toFixed(2),
+      totalOverheadCost: totalOverheadCost.toFixed(2),
+      totalEstimatedCost: totalEstimatedCost.toFixed(2),
+      estimatedUnitCost: estimatedUnitCost.toFixed(4),
+      items: itemBreakdown,
+      overheads: overheadBreakdown,
+    };
+  }
+
+  static async getBomAuditHistory(bomId: string) {
+    const bom = await prisma.bOM.findUnique({
+      where: { id: bomId },
+      include: { versions: { select: { id: true } } },
+    });
+    if (!bom) throw new AppError('Bill of materials not found.', 404);
+
+    const versionIds = bom.versions.map(v => v.id);
+    return prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { entityType: 'BOM', entityId: bomId },
+          ...(versionIds.length > 0
+            ? [{ entityType: 'BOMVersion', entityId: { in: versionIds } }]
+            : []),
+        ],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { user: { select: { id: true, fullName: true, username: true } } },
+    });
   }
 }

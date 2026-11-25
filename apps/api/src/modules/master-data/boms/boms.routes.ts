@@ -20,6 +20,17 @@ bomsRouter.post(
   requirePermissions('bom.approve'),
   BomsController.activateVersion,
 );
+bomsRouter.post(
+  '/:id/versions/:versionId/obsolete',
+  requirePermissions('bom.approve'),
+  BomsController.obsoleteVersion,
+);
+bomsRouter.get(
+  '/:id/versions/:versionId/cost-estimate',
+  requirePermissions('bom.read'),
+  BomsController.getVersionCostEstimate,
+);
+bomsRouter.get('/:id/history', requirePermissions('bom.read'), BomsController.getHistory);
 
 export const inventoryItemsRouter = Router();
 inventoryItemsRouter.get(

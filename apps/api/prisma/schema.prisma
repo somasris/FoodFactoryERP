@@ -108,6 +108,34 @@ enum SalesInvoiceStatus {
   CANCELLED
 }
 
+enum ProductionPlanStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  RELEASED
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  RELEASED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum WorkOrderPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 enum InventoryDocumentStatus {
   DRAFT
   SUBMITTED
@@ -231,6 +259,8 @@ model Warehouse {
   inventoryAdjustments InventoryAdjustment[]
   salesOrders          SalesOrder[]
   salesInvoices        SalesInvoice[]
+  productionPlans      ProductionPlan[]
+  workOrders           WorkOrder[]
 
   @@map("warehouses")
 }
@@ -260,6 +290,9 @@ model User {
   salesOrders                 SalesOrder[]           @relation("SalesmanOrders")
   salesOrderStatusChanges     SalesOrderStatusHistory[]
   salesInvoiceStatusChanges   SalesInvoiceStatusHistory[]
+  productionPlanStatusChanges ProductionPlanStatusHistory[]
+  assignedWorkOrders          WorkOrder[]                   @relation("WorkOrderAssignee")
+  workOrderStatusChanges      WorkOrderStatusHistory[]
 
   @@map("users")
 }
@@ -411,7 +444,9 @@ model UnitOfMeasure {
   transferLines     InventoryTransferLine[]
   adjustmentLines   InventoryAdjustmentLine[]
   salesOrderLines   SalesOrderLine[]
-  salesInvoiceLines SalesInvoiceLine[]
+  salesInvoiceLines   SalesInvoiceLine[]
+  productionPlanItems ProductionPlanItem[]
+  workOrders          WorkOrder[]
 
   @@map("units_of_measure")
 }
@@ -567,8 +602,10 @@ model ProductVariant {
   uom               UnitOfMeasure      @relation(fields: [uomId], references: [id])
   inventoryItem     InventoryItem?
   boms              BOM[]
-  salesOrderLines   SalesOrderLine[]
-  salesInvoiceLines SalesInvoiceLine[]
+  salesOrderLines     SalesOrderLine[]
+  salesInvoiceLines   SalesInvoiceLine[]
+  productionPlanItems ProductionPlanItem[]
+  workOrders          WorkOrder[]
 
   @@index([productId])
   @@index([uomId])
@@ -600,8 +637,11 @@ model InventoryItem {
   issueLines       InventoryIssueLine[]
   transferLines    InventoryTransferLine[]
   adjustmentLines   InventoryAdjustmentLine[]
-  salesOrderLines   SalesOrderLine[]
-  salesInvoiceLines SalesInvoiceLine[]
+  salesOrderLines           SalesOrderLine[]
+  salesInvoiceLines         SalesInvoiceLine[]
+  productionPlanItems       ProductionPlanItem[]
+  productionPlanMaterials   ProductionPlanMaterialRequirement[]
+  workOrders                WorkOrder[]
 
   @@map("inventory_items")
 }
@@ -697,9 +737,11 @@ model BOM {
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
-  outputUom      UnitOfMeasure  @relation(fields: [outputUomId], references: [id])
-  versions       BOMVersion[]
+  productVariant      ProductVariant       @relation(fields: [productVariantId], references: [id])
+  outputUom           UnitOfMeasure        @relation(fields: [outputUomId], references: [id])
+  versions            BOMVersion[]
+  productionPlanItems ProductionPlanItem[]
+  workOrders          WorkOrder[]
 
   @@index([productVariantId])
   @@map("boms")
@@ -712,18 +754,22 @@ model BOMVersion {
   status             BOMVersionStatus @default(DRAFT)
   effectiveFrom      DateTime         @default(now()) @map("effective_from") @db.Date
   effectiveTo        DateTime?        @map("effective_to") @db.Date
-  expectedGoodOutput Decimal          @map("expected_good_output") @db.Decimal(14, 4)
-  outputUomId        String           @map("output_uom_id")
+  expectedGoodOutput     Decimal          @map("expected_good_output") @db.Decimal(14, 4)
+  yieldPercentage        Decimal          @default(100) @map("yield_percentage") @db.Decimal(5, 2)
+  expectedWastagePercent Decimal          @default(0) @map("expected_wastage_percent") @db.Decimal(5, 2)
+  outputUomId            String           @map("output_uom_id")
   approvedById       String?          @map("approved_by_id")
   approvedAt         DateTime?        @map("approved_at")
   remarks            String?          @db.Text
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
 
-  bom       BOM           @relation(fields: [bomId], references: [id], onDelete: Cascade)
-  outputUom UnitOfMeasure @relation(fields: [outputUomId], references: [id])
-  items     BOMItem[]
-  overheads BOMOverhead[]
+  bom                 BOM                  @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  outputUom           UnitOfMeasure        @relation(fields: [outputUomId], references: [id])
+  items               BOMItem[]
+  overheads           BOMOverhead[]
+  productionPlanItems ProductionPlanItem[]
+  workOrders          WorkOrder[]
 
   @@unique([bomId, versionNumber])
   @@map("bom_versions")
@@ -1136,8 +1182,9 @@ model SalesOrder {
   salesman        User?                     @relation("SalesmanOrders", fields: [salesmanId], references: [id])
   lines           SalesOrderLine[]
   statusHistory   SalesOrderStatusHistory[]
-  fulfillments    SalesOrderFulfillment[]
-  invoices        SalesInvoice[]
+  fulfillments          SalesOrderFulfillment[]
+  invoices              SalesInvoice[]
+  productionDemandLinks ProductionPlanDemandSource[]
 
   @@index([customerId])
   @@index([warehouseId])
@@ -1171,9 +1218,10 @@ model SalesOrderLine {
   salesOrder     SalesOrder     @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
   productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
   inventoryItem  InventoryItem  @relation(fields: [inventoryItemId], references: [id])
-  uom            UnitOfMeasure  @relation(fields: [uomId], references: [id])
-  taxRate        TaxRate        @relation(fields: [taxRateId], references: [id])
-  invoiceLines   SalesInvoiceLine[]
+  uom                   UnitOfMeasure                @relation(fields: [uomId], references: [id])
+  taxRate               TaxRate                      @relation(fields: [taxRateId], references: [id])
+  invoiceLines          SalesInvoiceLine[]
+  productionDemandLinks ProductionPlanDemandSource[]
 
   @@unique([salesOrderId, lineNumber])
   @@index([productVariantId])
@@ -1355,4 +1403,231 @@ model SalesInvoiceStatusHistory {
 
   @@index([salesInvoiceId])
   @@map("sales_invoice_status_history")
+}
+
+// ------------------------------------------------------------------------------
+// 9. PRODUCTION PLANNING (PHASE 3.2)
+// ------------------------------------------------------------------------------
+
+model ProductionPlan {
+  id                 String               @id @default(uuid())
+  planNumber         String               @unique @map("plan_number") @db.VarChar(40)
+  name               String?              @db.VarChar(150)
+  warehouseId        String               @map("warehouse_id")
+  planDate           DateTime             @default(now()) @map("plan_date")
+  targetStartDate    DateTime?            @map("target_start_date") @db.Date
+  targetEndDate      DateTime?            @map("target_end_date") @db.Date
+  status             ProductionPlanStatus @default(DRAFT)
+  notes              String?              @db.Text
+  idempotencyKey     String?              @unique @map("idempotency_key") @db.VarChar(100)
+  createdById        String               @map("created_by_id")
+  submittedById      String?              @map("submitted_by_id")
+  submittedAt        DateTime?            @map("submitted_at")
+  approvedById       String?              @map("approved_by_id")
+  approvedAt         DateTime?            @map("approved_at")
+  rejectedById       String?              @map("rejected_by_id")
+  rejectedAt         DateTime?            @map("rejected_at")
+  rejectionReason    String?              @map("rejection_reason") @db.Text
+  releasedById       String?              @map("released_by_id")
+  releasedAt         DateTime?            @map("released_at")
+  cancelledById      String?              @map("cancelled_by_id")
+  cancelledAt        DateTime?            @map("cancelled_at")
+  cancellationReason String?              @map("cancellation_reason") @db.Text
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  warehouse            Warehouse                           @relation(fields: [warehouseId], references: [id])
+  items                ProductionPlanItem[]
+  materialRequirements ProductionPlanMaterialRequirement[]
+  statusHistory        ProductionPlanStatusHistory[]
+  workOrders           WorkOrder[]
+
+  @@index([warehouseId])
+  @@index([status])
+  @@index([planDate])
+  @@map("production_plans")
+}
+
+model ProductionPlanItem {
+  id                      String   @id @default(uuid())
+  productionPlanId        String   @map("production_plan_id")
+  lineNumber              Int      @map("line_number")
+  productVariantId        String   @map("product_variant_id")
+  inventoryItemId         String   @map("inventory_item_id")
+  bomId                   String   @map("bom_id")
+  bomVersionId            String   @map("bom_version_id")
+  uomId                   String   @map("uom_id")
+  demandQuantity          Decimal  @map("demand_quantity") @db.Decimal(14, 4)
+  availableFgQuantity     Decimal  @default(0) @map("available_fg_quantity") @db.Decimal(14, 4)
+  existingPlannedQuantity Decimal  @default(0) @map("existing_planned_quantity") @db.Decimal(14, 4)
+  netRequirementQuantity  Decimal  @map("net_requirement_quantity") @db.Decimal(14, 4)
+  plannedQuantity         Decimal  @map("planned_quantity") @db.Decimal(14, 4)
+  workOrderedQuantity     Decimal  @default(0) @map("work_ordered_quantity") @db.Decimal(14, 4)
+  yieldPercentage         Decimal  @default(100) @map("yield_percentage") @db.Decimal(5, 2)
+  expectedWastagePercent  Decimal  @default(0) @map("expected_wastage_percent") @db.Decimal(5, 2)
+  estimatedMaterialCost   Decimal  @default(0) @map("estimated_material_cost") @db.Decimal(14, 2)
+  estimatedOverheadCost   Decimal  @default(0) @map("estimated_overhead_cost") @db.Decimal(14, 2)
+  estimatedTotalCost      Decimal  @default(0) @map("estimated_total_cost") @db.Decimal(14, 2)
+
+  productionPlan       ProductionPlan                      @relation(fields: [productionPlanId], references: [id], onDelete: Cascade)
+  productVariant       ProductVariant                      @relation(fields: [productVariantId], references: [id])
+  inventoryItem        InventoryItem                       @relation(fields: [inventoryItemId], references: [id])
+  bom                  BOM                                 @relation(fields: [bomId], references: [id])
+  bomVersion           BOMVersion                          @relation(fields: [bomVersionId], references: [id])
+  uom                  UnitOfMeasure                       @relation(fields: [uomId], references: [id])
+  demandSources        ProductionPlanDemandSource[]
+  materialRequirements ProductionPlanMaterialRequirement[]
+  workOrders           WorkOrder[]
+
+  @@unique([productionPlanId, lineNumber])
+  @@index([productVariantId])
+  @@index([bomVersionId])
+  @@map("production_plan_items")
+}
+
+model ProductionPlanDemandSource {
+  id                    String  @id @default(uuid())
+  productionPlanItemId  String  @map("production_plan_item_id")
+  salesOrderId          String  @map("sales_order_id")
+  salesOrderLineId      String  @map("sales_order_line_id")
+  allocatedBaseQuantity Decimal @map("allocated_base_quantity") @db.Decimal(14, 4)
+
+  productionPlanItem ProductionPlanItem @relation(fields: [productionPlanItemId], references: [id], onDelete: Cascade)
+  salesOrder         SalesOrder         @relation(fields: [salesOrderId], references: [id])
+  salesOrderLine     SalesOrderLine     @relation(fields: [salesOrderLineId], references: [id])
+
+  @@index([salesOrderId])
+  @@index([salesOrderLineId])
+  @@map("production_plan_demand_sources")
+}
+
+model ProductionPlanMaterialRequirement {
+  id                   String   @id @default(uuid())
+  productionPlanId     String   @map("production_plan_id")
+  productionPlanItemId String   @map("production_plan_item_id")
+  inventoryItemId      String   @map("inventory_item_id")
+  itemType             ItemType @map("item_type")
+  requiredBaseQuantity Decimal  @map("required_base_quantity") @db.Decimal(14, 4)
+  availableQuantity    Decimal  @default(0) @map("available_quantity") @db.Decimal(14, 4)
+  reservedQuantity     Decimal  @default(0) @map("reserved_quantity") @db.Decimal(14, 4)
+  netAvailableQuantity Decimal  @default(0) @map("net_available_quantity") @db.Decimal(14, 4)
+  shortageQuantity     Decimal  @default(0) @map("shortage_quantity") @db.Decimal(14, 4)
+  unitMwacCost         Decimal  @default(0) @map("unit_mwac_cost") @db.Decimal(18, 4)
+  estimatedCost        Decimal  @default(0) @map("estimated_cost") @db.Decimal(14, 2)
+
+  productionPlan     ProductionPlan     @relation(fields: [productionPlanId], references: [id], onDelete: Cascade)
+  productionPlanItem ProductionPlanItem @relation(fields: [productionPlanItemId], references: [id], onDelete: Cascade)
+  inventoryItem      InventoryItem      @relation(fields: [inventoryItemId], references: [id])
+
+  @@index([productionPlanId])
+  @@index([inventoryItemId])
+  @@map("production_plan_material_requirements")
+}
+
+model ProductionPlanStatusHistory {
+  id               String                @id @default(uuid())
+  productionPlanId String                @map("production_plan_id")
+  fromStatus       ProductionPlanStatus? @map("from_status")
+  toStatus         ProductionPlanStatus  @map("to_status")
+  changedById      String                @map("changed_by_id")
+  reason           String?               @db.Text
+  createdAt        DateTime              @default(now()) @map("created_at")
+
+  productionPlan ProductionPlan @relation(fields: [productionPlanId], references: [id], onDelete: Cascade)
+  changedBy      User           @relation(fields: [changedById], references: [id])
+
+  @@index([productionPlanId])
+  @@map("production_plan_status_history")
+}
+
+// ------------------------------------------------------------------------------
+// 10. WORK ORDER MANAGEMENT (PHASE 3.3)
+// ------------------------------------------------------------------------------
+
+model WorkOrderNumberSequence {
+  id            String   @id @default(uuid())
+  prefix        String   @default("WO") @db.VarChar(15)
+  financialYear String   @map("financial_year") @db.VarChar(10)
+  lastNumber    Int      @default(0) @map("last_number")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([prefix, financialYear])
+  @@map("work_order_number_sequences")
+}
+
+model WorkOrder {
+  id                   String            @id @default(uuid())
+  workOrderNumber      String            @unique @map("work_order_number") @db.VarChar(40)
+  financialYear        String            @map("financial_year") @db.VarChar(10)
+  productionPlanId     String            @map("production_plan_id")
+  productionPlanItemId String            @map("production_plan_item_id")
+  productVariantId     String            @map("product_variant_id")
+  inventoryItemId      String            @map("inventory_item_id")
+  bomId                String            @map("bom_id")
+  bomVersionId         String            @map("bom_version_id")
+  warehouseId          String            @map("warehouse_id")
+  uomId                String            @map("uom_id")
+  plannedQuantity      Decimal           @map("planned_quantity") @db.Decimal(14, 4)
+  actualGoodQuantity   Decimal           @default(0) @map("actual_good_quantity") @db.Decimal(14, 4)
+  actualScrapQuantity  Decimal           @default(0) @map("actual_scrap_quantity") @db.Decimal(14, 4)
+  priority             WorkOrderPriority @default(NORMAL)
+  status               WorkOrderStatus   @default(DRAFT)
+  plannedStartDate     DateTime?         @map("planned_start_date") @db.Date
+  plannedEndDate       DateTime?         @map("planned_end_date") @db.Date
+  productionLine       String?           @map("production_line") @db.VarChar(80)
+  assignedToId         String?           @map("assigned_to_id")
+  notes                String?           @db.Text
+  instructions         String?           @db.Text
+  idempotencyKey       String?           @unique @map("idempotency_key") @db.VarChar(100)
+  createdById          String            @map("created_by_id")
+  submittedById        String?           @map("submitted_by_id")
+  submittedAt          DateTime?         @map("submitted_at")
+  approvedById         String?           @map("approved_by_id")
+  approvedAt           DateTime?         @map("approved_at")
+  rejectedById         String?           @map("rejected_by_id")
+  rejectedAt           DateTime?         @map("rejected_at")
+  rejectionReason      String?           @map("rejection_reason") @db.Text
+  releasedById         String?           @map("released_by_id")
+  releasedAt           DateTime?         @map("released_at")
+  cancelledById        String?           @map("cancelled_by_id")
+  cancelledAt          DateTime?         @map("cancelled_at")
+  cancellationReason   String?           @map("cancellation_reason") @db.Text
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  productionPlan     ProductionPlan           @relation(fields: [productionPlanId], references: [id])
+  productionPlanItem ProductionPlanItem       @relation(fields: [productionPlanItemId], references: [id])
+  productVariant     ProductVariant           @relation(fields: [productVariantId], references: [id])
+  inventoryItem      InventoryItem            @relation(fields: [inventoryItemId], references: [id])
+  bom                BOM                      @relation(fields: [bomId], references: [id])
+  bomVersion         BOMVersion               @relation(fields: [bomVersionId], references: [id])
+  warehouse          Warehouse                @relation(fields: [warehouseId], references: [id])
+  uom                UnitOfMeasure            @relation(fields: [uomId], references: [id])
+  assignedTo         User?                    @relation("WorkOrderAssignee", fields: [assignedToId], references: [id])
+  statusHistory      WorkOrderStatusHistory[]
+
+  @@index([productionPlanId])
+  @@index([productionPlanItemId])
+  @@index([productVariantId])
+  @@index([bomVersionId])
+  @@index([warehouseId])
+  @@index([status])
+  @@index([plannedStartDate])
+  @@map("work_orders")
+}
+
+model WorkOrderStatusHistory {
+  id          String           @id @default(uuid())
+  workOrderId String           @map("work_order_id")
+  fromStatus  WorkOrderStatus? @map("from_status")
+  toStatus    WorkOrderStatus  @map("to_status")
+  changedById String           @map("changed_by_id")
+  reason      String?          @db.Text
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  changedBy User      @relation(fields: [changedById], references: [id])
+
+  @@index([workOrderId])
+  @@map("work_order_status_history")
 }

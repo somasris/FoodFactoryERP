@@ -17,6 +17,7 @@ import {
   ZERO,
 } from '../inventory/inventory.utils';
 import { CreateSalesInvoiceInput, UpdateSalesInvoiceInput } from './sales-invoice.types';
+import { buildDateRangeFilter, resolveApplicableTaxRate } from './sales.utils';
 
 const HUNDRED = new Prisma.Decimal(100);
 const TWO = new Prisma.Decimal(2);
@@ -109,10 +110,9 @@ export class SalesInvoiceService {
     if (filters.status) where.status = filters.status as SalesInvoiceStatus;
     if (filters.customerId) where.customerId = filters.customerId;
     if (filters.salesOrderId) where.salesOrderId = filters.salesOrderId;
-    if (filters.fromDate || filters.toDate) {
-      where.invoiceDate = {};
-      if (filters.fromDate) where.invoiceDate.gte = new Date(filters.fromDate);
-      if (filters.toDate) where.invoiceDate.lte = new Date(filters.toDate);
+    const dateFilter = buildDateRangeFilter(filters.fromDate, filters.toDate);
+    if (dateFilter) {
+      where.invoiceDate = dateFilter;
     }
     if (params.search) {
       where.OR = [
@@ -362,18 +362,12 @@ export class SalesInvoiceService {
       const { orderLine, qty, baseQty } = targetItems[i];
       const hsnCode = orderLine.productVariant.product.hsnCode;
 
-      // Resolve active TaxConfiguration for HSN on invoiceDate if present; else use order line TaxRate
-      const taxConfig = await tx.taxConfiguration.findFirst({
-        where: {
-          hsnCode,
-          isActive: true,
-          effectiveFrom: { lte: invoiceDate },
-          OR: [{ effectiveTo: null }, { effectiveTo: { gte: invoiceDate } }],
-        },
-        orderBy: { effectiveFrom: 'desc' },
-        include: { taxRate: true },
-      });
-      const activeTaxRate = taxConfig?.taxRate ?? orderLine.taxRate;
+      const activeTaxRate = await resolveApplicableTaxRate(
+        tx,
+        hsnCode,
+        invoiceDate,
+        orderLine.taxRate,
+      );
 
       const unitPrice = new Prisma.Decimal(orderLine.unitPrice);
       const discountPct = new Prisma.Decimal(orderLine.discountPercent);

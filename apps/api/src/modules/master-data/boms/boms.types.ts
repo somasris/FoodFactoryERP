@@ -14,6 +14,20 @@ const decimalNonNegative2 = z
     message: 'Must be a non-negative decimal with up to 2 decimal places',
   });
 
+const decimalYieldPercent = z
+  .union([z.number(), z.string()])
+  .transform(v => String(v).trim())
+  .refine(v => /^\d+(\.\d{1,2})?$/.test(v) && Number(v) > 0 && Number(v) <= 100, {
+    message: 'Yield percentage must be between 0.01 and 100',
+  });
+
+const decimalWastagePercent = z
+  .union([z.number(), z.string()])
+  .transform(v => String(v).trim())
+  .refine(v => /^\d+(\.\d{1,2})?$/.test(v) && Number(v) >= 0 && Number(v) < 100, {
+    message: 'Expected wastage percentage must be between 0 and 99.99',
+  });
+
 export const bomItemInputSchema = z.object({
   inventoryItemId: z.string().uuid('Invalid inventory item ID'),
   standardQuantity: decimalPositive4,
@@ -32,6 +46,8 @@ export const createBomVersionBodySchema = z
     effectiveFrom: z.coerce.date().optional(),
     effectiveTo: z.coerce.date().optional().nullable(),
     expectedGoodOutput: decimalPositive4,
+    yieldPercentage: decimalYieldPercent.optional().default('100'),
+    expectedWastagePercent: decimalWastagePercent.optional().default('0'),
     outputUomId: z.string().uuid('Invalid output UOM ID'),
     remarks: z.string().trim().max(1000).optional().nullable(),
     items: z.array(bomItemInputSchema).min(1, 'At least one BOM component is required'),
@@ -78,6 +94,10 @@ export const updateBomHeaderSchema = z.object({
 });
 
 export const updateBomVersionSchema = createBomVersionBodySchema;
+
+export const obsoleteBomVersionSchema = z.object({
+  reason: z.string().trim().min(3, 'Reason must be at least 3 characters').max(500).optional(),
+});
 
 export type CreateBomInput = z.infer<typeof createBomSchema>;
 export type UpdateBomHeaderInput = z.infer<typeof updateBomHeaderSchema>;
