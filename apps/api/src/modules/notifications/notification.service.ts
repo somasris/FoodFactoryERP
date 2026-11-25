@@ -311,7 +311,7 @@ export class NotificationService {
         if (delivered) {
           const unreadCount = await this.getUnreadCount(entry.userId);
           NotificationSseService.publishToUser(entry.userId, 'unread_count', { unreadCount });
-          await prisma.notificationOutbox.update({
+          await prisma.notificationOutbox.updateMany({
             where: { id: entry.id },
             data: {
               status: NotificationOutboxStatus.DELIVERED,
