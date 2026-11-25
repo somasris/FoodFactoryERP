@@ -56,6 +56,7 @@ describe('Public Sign Up UI Suite', () => {
 
     fireEvent.change(screen.getByLabelText(/^Full Name/i), { target: { value: 'A' } });
     fireEvent.change(screen.getByLabelText(/^Email Address/i), { target: { value: 'bad-email' } });
+    fireEvent.click(screen.getByRole('radio', { name: /SALESMAN/i }));
     fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'StrongPass1!' } });
     fireEvent.change(screen.getByLabelText(/^Confirm Password/i), {
       target: { value: 'DifferentPass1!' },
