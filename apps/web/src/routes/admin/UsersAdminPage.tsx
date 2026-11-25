@@ -260,15 +260,22 @@ export const UsersAdminPage: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3">
-                        {u.registrationStatus === 'PENDING_APPROVAL' ? (
-                          <Badge variant="warning">Pending Approval</Badge>
-                        ) : u.registrationStatus === 'REJECTED' ? (
-                          <Badge variant="outline">Rejected</Badge>
-                        ) : (
-                          <Badge variant={u.isActive ? 'success' : 'outline'}>
-                            {u.isActive ? 'Active' : 'Disabled'}
-                          </Badge>
-                        )}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {u.registrationStatus === 'PENDING_APPROVAL' ? (
+                            <>
+                              <Badge variant="warning">Pending Approval</Badge>
+                              {u.requestedRole && (
+                                <Badge variant="outline">Requested: {u.requestedRole}</Badge>
+                              )}
+                            </>
+                          ) : u.registrationStatus === 'REJECTED' ? (
+                            <Badge variant="outline">Rejected</Badge>
+                          ) : (
+                            <Badge variant={u.isActive ? 'success' : 'outline'}>
+                              {u.isActive ? 'Active' : 'Disabled'}
+                            </Badge>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-slate-500">
                         {u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString('en-IN') : 'Never'}
@@ -280,7 +287,7 @@ export const UsersAdminPage: React.FC = () => {
                             <button
                               onClick={() => {
                                 setReviewTarget(u);
-                                setReviewRole('SALESMAN');
+                                setReviewRole(u.requestedRole || 'SALESMAN');
                                 setReviewReason('');
                               }}
                               title="Review Registration"

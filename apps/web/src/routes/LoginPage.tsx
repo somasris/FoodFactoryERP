@@ -1,10 +1,68 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Factory, Loader2 } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ClipboardCheck,
+  Crown,
+  Eye,
+  EyeOff,
+  Factory,
+  Loader2,
+  Shield,
+  ShoppingCart,
+  Wrench,
+} from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
-import { authService, UserProfile } from '../services/auth.service';
+import {
+  AllowedSignupRole,
+  authService,
+  DemoAccountOption,
+  DemoAccountsConfig,
+  UserProfile,
+} from '../services/auth.service';
 import { canAccessPath, getDefaultDashboardPath } from '../config/navigation';
+
+const SIGNUP_ROLE_OPTIONS: Array<{
+  role: AllowedSignupRole;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  {
+    role: 'ADMIN',
+    label: 'ADMIN',
+    description: 'Administration and operational management',
+    icon: Shield,
+  },
+  {
+    role: 'SALESMAN',
+    label: 'SALESMAN',
+    description: 'Sales orders, customers and invoicing',
+    icon: ShoppingCart,
+  },
+  {
+    role: 'PRODUCTION',
+    label: 'PRODUCTION',
+    description: 'Production planning, execution and inventory operations',
+    icon: Wrench,
+  },
+  {
+    role: 'AUDITOR',
+    label: 'AUDITOR',
+    description: 'Read-only access to authorized reports and audit information',
+    icon: ClipboardCheck,
+  },
+];
+
+const DEMO_ROLE_ICONS: Record<DemoAccountOption['role'], React.ComponentType<{ className?: string }>> = {
+  OWNER: Crown,
+  ADMIN: Shield,
+  SALESMAN: ShoppingCart,
+  PRODUCTION: Wrench,
+  AUDITOR: ClipboardCheck,
+};
 
 const loginSchema = z.object({
   usernameOrEmail: z.string().trim().min(1, 'Username or email is required'),
@@ -30,6 +88,9 @@ const signUpSchema = z
       .regex(/[0-9]/, 'Password must contain at least one number')
       .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
+    requestedRole: z.enum(['ADMIN', 'SALESMAN', 'PRODUCTION', 'AUDITOR'], {
+      errorMap: () => ({ message: 'Please select a role' }),
+    }),
   })
   .refine(data => data.password === data.confirmPassword, {
     message: 'Passwords do not match',
@@ -68,16 +129,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [demoConfig, setDemoConfig] = useState<DemoAccountsConfig>({ enabled: false, accounts: [] });
+  const [selectedDemoRole, setSelectedDemoRole] = useState<DemoAccountOption['role'] | null>(null);
 
   // Sign Up state
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [requestedRole, setRequestedRole] = useState<AllowedSignupRole | ''>('');
   const [signUpPassword, setSignUpPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [signUpSuccess, setSignUpSuccess] = useState<{ email: string } | null>(null);
+  const [signUpSuccess, setSignUpSuccess] = useState<{ email: string; requestedRole?: string | null } | null>(null);
 
   // Shared form feedback
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -87,6 +151,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode]);
+
+  useEffect(() => {
+    let active = true;
+    authService.getDemoAccounts().then(cfg => {
+      if (active) setDemoConfig(cfg);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -144,6 +218,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
       phoneNumber,
       password: signUpPassword,
       confirmPassword,
+      requestedRole: requestedRole || undefined,
     });
     if (!parsed.success) {
       const errs: Record<string, string> = {};
@@ -162,11 +237,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
         email: parsed.data.email,
         password: parsed.data.password,
         phoneNumber: parsed.data.phoneNumber || undefined,
+        requestedRole: parsed.data.requestedRole,
       });
-      setSignUpSuccess({ email: registered.email });
+      setSignUpSuccess({ email: registered.email, requestedRole: registered.requestedRole });
       setFullName('');
       setEmail('');
       setPhoneNumber('');
+      setRequestedRole('');
       setSignUpPassword('');
       setConfirmPassword('');
     } catch (err) {
@@ -293,79 +370,153 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
           )}
 
           {mode === 'signin' ? (
-            <form onSubmit={handleSignInSubmit} className="space-y-4" noValidate>
+            <div className="space-y-5">
               <div>
-                <label
-                  htmlFor="signin-username"
-                  className="mb-1 block text-xs font-medium text-slate-700"
-                >
-                  Username or Email
-                </label>
-                <input
-                  id="signin-username"
-                  type="text"
-                  autoComplete="username"
-                  value={usernameOrEmail}
-                  onChange={e => setUsernameOrEmail(e.target.value)}
-                  placeholder="Enter username or email"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
-                />
-                {fieldErrors.usernameOrEmail && (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.usernameOrEmail}</p>
-                )}
+                <h2 className="text-base font-semibold text-slate-900">Welcome back</h2>
+                <p className="text-xs text-slate-500">
+                  Sign in with your organization credentials to continue.
+                </p>
               </div>
 
-              <div>
-                <label
-                  htmlFor="signin-password"
-                  className="mb-1 block text-xs font-medium text-slate-700"
-                >
-                  Password
-                </label>
-                <div className="relative">
+              <form onSubmit={handleSignInSubmit} className="space-y-4" noValidate>
+                <div>
+                  <label
+                    htmlFor="signin-username"
+                    className="mb-1 block text-xs font-medium text-slate-700"
+                  >
+                    Username or Email
+                  </label>
                   <input
-                    id="signin-password"
-                    type={showPassword ? 'text' : 'password'}
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                    id="signin-username"
+                    type="text"
+                    autoComplete="username"
+                    value={usernameOrEmail}
+                    onChange={e => {
+                      setUsernameOrEmail(e.target.value);
+                      setSelectedDemoRole(null);
+                    }}
+                    placeholder="Enter username or email"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
                   />
+                  {fieldErrors.usernameOrEmail && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.usernameOrEmail}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label
+                    htmlFor="signin-password"
+                    className="mb-1 block text-xs font-medium text-slate-700"
+                  >
+                    Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="signin-password"
+                      type={showPassword ? 'text' : 'password'}
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={e => {
+                        setPassword(e.target.value);
+                        setSelectedDemoRole(null);
+                      }}
+                      placeholder="Enter password"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(v => !v)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {fieldErrors.password && (
+                    <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#172F50] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e3d68] disabled:opacity-60"
+                >
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Signing In...' : 'Sign In'}
+                </button>
+
+                <p className="text-center text-xs text-slate-500">
+                  Need an account?{' '}
                   <button
                     type="button"
-                    onClick={() => setShowPassword(v => !v)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                    onClick={() => switchMode('signup')}
+                    className="font-medium text-[#172F50] hover:underline"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    Create an account
                   </button>
+                </p>
+              </form>
+
+              {demoConfig.enabled && demoConfig.accounts.length > 0 && (
+                <div className="border-t border-slate-200 pt-4 space-y-2.5">
+                  <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      Try Demo Accounts
+                    </h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500">
+                      Demo accounts are provided for evaluation purposes.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 gap-1.5">
+                    {demoConfig.accounts.map(demo => {
+                      const Icon = DEMO_ROLE_ICONS[demo.role];
+                      const isSelected = selectedDemoRole === demo.role;
+                      return (
+                        <button
+                          key={demo.role}
+                          type="button"
+                          onClick={() => {
+                            setUsernameOrEmail(demo.email);
+                            setPassword(demo.password);
+                            setSelectedDemoRole(demo.role);
+                            setFieldErrors({});
+                            setServerError(null);
+                          }}
+                          aria-pressed={isSelected}
+                          className={`flex items-start gap-2.5 rounded-md border px-3 py-2 text-left transition-colors ${
+                            isSelected
+                              ? 'border-brand-navy bg-brand-navy/5 ring-1 ring-brand-navy'
+                              : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/70'
+                          }`}
+                        >
+                          <Icon
+                            className={`mt-0.5 h-4 w-4 shrink-0 ${
+                              isSelected ? 'text-brand-navy' : 'text-slate-500'
+                            }`}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-semibold text-slate-900">
+                                {demo.label}
+                              </span>
+                              {isSelected && (
+                                <span className="text-[10px] font-semibold text-brand-navy">
+                                  Selected
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 truncate">
+                              {demo.description}
+                            </p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                {fieldErrors.password && (
-                  <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#172F50] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e3d68] disabled:opacity-60"
-              >
-                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-                {isSubmitting ? 'Signing In...' : 'Sign In'}
-              </button>
-
-              <p className="text-center text-xs text-slate-500">
-                Need an account?{' '}
-                <button
-                  type="button"
-                  onClick={() => switchMode('signup')}
-                  className="font-medium text-[#172F50] hover:underline"
-                >
-                  Create an account
-                </button>
-              </p>
-            </form>
+              )}
+            </div>
           ) : signUpSuccess ? (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -451,6 +602,54 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                 />
                 {fieldErrors.phoneNumber && (
                   <p className="mt-1 text-xs text-red-600">{fieldErrors.phoneNumber}</p>
+                )}
+              </div>
+
+              <div>
+                <span className="mb-1.5 block text-xs font-medium text-slate-700">
+                  Select Your Role <span className="text-red-500">*</span>
+                </span>
+                <div className="grid grid-cols-1 gap-1.5" role="radiogroup" aria-label="Select Your Role">
+                  {SIGNUP_ROLE_OPTIONS.map(option => {
+                    const Icon = option.icon;
+                    const isSelected = requestedRole === option.role;
+                    return (
+                      <button
+                        key={option.role}
+                        type="button"
+                        role="radio"
+                        aria-checked={isSelected}
+                        onClick={() => setRequestedRole(option.role)}
+                        className={`flex items-start gap-2.5 rounded-md border px-3 py-2 text-left transition-colors ${
+                          isSelected
+                            ? 'border-brand-navy bg-brand-navy/5 ring-1 ring-brand-navy'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Icon
+                          className={`mt-0.5 h-4 w-4 shrink-0 ${
+                            isSelected ? 'text-brand-navy' : 'text-slate-400'
+                          }`}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-semibold text-slate-900">
+                              {option.label}
+                            </span>
+                            {isSelected && (
+                              <span className="text-[10px] font-semibold text-brand-navy">
+                                Selected
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-slate-500">{option.description}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {fieldErrors.requestedRole && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.requestedRole}</p>
                 )}
               </div>
 

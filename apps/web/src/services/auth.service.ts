@@ -24,11 +24,14 @@ export interface AuthResponseData {
   refreshToken?: string;
 }
 
+export type AllowedSignupRole = 'ADMIN' | 'SALESMAN' | 'PRODUCTION' | 'AUDITOR';
+
 export interface RegisterPayload {
   name: string;
   email: string;
   password: string;
   phoneNumber?: string;
+  requestedRole: AllowedSignupRole;
 }
 
 export interface RegisterResponseData {
@@ -37,7 +40,21 @@ export interface RegisterResponseData {
   fullName: string;
   isActive: boolean;
   registrationStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  requestedRole?: string | null;
   createdAt: string;
+}
+
+export interface DemoAccountOption {
+  role: 'OWNER' | 'ADMIN' | 'SALESMAN' | 'PRODUCTION' | 'AUDITOR';
+  label: string;
+  description: string;
+  email: string;
+  password: string;
+}
+
+export interface DemoAccountsConfig {
+  enabled: boolean;
+  accounts: DemoAccountOption[];
 }
 
 export const authService = {
@@ -103,5 +120,19 @@ export const authService = {
     }
 
     return response.data;
+  },
+
+  async getDemoAccounts(): Promise<DemoAccountsConfig> {
+    if (import.meta.env.PROD || import.meta.env.VITE_DEMO_MODE === 'false') {
+      return { enabled: false, accounts: [] };
+    }
+    try {
+      const response = await apiClient<DemoAccountsConfig>('/auth/demo-accounts', {
+        method: 'GET',
+      });
+      return response.data ?? { enabled: false, accounts: [] };
+    } catch {
+      return { enabled: false, accounts: [] };
+    }
   },
 };

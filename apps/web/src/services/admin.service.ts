@@ -56,6 +56,7 @@ export interface AdminUserRecord {
   phone: string | null;
   isActive: boolean;
   registrationStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  requestedRole?: string | null;
   lastLoginAt: string | null;
   activeSessions: number;
   roles: string[];
