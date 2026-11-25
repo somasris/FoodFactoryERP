@@ -446,6 +446,30 @@ const PERMISSIONS = [
     action: 'APPROVE',
     description: 'Release quarantined finished goods or disposition rejected batches',
   },
+  {
+    code: 'production.costing.read',
+    module: 'production',
+    action: 'READ',
+    description: 'View production batch costings and variance reports',
+  },
+  {
+    code: 'production.costing.entry',
+    module: 'production',
+    action: 'CREATE',
+    description: 'Record labour, machine, and overhead cost entries and calculate draft batch costs',
+  },
+  {
+    code: 'production.costing.review',
+    module: 'production',
+    action: 'APPROVE',
+    description: 'Approve cost entries and review calculated batch costings',
+  },
+  {
+    code: 'production.costing.finalize',
+    module: 'production',
+    action: 'POST',
+    description: 'Finalize batch costing and apply finished goods valuation adjustments',
+  },
 
   // Procurement Management
   {
@@ -700,6 +724,10 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.quality.read',
     'production.quality.inspect',
     'production.quality.release',
+    'production.costing.read',
+    'production.costing.entry',
+    'production.costing.review',
+    'production.costing.finalize',
     'purchases.read',
     'purchases.create',
     'purchases.approve',
@@ -751,6 +779,8 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.batches.return',
     'production.quality.read',
     'production.quality.inspect',
+    'production.costing.read',
+    'production.costing.entry',
     'sales.orders.read',
     'sales.orders.fulfill',
     'sales.dashboard.read',
@@ -800,6 +830,7 @@ const ROLE_PERMISSIONS_MAP: Record<string, string[]> = {
     'production.work_orders.read',
     'production.batches.read',
     'production.quality.read',
+    'production.costing.read',
     'purchases.read',
     'invoices.read',
     'payments.read',

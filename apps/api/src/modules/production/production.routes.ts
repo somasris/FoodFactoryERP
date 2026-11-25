@@ -5,6 +5,7 @@ import { ProductionPlanController } from './production-plan.controller';
 import { WorkOrderController } from './work-order.controller';
 import { ProductionBatchController } from './production-batch.controller';
 import { MaterialFgController } from './material-fg.controller';
+import { ProductionCostingController } from './production-costing.controller';
 
 export const productionRouter: Router = Router();
 
@@ -244,4 +245,71 @@ productionRouter.get(
   '/traceability/recall',
   requirePermissions('production.quality.read'),
   MaterialFgController.recallLookup,
+);
+
+// Phase 3.6: Production Costing
+productionRouter.get(
+  '/costing/dashboard',
+  requirePermissions('production.costing.read'),
+  ProductionCostingController.getDashboard,
+);
+productionRouter.get(
+  '/costing/variance-report',
+  requirePermissions('production.costing.read'),
+  ProductionCostingController.getVarianceReport,
+);
+productionRouter.get(
+  '/costing/batches',
+  requirePermissions('production.costing.read'),
+  ProductionCostingController.listBatchCostings,
+);
+productionRouter.get(
+  '/costing/batches/:batchId',
+  requirePermissions('production.costing.read'),
+  ProductionCostingController.getBatchCostingDetail,
+);
+productionRouter.post(
+  '/costing/batches/:batchId/calculate',
+  requirePermissions('production.costing.entry'),
+  ProductionCostingController.calculateBatchCosting,
+);
+productionRouter.post(
+  '/costing/batches/:batchId/entries',
+  requirePermissions('production.costing.entry'),
+  ProductionCostingController.addCostEntry,
+);
+productionRouter.post(
+  '/costing/entries/:entryId/review',
+  requirePermissions('production.costing.review'),
+  ProductionCostingController.reviewCostEntry,
+);
+productionRouter.delete(
+  '/costing/entries/:entryId',
+  requirePermissions('production.costing.entry'),
+  ProductionCostingController.deleteCostEntry,
+);
+productionRouter.post(
+  '/costing/batches/:batchId/overheads',
+  requirePermissions('production.costing.entry'),
+  ProductionCostingController.addOverheadAllocation,
+);
+productionRouter.delete(
+  '/costing/overheads/:allocationId',
+  requirePermissions('production.costing.entry'),
+  ProductionCostingController.deleteOverheadAllocation,
+);
+productionRouter.post(
+  '/costing/batches/:batchId/review',
+  requirePermissions('production.costing.review'),
+  ProductionCostingController.reviewBatchCosting,
+);
+productionRouter.post(
+  '/costing/batches/:batchId/finalize',
+  requirePermissions('production.costing.finalize'),
+  ProductionCostingController.finalizeBatchCosting,
+);
+productionRouter.post(
+  '/costing/batches/:batchId/post-finalization-note',
+  requirePermissions('production.costing.finalize'),
+  ProductionCostingController.addPostFinalizationNote,
 );
