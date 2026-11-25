@@ -134,6 +134,12 @@ export class InventoryTransferService {
           if (!batch || batch.inventoryItemId !== item.id) {
             throw new AppError(`Line ${i + 1}: Invalid batch for inventory item.`, 400);
           }
+          if (batch.qualityStatus !== 'ACCEPTED') {
+            throw new AppError(
+              `Line ${i + 1}: Batch ${batch.batchNumber} has quality status ${batch.qualityStatus} and cannot be transferred.`,
+              400,
+            );
+          }
           if (isBatchExpired(batch.expiryDate)) {
             throw new AppError(`Line ${i + 1}: Batch ${batch.batchNumber} is expired.`, 400);
           }
@@ -316,6 +322,16 @@ export class InventoryTransferService {
       for (const line of transfer.lines) {
         const item = lockedItems.get(line.inventoryItemId);
         if (!item) throw new AppError('Inventory item not found.', 404);
+
+        if (line.batchId) {
+          const batch = await tx.inventoryBatch.findUnique({ where: { id: line.batchId } });
+          if (!batch || batch.qualityStatus !== 'ACCEPTED') {
+            throw new AppError(
+              `Batch ${batch?.batchNumber ?? line.batchId} is not ACCEPTED and cannot be transferred.`,
+              400,
+            );
+          }
+        }
 
         const baseQty = new Prisma.Decimal(line.baseQuantity);
         const bal = await lockOrCreateBalance(tx, transfer.sourceWarehouseId, item.id, line.batchId);

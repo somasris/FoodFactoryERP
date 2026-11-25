@@ -312,7 +312,7 @@ export class WorkOrderService {
         },
         include: {
           warehouse: { select: { id: true, code: true, name: true } },
-          batch: { select: { expiryDate: true } },
+          batch: { select: { expiryDate: true, qualityStatus: true } },
         },
       });
 
@@ -320,6 +320,7 @@ export class WorkOrderService {
       let reserved = ZERO;
       const warehouses: string[] = [];
       for (const b of balances) {
+        if (b.batch && b.batch.qualityStatus !== 'ACCEPTED') continue;
         if (b.batch && isBatchExpired(b.batch.expiryDate, refDate)) continue;
         onHand = onHand.add(b.quantityOnHand);
         reserved = reserved.add(b.quantityReserved);

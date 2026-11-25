@@ -833,6 +833,12 @@ export class ProductionBatchService {
             if (!b || b.inventoryItemId !== item.id) {
               throw new AppError('Invalid inventory batch for selected material.', 400);
             }
+            if (b.qualityStatus !== QualityStatus.ACCEPTED) {
+              throw new AppError(
+                `Batch ${b.batchNumber} has quality status ${b.qualityStatus} and cannot be consumed.`,
+                400,
+              );
+            }
             if (isBatchExpired(b.expiryDate, now)) {
               throw new AppError(`Batch ${b.batchNumber} is expired and cannot be consumed.`, 400);
             }
@@ -855,6 +861,7 @@ export class ProductionBatchService {
                 WHERE b.warehouse_id = ${warehouseId}
                   AND b.inventory_item_id = ${item.id}
                   AND b.batch_id = ${line.batchId}
+                  AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
                 FOR UPDATE OF b
               `
             : await tx.$queryRaw<LockedCandidateBalance[]>`
@@ -865,6 +872,7 @@ export class ProductionBatchService {
                 WHERE b.warehouse_id = ${warehouseId}
                   AND b.inventory_item_id = ${item.id}
                   AND b.quantity_on_hand > 0
+                  AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
                 FOR UPDATE OF b
               `;
 

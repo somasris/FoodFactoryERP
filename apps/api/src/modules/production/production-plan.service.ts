@@ -87,11 +87,12 @@ export class ProductionPlanService {
   ): Promise<Prisma.Decimal> {
     const balances = await tx.inventoryBalance.findMany({
       where: { inventoryItemId, warehouseId },
-      include: { batch: { select: { expiryDate: true } } },
+      include: { batch: { select: { expiryDate: true, qualityStatus: true } } },
     });
 
     let total = ZERO;
     for (const b of balances) {
+      if (b.batch && b.batch.qualityStatus !== 'ACCEPTED') continue;
       if (b.batch && isBatchExpired(b.batch.expiryDate, refDate)) continue;
       const avail = new Prisma.Decimal(b.quantityOnHand).sub(b.quantityReserved);
       if (avail.gt(ZERO)) total = total.add(avail);
@@ -115,7 +116,7 @@ export class ProductionPlanService {
       },
       include: {
         warehouse: { select: { id: true, code: true, name: true } },
-        batch: { select: { id: true, batchNumber: true, expiryDate: true } },
+        batch: { select: { id: true, batchNumber: true, expiryDate: true, qualityStatus: true } },
       },
     });
 
@@ -133,6 +134,7 @@ export class ProductionPlanService {
     }> = [];
 
     for (const b of balances) {
+      if (b.batch && b.batch.qualityStatus !== 'ACCEPTED') continue;
       if (b.batch && isBatchExpired(b.batch.expiryDate, refDate)) continue;
       const bOnHand = new Prisma.Decimal(b.quantityOnHand);
       const bRes = new Prisma.Decimal(b.quantityReserved);

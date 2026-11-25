@@ -347,6 +347,7 @@ export class InventoryIssueService {
               WHERE b.warehouse_id = ${issue.warehouseId}
                 AND b.inventory_item_id = ${item.id}
                 AND b.batch_id = ${line.batchId}
+                AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
               FOR UPDATE OF b
             `
           : await tx.$queryRaw<LockedCandidateBalance[]>`
