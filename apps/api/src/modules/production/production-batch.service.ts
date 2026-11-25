@@ -736,8 +736,13 @@ export class ProductionBatchService {
     const effectiveKey = input.idempotencyKey || `PB-CONS-${id}-${crypto.randomUUID()}`;
 
     if (input.idempotencyKey) {
-      const existingTx = await prisma.inventoryTransaction.findUnique({
-        where: { idempotencyKey: effectiveKey },
+      const existingTx = await prisma.inventoryTransaction.findFirst({
+        where: {
+          OR: [
+            { idempotencyKey: effectiveKey },
+            { idempotencyKey: { startsWith: `${effectiveKey}-` } },
+          ],
+        },
       });
       if (existingTx) {
         return this.getBatchById(id, user);
@@ -938,6 +943,11 @@ export class ProductionBatchService {
               },
             });
 
+            const { converted: pickLineQty } =
+              line.uomId === item.uom_id
+                ? { converted: pickQty }
+                : await convertQuantityDecimal(tx, pickQty, item.uom_id, line.uomId);
+
             txLineNo += 1;
             await tx.inventoryTransactionLine.create({
               data: {
@@ -946,7 +956,7 @@ export class ProductionBatchService {
                 inventoryItemId: item.id,
                 batchId: cand.batch_id,
                 uomId: line.uomId,
-                quantity: pickQty.neg(),
+                quantity: pickLineQty.neg(),
                 baseUomId: item.uom_id,
                 baseQuantity: pickQty.neg(),
                 unitCost: outwardUnitCost,
@@ -967,7 +977,7 @@ export class ProductionBatchService {
                 batchId: cand.batch_id,
                 uomId: line.uomId,
                 plannedQuantity: plannedItemQty,
-                consumedQuantity: pickQty,
+                consumedQuantity: pickLineQty,
                 baseQuantity: pickQty,
                 unitCost: outwardUnitCost,
                 totalCost: pickCost,
@@ -1156,7 +1166,7 @@ export class ProductionBatchService {
 
       const batch = await tx.productionBatch.findUniqueOrThrow({
         where: { id },
-        include: { consumptions: true },
+        include: { consumptions: true, returns: true },
       });
 
       const targetWhId = input.targetWarehouseId || batch.warehouseId;
@@ -1236,9 +1246,14 @@ export class ProductionBatchService {
         (acc, c) => acc.add(c.totalCost),
         ZERO,
       );
+      const totalReturnedCost = batch.returns.reduce(
+        (acc, r) => acc.add(r.totalCost),
+        ZERO,
+      );
+      const netConsumedCost = Prisma.Decimal.max(ZERO, totalConsumedCost.sub(totalReturnedCost));
       const unitCostInBase =
-        totalConsumedCost.gt(ZERO) && baseGoodQty.gt(ZERO)
-          ? totalConsumedCost.div(baseGoodQty).toDecimalPlaces(4)
+        netConsumedCost.gt(ZERO) && baseGoodQty.gt(ZERO)
+          ? netConsumedCost.div(baseGoodQty).toDecimalPlaces(4)
           : new Prisma.Decimal(fgItem.moving_average_cost || '0');
       const totalReceiptCost = baseGoodQty.mul(unitCostInBase).toDecimalPlaces(4);
 

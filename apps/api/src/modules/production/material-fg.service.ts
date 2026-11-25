@@ -221,8 +221,13 @@ export class MaterialFgService {
     const effectiveKey = input.idempotencyKey || `PB-RET-${batchId}-${crypto.randomUUID()}`;
 
     if (input.idempotencyKey) {
-      const existingTx = await prisma.inventoryTransaction.findUnique({
-        where: { idempotencyKey: effectiveKey },
+      const existingTx = await prisma.inventoryTransaction.findFirst({
+        where: {
+          OR: [
+            { idempotencyKey: effectiveKey },
+            { idempotencyKey: { startsWith: `${effectiveKey}-` } },
+          ],
+        },
       });
       if (existingTx) {
         return this.getBatchReconciliation(batchId, user);
@@ -378,6 +383,7 @@ export class MaterialFgService {
               where: { id: item.id },
               data: { movingAverageCost: newMwac },
             });
+            item.moving_average_cost = newMwac.toFixed(4);
             mwacAfter = newMwac;
             effectiveUnitCost = newMwac;
           }
@@ -770,10 +776,14 @@ export class MaterialFgService {
           fgItem.id,
           qi.inventoryBatchId,
         );
-        const newMainOnHand = Prisma.Decimal.max(
-          ZERO,
-          new Prisma.Decimal(mainBal.quantity_on_hand).sub(rejectedBaseQty),
-        );
+        const currentMainOnHand = new Prisma.Decimal(mainBal.quantity_on_hand);
+        if (currentMainOnHand.lt(rejectedBaseQty)) {
+          throw new AppError(
+            `Insufficient on-hand quantity (${currentMainOnHand.toFixed(4)}) in batch ${qi.inventoryBatch.batchNumber} to split rejected quantity (${rejectedBaseQty.toFixed(4)}).`,
+            400,
+          );
+        }
+        const newMainOnHand = currentMainOnHand.sub(rejectedBaseQty);
         const unitCost = new Prisma.Decimal(mainBal.unit_cost);
         await tx.inventoryBalance.update({
           where: { id: mainBal.id },
