@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 import { AlertCircle, CheckCircle2, Eye, EyeOff, Factory, Loader2 } from 'lucide-react';
@@ -45,19 +45,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   const location = useLocation();
   const { login, isAuthenticated, user } = useAuth();
 
-  const resolvePostLoginDestination = (targetUser: UserProfile | null): string => {
-    const state = location.state as { from?: { pathname?: string; search?: string } } | null;
-    const requestedPath = state?.from?.pathname;
-    if (
-      requestedPath &&
-      requestedPath !== '/login' &&
-      requestedPath !== '/signup' &&
-      canAccessPath(targetUser, requestedPath)
-    ) {
-      return `${requestedPath}${state?.from?.search || ''}`;
-    }
-    return getDefaultDashboardPath(targetUser);
-  };
+  const resolvePostLoginDestination = useCallback(
+    (targetUser: UserProfile | null): string => {
+      const state = location.state as { from?: { pathname?: string; search?: string } } | null;
+      const requestedPath = state?.from?.pathname;
+      if (
+        requestedPath &&
+        requestedPath !== '/login' &&
+        requestedPath !== '/signup' &&
+        canAccessPath(targetUser, requestedPath)
+      ) {
+        return `${requestedPath}${state?.from?.search || ''}`;
+      }
+      return getDefaultDashboardPath(targetUser);
+    },
+    [location.state],
+  );
 
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
 
@@ -89,7 +92,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
     if (isAuthenticated && user) {
       navigate(resolvePostLoginDestination(user), { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, resolvePostLoginDestination]);
 
   const switchMode = (nextMode: 'signin' | 'signup') => {
     setMode(nextMode);

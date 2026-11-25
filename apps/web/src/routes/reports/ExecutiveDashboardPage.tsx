@@ -16,8 +16,7 @@ import { PageHeader } from '../../components/common/PageHeader';
 import { KpiCard } from '../../components/common/KpiCard';
 import { ErrorState, LoadingState } from '../../components/common/StateViews';
 
-const formatInr = (val: string | number) =>
-  `₹${Number(val || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatInr = (val: string | number) => `₹${val}`;
 
 export const ExecutiveDashboardPage: React.FC = () => {
   const [financialYear, setFinancialYear] = useState('');

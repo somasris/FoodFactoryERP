@@ -23,14 +23,21 @@ describe('Phase 4 Cross-Module End-to-End Integration Audit', () => {
     if (!role) throw new Error(`Role ${roleCode} not found`);
     const user = await prisma.user.upsert({
       where: { username },
-      update: { passwordHash: pw, isActive: true },
+      update: { passwordHash: pw, isActive: true, registrationStatus: 'APPROVED' },
       create: {
         email: `${username}@foodfactory.com`,
         username,
         passwordHash: pw,
         fullName: `P4 E2E ${roleCode}`,
+        isActive: true,
+        registrationStatus: 'APPROVED',
         userRoles: { create: { roleId: role.id } },
       },
+    });
+    await prisma.userRole.upsert({
+      where: { userId_roleId: { userId: user.id, roleId: role.id } },
+      update: {},
+      create: { userId: user.id, roleId: role.id },
     });
     const token = generateAccessToken({
       userId: user.id,
