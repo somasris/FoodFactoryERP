@@ -90,6 +90,7 @@ describe('Public Sign Up UI Suite', () => {
     fireEvent.change(screen.getByLabelText(/^Phone Number/i), {
       target: { value: '+91 9876543210' },
     });
+    fireEvent.click(screen.getByRole('radio', { name: /SALESMAN/i }));
     fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'StrongPass1!' } });
     fireEvent.change(screen.getByLabelText(/^Confirm Password/i), {
       target: { value: 'StrongPass1!' },
@@ -103,6 +104,7 @@ describe('Public Sign Up UI Suite', () => {
         email: 'jane.doe@foodfactory.com',
         password: 'StrongPass1!',
         phoneNumber: '+91 9876543210',
+        requestedRole: 'SALESMAN',
       });
       expect(screen.getByText('Registration Submitted')).toBeTruthy();
       expect(screen.getByText(/pending administrator approval/i)).toBeTruthy();
@@ -120,6 +122,7 @@ describe('Public Sign Up UI Suite', () => {
     fireEvent.change(screen.getByLabelText(/^Email Address/i), {
       target: { value: 'jane.doe@foodfactory.com' },
     });
+    fireEvent.click(screen.getByRole('radio', { name: /SALESMAN/i }));
     fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'StrongPass1!' } });
     fireEvent.change(screen.getByLabelText(/^Confirm Password/i), {
       target: { value: 'StrongPass1!' },
@@ -152,6 +155,105 @@ describe('Public Sign Up UI Suite', () => {
 
     await waitFor(() => {
       expect(loginMock).toHaveBeenCalledWith('owner', 'OwnerPass2026!');
+    });
+  });
+
+  it('6. Sign Up requires role selection and does not offer OWNER', async () => {
+    const registerSpy = vi.spyOn(authService, 'register');
+    renderLoginPage('signup');
+
+    expect(screen.getByRole('radio', { name: /ADMIN/i })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /SALESMAN/i })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /PRODUCTION/i })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: /AUDITOR/i })).toBeTruthy();
+    expect(screen.queryByRole('radio', { name: /OWNER/i })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText(/^Full Name/i), { target: { value: 'Jane Doe' } });
+    fireEvent.change(screen.getByLabelText(/^Email Address/i), {
+      target: { value: 'jane.doe@foodfactory.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^Password/i), { target: { value: 'StrongPass1!' } });
+    fireEvent.change(screen.getByLabelText(/^Confirm Password/i), {
+      target: { value: 'StrongPass1!' },
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Please select a role/i)).toBeTruthy();
+    });
+    expect(registerSpy).not.toHaveBeenCalled();
+  });
+
+  it('7. Renders 5 demo accounts when enabled, autofills without auto-submit, and hides when disabled', async () => {
+    const demoAccounts = [
+      {
+        role: 'OWNER' as const,
+        label: 'OWNER Demo',
+        description: 'Executive oversight',
+        email: 'demo.owner@foodfactory.local',
+        password: 'DemoPassword1!',
+      },
+      {
+        role: 'ADMIN' as const,
+        label: 'ADMIN Demo',
+        description: 'System administration',
+        email: 'demo.admin@foodfactory.local',
+        password: 'DemoPassword1!',
+      },
+      {
+        role: 'SALESMAN' as const,
+        label: 'SALESMAN Demo',
+        description: 'Sales & invoicing',
+        email: 'demo.salesman@foodfactory.local',
+        password: 'DemoPassword1!',
+      },
+      {
+        role: 'PRODUCTION' as const,
+        label: 'PRODUCTION Demo',
+        description: 'Production & inventory',
+        email: 'demo.production@foodfactory.local',
+        password: 'DemoPassword1!',
+      },
+      {
+        role: 'AUDITOR' as const,
+        label: 'AUDITOR Demo',
+        description: 'Read-only audit',
+        email: 'demo.auditor@foodfactory.local',
+        password: 'DemoPassword1!',
+      },
+    ];
+
+    vi.spyOn(authService, 'getDemoAccounts').mockResolvedValueOnce({
+      enabled: true,
+      accounts: demoAccounts,
+    });
+
+    const loginMock = vi.fn().mockResolvedValue(undefined);
+    renderLoginPage('signin', makeUnauthenticatedAuth(loginMock));
+
+    await waitFor(() => {
+      expect(screen.getByText('Try Demo Accounts')).toBeTruthy();
+    });
+
+    for (const demo of demoAccounts) {
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(demo.label, 'i') }));
+      expect((screen.getByLabelText('Username or Email') as HTMLInputElement).value).toBe(
+        demo.email,
+      );
+      expect((screen.getByLabelText('Password') as HTMLInputElement).value).toBe(demo.password);
+      expect(loginMock).not.toHaveBeenCalled();
+    }
+
+    cleanup();
+    vi.spyOn(authService, 'getDemoAccounts').mockResolvedValueOnce({
+      enabled: false,
+      accounts: [],
+    });
+    renderLoginPage('signin', makeUnauthenticatedAuth(loginMock));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Try Demo Accounts')).toBeNull();
     });
   });
 });

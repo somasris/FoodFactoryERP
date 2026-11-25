@@ -117,6 +117,7 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
       email: '  Pending.Applicant@FoodFactory.com  ',
       phoneNumber: '+91 9876543210',
       password: testPassword,
+      requestedRole: 'SALESMAN',
     });
 
     expect(res.status).toBe(201);
@@ -125,6 +126,7 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
     expect(res.body.data.fullName).toBe('Pending Applicant');
     expect(res.body.data.isActive).toBe(false);
     expect(res.body.data.registrationStatus).toBe('PENDING_APPROVAL');
+    expect(res.body.data.requestedRole).toBe('SALESMAN');
     expect(res.body.data.passwordHash).toBeUndefined();
     expect(res.body.data.accessToken).toBeUndefined();
     expect(res.body.data.refreshToken).toBeUndefined();
@@ -156,6 +158,7 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
       name: 'Duplicate User',
       email: 'PENDING.APPLICANT@FOODFACTORY.COM',
       password: testPassword,
+      requestedRole: 'SALESMAN',
     });
 
     expect(res.status).toBe(409);
@@ -260,6 +263,7 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
       name: 'Rejected Applicant',
       email: 'rejected.applicant@foodfactory.com',
       password: testPassword,
+      requestedRole: 'AUDITOR',
     });
     expect(regRes.status).toBe(201);
     const rejectedId = regRes.body.data.id as string;
@@ -298,5 +302,102 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
       }
     }
     expect(hit429).toBe(true);
+  });
+
+  it('9. Validates allowed signup roles (ADMIN, SALESMAN, PRODUCTION, AUDITOR) and rejects missing/OWNER/unknown/tampered fields', async () => {
+    // Missing requestedRole
+    const missingRole = await request(app).post('/api/v1/auth/register').send({
+      name: 'Missing Role',
+      email: 'missing.role@foodfactory.com',
+      password: testPassword,
+    });
+    expect(missingRole.status).toBe(400);
+
+    // OWNER rejected
+    const ownerRole = await request(app).post('/api/v1/auth/register').send({
+      name: 'Owner Attempt',
+      email: 'owner.attempt@foodfactory.com',
+      password: testPassword,
+      requestedRole: 'OWNER',
+    });
+    expect(ownerRole.status).toBe(400);
+
+    // Unknown role rejected
+    const unknownRole = await request(app).post('/api/v1/auth/register').send({
+      name: 'Unknown Role',
+      email: 'unknown.role@foodfactory.com',
+      password: testPassword,
+      requestedRole: 'SUPERUSER',
+    });
+    expect(unknownRole.status).toBe(400);
+
+    // Manipulated permissions / warehouseAccess rejected
+    const manipulated = await request(app).post('/api/v1/auth/register').send({
+      name: 'Manipulated User',
+      email: 'manipulated.user@foodfactory.com',
+      password: testPassword,
+      requestedRole: 'SALESMAN',
+      permissions: ['users.create'],
+      warehouseAccess: [{ warehouseId: 'wh-1', accessLevel: 'READ_WRITE' }],
+    });
+    expect(manipulated.status).toBe(400);
+
+    // All 4 allowed roles succeed as inactive PENDING_APPROVAL with zero granted roles
+    for (const role of ['ADMIN', 'SALESMAN', 'PRODUCTION', 'AUDITOR'] as const) {
+      const email = `signup_${role.toLowerCase()}_role@foodfactory.com`;
+      await prisma.user.deleteMany({ where: { email } });
+      const ok = await request(app).post('/api/v1/auth/register').send({
+        name: `Role ${role}`,
+        email,
+        password: testPassword,
+        requestedRole: role,
+      });
+      expect(ok.status).toBe(201);
+      expect(ok.body.data.requestedRole).toBe(role);
+      expect(ok.body.data.isActive).toBe(false);
+      expect(ok.body.data.registrationStatus).toBe('PENDING_APPROVAL');
+      createdUserIds.push(ok.body.data.id as string);
+    }
+  });
+
+  it('10. Demo accounts endpoint is disabled by default and never exposes credentials in production', async () => {
+    const { env } = await import('../src/config/env');
+    const origDemo = env.DEMO_MODE_ENABLED;
+    const origNodeEnv = env.NODE_ENV;
+
+    try {
+      // Disabled
+      env.DEMO_MODE_ENABLED = false;
+      const disabledRes = await request(app).get('/api/v1/auth/demo-accounts');
+      expect(disabledRes.status).toBe(200);
+      expect(disabledRes.body.data.enabled).toBe(false);
+      expect(disabledRes.body.data.accounts).toEqual([]);
+
+      // Enabled in non-production
+      env.NODE_ENV = 'development';
+      env.DEMO_MODE_ENABLED = true;
+      const enabledRes = await request(app).get('/api/v1/auth/demo-accounts');
+      expect(enabledRes.status).toBe(200);
+      expect(enabledRes.body.data.enabled).toBe(true);
+      expect(enabledRes.body.data.accounts).toHaveLength(5);
+      expect(enabledRes.body.data.accounts.map((a: { role: string }) => a.role)).toEqual([
+        'OWNER',
+        'ADMIN',
+        'SALESMAN',
+        'PRODUCTION',
+        'AUDITOR',
+      ]);
+
+      // Forced disabled in production even if DEMO_MODE_ENABLED=true
+      env.NODE_ENV = 'production';
+      env.DEMO_MODE_ENABLED = true;
+      const prodRes = await request(app).get('/api/v1/auth/demo-accounts');
+      expect(prodRes.status).toBe(200);
+      expect(prodRes.body.data.enabled).toBe(false);
+      expect(prodRes.body.data.accounts).toEqual([]);
+    } finally {
+      env.DEMO_MODE_ENABLED = origDemo;
+      env.NODE_ENV = origNodeEnv;
+    }
   });
 });
