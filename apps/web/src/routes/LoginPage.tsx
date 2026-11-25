@@ -1,194 +1,468 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../hooks/useAuth';
-import { Factory, Lock, User, Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Factory, Loader2 } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { authService } from '../services/auth.service';
 
-const loginFormSchema = z.object({
-  usernameOrEmail: z.string().min(1, 'Username or email is required'),
+const loginSchema = z.object({
+  usernameOrEmail: z.string().trim().min(1, 'Username or email is required'),
   password: z.string().min(1, 'Password is required'),
 });
 
-export const LoginPage: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login } = useAuth();
+const signUpSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Full name must be at least 2 characters').max(100),
+    email: z.string().trim().email('Please enter a valid email address').max(150),
+    phoneNumber: z
+      .string()
+      .trim()
+      .max(20, 'Phone number must be at most 20 characters')
+      .optional()
+      .or(z.literal('')),
+    password: z
+      .string()
+      .min(8, 'Password must be at least 8 characters')
+      .max(128, 'Password must be at most 128 characters')
+      .regex(/[A-Z]/, 'Password must contain at least one uppercase letter')
+      .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
+      .regex(/[0-9]/, 'Password must contain at least one number')
+      .regex(/[^A-Za-z0-9]/, 'Password must contain at least one special character'),
+    confirmPassword: z.string().min(1, 'Please confirm your password'),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  });
 
+export interface LoginPageProps {
+  initialMode?: 'signin' | 'signup';
+}
+
+export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) => {
+  const navigate = useNavigate();
+  const { login, isAuthenticated } = useAuth();
+
+  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
+
+  // Sign In state
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [errors, setErrors] = useState<{ usernameOrEmail?: string; password?: string }>({});
+
+  // Sign Up state
+  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [signUpPassword, setSignUpPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [signUpSuccess, setSignUpSuccess] = useState<{ email: string } | null>(null);
+
+  // Shared form feedback
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [serverError, setServerError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
+
+  const switchMode = (nextMode: 'signin' | 'signup') => {
+    setMode(nextMode);
+    setFieldErrors({});
+    setServerError(null);
+    if (nextMode === 'signup') {
+      setSignUpSuccess(null);
+    }
+  };
+
+  const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
+    setFieldErrors({});
     setServerError(null);
 
-    // Validate with Zod
-    const validation = loginFormSchema.safeParse({ usernameOrEmail, password });
-    if (!validation.success) {
-      const fieldErrors: { usernameOrEmail?: string; password?: string } = {};
-      for (const issue of validation.error.issues) {
-        if (issue.path[0] === 'usernameOrEmail') fieldErrors.usernameOrEmail = issue.message;
-        if (issue.path[0] === 'password') fieldErrors.password = issue.message;
-      }
-      setErrors(fieldErrors);
+    const parsed = loginSchema.safeParse({ usernameOrEmail, password });
+    if (!parsed.success) {
+      const errs: Record<string, string> = {};
+      parsed.error.errors.forEach(err => {
+        if (err.path[0]) errs[String(err.path[0])] = err.message;
+      });
+      setFieldErrors(errs);
       return;
     }
 
-    setErrors({});
     setIsSubmitting(true);
-
     try {
-      await login(usernameOrEmail.trim(), password);
-      navigate(from, { replace: true });
+      await login(parsed.data.usernameOrEmail, parsed.data.password);
+      navigate('/', { replace: true });
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Authentication failed. Please verify credentials.';
-      setServerError(message);
+      setServerError(err instanceof Error ? err.message : 'Sign in failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    setFieldErrors({});
+    setServerError(null);
+
+    const parsed = signUpSchema.safeParse({
+      name: fullName,
+      email,
+      phoneNumber,
+      password: signUpPassword,
+      confirmPassword,
+    });
+    if (!parsed.success) {
+      const errs: Record<string, string> = {};
+      parsed.error.errors.forEach(err => {
+        const key = err.path[0] ? String(err.path[0]) : 'form';
+        if (!errs[key]) errs[key] = err.message;
+      });
+      setFieldErrors(errs);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const registered = await authService.register({
+        name: parsed.data.name,
+        email: parsed.data.email,
+        password: parsed.data.password,
+        phoneNumber: parsed.data.phoneNumber || undefined,
+      });
+      setSignUpSuccess({ email: registered.email });
+      setFullName('');
+      setEmail('');
+      setPhoneNumber('');
+      setSignUpPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Registration failed. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4 py-12 relative overflow-hidden">
-      {/* Decorative background grid and industrial glow */}
-      <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-40 pointer-events-none" />
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden relative z-10">
-        {/* Header Banner */}
-        <div className="bg-[#172F50] px-8 py-8 text-center text-white relative">
-          <div className="inline-flex p-3 bg-teal-500/20 rounded-xl mb-3 ring-1 ring-teal-400/30">
-            <Factory className="w-8 h-8 text-teal-400" />
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+        {/* Navy Header */}
+        <div className="bg-[#172F50] px-6 py-7 text-center text-white">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
+            <Factory className="h-7 w-7 text-teal-300" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">FoodFactory ERP</h1>
-          <p className="text-xs text-slate-300 mt-1 font-medium tracking-wide">
-            Manufacturing Operations & Relational Database System
+          <h1 className="text-xl font-bold tracking-tight">FoodFactory ERP</h1>
+          <p className="mt-1 text-xs text-slate-300">
+            Manufacturing, Inventory &amp; Compliance Platform
           </p>
-          <div className="mt-3 inline-block bg-teal-900/60 border border-teal-500/40 px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-teal-300 uppercase tracking-widest">
-            Phase 1.3 Certified
-          </div>
         </div>
 
-        {/* Login Form Body */}
-        <div className="p-8">
-          <div className="mb-6">
-            <h2 className="text-lg font-semibold text-slate-900">Sign In to Your Workspace</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Enter your enterprise credentials to access the plant portal
-            </p>
-          </div>
+        {/* Mode Tabs */}
+        <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => switchMode('signin')}
+            className={`py-3 transition-colors ${
+              mode === 'signin'
+                ? 'border-b-2 border-[#172F50] bg-white text-[#172F50]'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('signup')}
+            className={`py-3 transition-colors ${
+              mode === 'signup'
+                ? 'border-b-2 border-[#172F50] bg-white text-[#172F50]'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Sign Up
+          </button>
+        </div>
 
+        <div className="p-6">
           {serverError && (
-            <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-lg flex items-start gap-2.5 text-rose-800 text-xs">
-              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-              <div className="leading-relaxed font-medium">{serverError}</div>
+            <div
+              role="alert"
+              className="mb-4 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{serverError}</span>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Username or Email
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
-                </div>
+          {mode === 'signin' ? (
+            <form onSubmit={handleSignInSubmit} className="space-y-4" noValidate>
+              <div>
+                <label
+                  htmlFor="signin-username"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Username or Email
+                </label>
                 <input
+                  id="signin-username"
                   type="text"
+                  autoComplete="username"
                   value={usernameOrEmail}
                   onChange={e => setUsernameOrEmail(e.target.value)}
-                  placeholder="e.g. owner or sales@foodfactory.com"
-                  className={`w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
-                    errors.usernameOrEmail
-                      ? 'border-rose-400 focus:ring-rose-200 focus:border-rose-500 bg-rose-50/30'
-                      : 'border-slate-300 focus:ring-teal-500/20 focus:border-teal-600 focus:bg-white'
-                  }`}
-                  disabled={isSubmitting}
+                  placeholder="Enter username or email"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
                 />
+                {fieldErrors.usernameOrEmail && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.usernameOrEmail}</p>
+                )}
               </div>
-              {errors.usernameOrEmail && (
-                <p className="text-xs text-rose-600 mt-1 font-medium">{errors.usernameOrEmail}</p>
-              )}
-            </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="w-4 h-4" />
+              <div>
+                <label
+                  htmlFor="signin-password"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="signin-password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
                 </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  className={`w-full pl-9 pr-10 py-2 text-sm bg-slate-50 border rounded-lg focus:outline-none focus:ring-2 transition-all ${
-                    errors.password
-                      ? 'border-rose-400 focus:ring-rose-200 focus:border-rose-500 bg-rose-50/30'
-                      : 'border-slate-300 focus:ring-teal-500/20 focus:border-teal-600 focus:bg-white'
-                  }`}
-                  disabled={isSubmitting}
-                />
+                {fieldErrors.password && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#172F50] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e3d68] disabled:opacity-60"
+              >
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? 'Signing In...' : 'Sign In'}
+              </button>
+
+              <p className="text-center text-xs text-slate-500">
+                Need an account?{' '}
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                  tabIndex={-1}
+                  onClick={() => switchMode('signup')}
+                  className="font-medium text-[#172F50] hover:underline"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  Create an account
                 </button>
-              </div>
-              {errors.password && (
-                <p className="text-xs text-rose-600 mt-1 font-medium">{errors.password}</p>
-              )}
-            </div>
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full mt-2 py-2.5 px-4 bg-[#172F50] hover:bg-[#1f3f6b] text-white font-medium text-sm rounded-lg shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-teal-400" />
-                  <span>Authenticating...</span>
-                </>
-              ) : (
-                <span>Sign In to ERP System</span>
-              )}
-            </button>
-          </form>
-
-          {/* Development / Demo Quick Assist Box */}
-          <div className="mt-6 pt-5 border-t border-slate-100">
-            <div className="bg-slate-50 rounded-lg p-3 border border-slate-200">
-              <span className="text-[11px] font-semibold text-slate-600 uppercase tracking-wider block mb-1">
-                Development Credentials Notice
-              </span>
-              <p className="text-xs text-slate-500 leading-relaxed">
-                Initial Owner account provisioned via{' '}
-                <code className="bg-slate-200 px-1 py-0.5 rounded text-slate-700">.env</code>:
-                <br />
-                User: <span className="font-semibold text-slate-700">owner</span> (or{' '}
-                <span className="font-semibold text-slate-700">owner@foodfactory.com</span>)
               </p>
+            </form>
+          ) : signUpSuccess ? (
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h2 className="text-base font-semibold text-slate-900">
+                  Registration Submitted
+                </h2>
+                <p className="text-xs text-slate-600">
+                  Your account for <span className="font-medium">{signUpSuccess.email}</span> has
+                  been created and is pending administrator approval. You will be able to sign in
+                  once an administrator activates your account and assigns a role.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => switchMode('signin')}
+                className="w-full rounded-lg bg-[#172F50] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e3d68]"
+              >
+                Back to Sign In
+              </button>
             </div>
-          </div>
-        </div>
+          ) : (
+            <form onSubmit={handleSignUpSubmit} className="space-y-3.5" noValidate>
+              <div>
+                <label
+                  htmlFor="signup-name"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Full Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="signup-name"
+                  type="text"
+                  autoComplete="name"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                />
+                {fieldErrors.name && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+                )}
+              </div>
 
-        {/* Footer */}
-        <div className="bg-slate-50 px-8 py-3.5 border-t border-slate-100 text-center text-[11px] text-slate-400">
-          Centre for Digital Infrastructure, NIT Tiruchirappalli
+              <div>
+                <label
+                  htmlFor="signup-email"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Email Address <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="signup-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                />
+                {fieldErrors.email && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="signup-phone"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Phone Number <span className="text-slate-400">(optional)</span>
+                </label>
+                <input
+                  id="signup-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={phoneNumber}
+                  onChange={e => setPhoneNumber(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                />
+                {fieldErrors.phoneNumber && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.phoneNumber}</p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="signup-password"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="signup-password"
+                    type={showSignUpPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={signUpPassword}
+                    onChange={e => setSignUpPassword(e.target.value)}
+                    placeholder="Min 8 chars, upper, lower, number, symbol"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignUpPassword(v => !v)}
+                    aria-label={showSignUpPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showSignUpPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {fieldErrors.password && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                )}
+              </div>
+
+              <div>
+                <label
+                  htmlFor="signup-confirm-password"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="signup-confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#172F50] focus:outline-none focus:ring-1 focus:ring-[#172F50]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(v => !v)}
+                    aria-label={
+                      showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'
+                    }
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+                {fieldErrors.confirmPassword && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.confirmPassword}</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#172F50] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#1e3d68] disabled:opacity-60"
+              >
+                {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isSubmitting ? 'Creating Account...' : 'Create Account'}
+              </button>
+
+              <p className="text-center text-xs text-slate-500">
+                Already have an account?{' '}
+                <button
+                  type="button"
+                  onClick={() => switchMode('signin')}
+                  className="font-medium text-[#172F50] hover:underline"
+                >
+                  Back to Sign In
+                </button>
+              </p>
+            </form>
+          )}
         </div>
       </div>
     </div>

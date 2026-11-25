@@ -85,6 +85,10 @@ export const router = createBrowserRouter([
     element: <LoginPage />,
   },
   {
+    path: '/signup',
+    element: <LoginPage initialMode="signup" />,
+  },
+  {
     path: '/unauthorized',
     element: <UnauthorizedPage />,
   },

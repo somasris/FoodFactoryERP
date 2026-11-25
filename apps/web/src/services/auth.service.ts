@@ -24,7 +24,30 @@ export interface AuthResponseData {
   refreshToken?: string;
 }
 
+export interface RegisterPayload {
+  name: string;
+  email: string;
+  password: string;
+  phoneNumber?: string;
+}
+
+export interface RegisterResponseData {
+  id: string;
+  email: string;
+  fullName: string;
+  isActive: boolean;
+  registrationStatus: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  createdAt: string;
+}
+
 export const authService = {
+  async register(payload: RegisterPayload): Promise<RegisterResponseData> {
+    const response = await apiClient<RegisterResponseData>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return response.data as RegisterResponseData;
+  },
   async login(usernameOrEmail: string, password: string): Promise<UserProfile> {
     const response = await apiClient<AuthResponseData>('/auth/login', {
       method: 'POST',
