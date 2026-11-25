@@ -8,6 +8,9 @@ import {
   Warehouse,
   Sliders,
   FileSearch,
+  HeartPulse,
+  HardDriveDownload,
+  Wrench,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
@@ -57,6 +60,24 @@ export const AdministrationLayout: React.FC = () => {
       to: '/admin/governance',
       icon: FileSearch,
       permission: 'governance.audit.read',
+    },
+    {
+      label: 'System Health',
+      to: '/admin/health',
+      icon: HeartPulse,
+      permission: 'operations.health.read',
+    },
+    {
+      label: 'Backup & Recovery',
+      to: '/admin/backups',
+      icon: HardDriveDownload,
+      permission: 'operations.backup.read',
+    },
+    {
+      label: 'Maintenance',
+      to: '/admin/maintenance',
+      icon: Wrench,
+      permission: 'operations.health.read',
     },
   ].filter(t => hasPermission(t.permission));
 
