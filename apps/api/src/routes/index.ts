@@ -4,6 +4,7 @@ import { authRouter } from '../modules/auth/auth.routes';
 import { usersRouter } from '../modules/users/users.routes';
 import { masterDataRouter } from '../modules/master-data/master-data.routes';
 import { inventoryRouter } from '../modules/inventory/inventory.routes';
+import { salesRouter } from '../modules/sales/sales.routes';
 
 export const apiRouter: Router = Router();
 
@@ -21,3 +22,6 @@ apiRouter.use('/master-data', masterDataRouter);
 
 // Mount Phase 1.5 Stage 3 Inventory Management routes under /api/v1/inventory
 apiRouter.use('/inventory', inventoryRouter);
+
+// Mount Phase 2 Sales & Orders routes under /api/v1/sales
+apiRouter.use('/sales', salesRouter);

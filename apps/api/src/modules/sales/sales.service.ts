@@ -1,0 +1,1006 @@
+import { AuditAction, Prisma, SalesOrderStatus } from '@prisma/client';
+import { prisma } from '../../services/prisma.service';
+import { AuditService } from '../../services/audit.service';
+import { AppError } from '../../middleware/error.middleware';
+import {
+  AuditMeta,
+  paginatedResult,
+  PaginationParams,
+  toPlainJson,
+} from '../master-data/master-data.utils';
+import {
+  assertWarehouseAccess,
+  convertQuantityDecimal,
+  generateDocNumber,
+  getAuthorizedWarehouseIds,
+  UserContext,
+  ZERO,
+} from '../inventory/inventory.utils';
+import { InventoryReservationService } from '../inventory/inventory-reservation.service';
+import {
+  CreateSalesOrderInput,
+  FulfillSalesOrderInput,
+  UpdateSalesOrderInput,
+} from './sales.types';
+
+const HUNDRED = new Prisma.Decimal(100);
+
+const ORDER_INCLUDE = {
+  customer: {
+    select: {
+      id: true,
+      code: true,
+      legalName: true,
+      tradeName: true,
+      customerType: true,
+      gstin: true,
+      phone: true,
+      email: true,
+    },
+  },
+  shippingAddress: true,
+  warehouse: { select: { id: true, code: true, name: true, warehouseType: true } },
+  salesman: { select: { id: true, fullName: true, username: true } },
+  lines: {
+    orderBy: { lineNumber: 'asc' as const },
+    include: {
+      productVariant: {
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          defaultSellingPrice: true,
+          uomId: true,
+          product: { select: { id: true, code: true, name: true, hsnCode: true } },
+        },
+      },
+      uom: { select: { id: true, code: true, symbol: true } },
+      taxRate: { select: { id: true, code: true, name: true, ratePercentage: true } },
+    },
+  },
+};
+
+export class SalesService {
+  static async getDashboardSummary(
+    user: UserContext,
+    filters: { fromDate?: string; toDate?: string },
+  ) {
+    const allowedWh = await getAuthorizedWarehouseIds(user, 'READ');
+    const baseWhere: Prisma.SalesOrderWhereInput = allowedWh
+      ? { warehouseId: { in: allowedWh } }
+      : {};
+
+    if (filters.fromDate || filters.toDate) {
+      baseWhere.orderDate = {};
+      if (filters.fromDate) baseWhere.orderDate.gte = new Date(filters.fromDate);
+      if (filters.toDate) baseWhere.orderDate.lte = new Date(filters.toDate);
+    }
+
+    const [
+      totalOrders,
+      draftOrders,
+      pendingApprovals,
+      approvedOrders,
+      confirmedOrders,
+      partiallyFulfilledOrders,
+      fulfilledOrders,
+      cancelledOrders,
+      rejectedOrders,
+      valueAgg,
+      recentOrders,
+    ] = await Promise.all([
+      prisma.salesOrder.count({ where: baseWhere }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'DRAFT' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'SUBMITTED' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'APPROVED' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'CONFIRMED' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'PARTIALLY_FULFILLED' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'FULFILLED' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'CANCELLED' } }),
+      prisma.salesOrder.count({ where: { ...baseWhere, status: 'REJECTED' } }),
+      prisma.salesOrder.aggregate({
+        where: {
+          ...baseWhere,
+          status: { in: ['CONFIRMED', 'PARTIALLY_FULFILLED', 'FULFILLED'] },
+        },
+        _sum: { totalAmount: true },
+      }),
+      prisma.salesOrder.findMany({
+        where: baseWhere,
+        take: 8,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          customer: { select: { id: true, code: true, legalName: true } },
+          warehouse: { select: { id: true, code: true, name: true } },
+          _count: { select: { lines: true } },
+        },
+      }),
+    ]);
+
+    return {
+      totalOrders,
+      draftOrders,
+      pendingApprovals,
+      approvedOrders,
+      confirmedOrders,
+      partiallyFulfilledOrders,
+      fulfilledOrders,
+      cancelledOrders,
+      rejectedOrders,
+      confirmedSalesValue: new Prisma.Decimal(valueAgg._sum.totalAmount ?? 0)
+        .toDecimalPlaces(2)
+        .toString(),
+      recentOrders,
+    };
+  }
+
+  static async listOrders(
+    params: PaginationParams,
+    user: UserContext,
+    filters: {
+      status?: string;
+      customerId?: string;
+      warehouseId?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    const allowedWh = await getAuthorizedWarehouseIds(user, 'READ');
+    if (filters.warehouseId) {
+      await assertWarehouseAccess(user, filters.warehouseId, 'READ');
+    }
+
+    const where: Prisma.SalesOrderWhereInput = {};
+    if (filters.warehouseId) {
+      where.warehouseId = filters.warehouseId;
+    } else if (allowedWh) {
+      where.warehouseId = { in: allowedWh };
+    }
+
+    if (filters.status) where.status = filters.status as SalesOrderStatus;
+    if (filters.customerId) where.customerId = filters.customerId;
+    if (filters.fromDate || filters.toDate) {
+      where.orderDate = {};
+      if (filters.fromDate) where.orderDate.gte = new Date(filters.fromDate);
+      if (filters.toDate) where.orderDate.lte = new Date(filters.toDate);
+    }
+    if (params.search) {
+      where.OR = [
+        { orderNumber: { contains: params.search, mode: 'insensitive' } },
+        { customer: { legalName: { contains: params.search, mode: 'insensitive' } } },
+        { customer: { code: { contains: params.search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      prisma.salesOrder.findMany({
+        where,
+        skip: params.skip,
+        take: params.take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          customer: { select: { id: true, code: true, legalName: true, customerType: true } },
+          warehouse: { select: { id: true, code: true, name: true } },
+          salesman: { select: { id: true, fullName: true, username: true } },
+          _count: { select: { lines: true } },
+        },
+      }),
+      prisma.salesOrder.count({ where }),
+    ]);
+
+    return paginatedResult(items, total, params.page, params.limit);
+  }
+
+  static async getOrderById(id: string, user: UserContext) {
+    const order = await prisma.salesOrder.findUnique({
+      where: { id },
+      include: {
+        ...ORDER_INCLUDE,
+        statusHistory: {
+          orderBy: { createdAt: 'desc' },
+          include: { changedBy: { select: { id: true, fullName: true, username: true } } },
+        },
+        fulfillments: { orderBy: { fulfilledAt: 'desc' } },
+      },
+    });
+    if (!order) throw new AppError('Sales order not found.', 404);
+    await assertWarehouseAccess(user, order.warehouseId, 'READ');
+    return order;
+  }
+
+  static async getOrderHistory(id: string, user: UserContext) {
+    const order = await prisma.salesOrder.findUnique({
+      where: { id },
+      select: { id: true, warehouseId: true },
+    });
+    if (!order) throw new AppError('Sales order not found.', 404);
+    await assertWarehouseAccess(user, order.warehouseId, 'READ');
+
+    return prisma.salesOrderStatusHistory.findMany({
+      where: { salesOrderId: id },
+      orderBy: { createdAt: 'desc' },
+      include: { changedBy: { select: { id: true, fullName: true, username: true } } },
+    });
+  }
+
+  /**
+   * Compute authoritative line pricing, UOM conversion, and tax snapshots on the backend.
+   */
+  private static async buildOrderLines(
+    tx: Prisma.TransactionClient,
+    lines: CreateSalesOrderInput['lines'],
+  ) {
+    const preparedLines: Prisma.SalesOrderLineCreateWithoutSalesOrderInput[] = [];
+    let orderSubtotal = ZERO;
+    let orderDiscount = ZERO;
+    let orderTax = ZERO;
+    let orderTotal = ZERO;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const variant = await tx.productVariant.findUnique({
+        where: { id: line.productVariantId },
+        include: {
+          product: { include: { taxRate: true } },
+          inventoryItem: true,
+        },
+      });
+
+      if (!variant || !variant.isActive || !variant.product.isActive) {
+        throw new AppError(`Active product variant not found for line ${i + 1}.`, 404);
+      }
+      if (!variant.inventoryItem || !variant.inventoryItem.isActive) {
+        throw new AppError(
+          `Product variant ${variant.sku} does not have an active inventory item.`,
+          400,
+        );
+      }
+
+      const orderedQty = new Prisma.Decimal(line.orderedQuantity);
+      const { converted: baseQty, multiplier } = await convertQuantityDecimal(
+        tx,
+        orderedQty,
+        line.uomId,
+        variant.inventoryItem.uomId,
+      );
+
+      // Authoritative unit price in ordered UOM derived from variant.defaultSellingPrice (base UOM)
+      const baseUnitPrice = new Prisma.Decimal(variant.defaultSellingPrice);
+      const unitPrice = baseUnitPrice.mul(multiplier).toDecimalPlaces(2);
+
+      const discountPct = new Prisma.Decimal(line.discountPercent || '0');
+      const grossAmount = orderedQty.mul(unitPrice).toDecimalPlaces(2);
+      const lineDiscount = grossAmount.mul(discountPct).div(HUNDRED).toDecimalPlaces(2);
+      const taxableAmount = grossAmount.sub(lineDiscount);
+
+      const taxRate = variant.product.taxRate;
+      const taxPct = new Prisma.Decimal(taxRate.ratePercentage);
+      const taxAmount = taxableAmount.mul(taxPct).div(HUNDRED).toDecimalPlaces(2);
+      const lineTotal = taxableAmount.add(taxAmount);
+
+      orderSubtotal = orderSubtotal.add(grossAmount);
+      orderDiscount = orderDiscount.add(lineDiscount);
+      orderTax = orderTax.add(taxAmount);
+      orderTotal = orderTotal.add(lineTotal);
+
+      preparedLines.push({
+        lineNumber: i + 1,
+        productVariant: { connect: { id: variant.id } },
+        inventoryItem: { connect: { id: variant.inventoryItem.id } },
+        uom: { connect: { id: line.uomId } },
+        orderedQuantity: orderedQty,
+        baseQuantity: baseQty,
+        unitPrice,
+        discountPercent: discountPct,
+        taxRate: { connect: { id: taxRate.id } },
+        taxPercentage: taxPct,
+        taxableAmount,
+        taxAmount,
+        lineTotal,
+        notes: line.notes ?? null,
+      });
+    }
+
+    return {
+      preparedLines,
+      subtotal: orderSubtotal.toDecimalPlaces(2),
+      discountAmount: orderDiscount.toDecimalPlaces(2),
+      taxAmount: orderTax.toDecimalPlaces(2),
+      totalAmount: orderTotal.toDecimalPlaces(2),
+    };
+  }
+
+  static async createOrder(input: CreateSalesOrderInput, user: UserContext, meta: AuditMeta) {
+    await assertWarehouseAccess(user, input.warehouseId, 'READ_WRITE');
+
+    const [customer, warehouse] = await Promise.all([
+      prisma.customer.findUnique({ where: { id: input.customerId } }),
+      prisma.warehouse.findUnique({ where: { id: input.warehouseId } }),
+    ]);
+    if (!customer || !customer.isActive) throw new AppError('Active customer not found.', 404);
+    if (!warehouse || !warehouse.isActive) throw new AppError('Active warehouse not found.', 404);
+
+    if (input.shippingAddressId) {
+      const addr = await prisma.customerAddress.findUnique({
+        where: { id: input.shippingAddressId },
+      });
+      if (!addr || addr.customerId !== customer.id) {
+        throw new AppError('Shipping address does not belong to the selected customer.', 400);
+      }
+    }
+
+    const created = await prisma.$transaction(async tx => {
+      const computed = await this.buildOrderLines(tx, input.lines);
+
+      const order = await tx.salesOrder.create({
+        data: {
+          orderNumber: generateDocNumber('SO'),
+          customerId: customer.id,
+          shippingAddressId: input.shippingAddressId ?? null,
+          warehouseId: warehouse.id,
+          salesmanId: user.userId,
+          orderDate: input.orderDate ? new Date(input.orderDate) : new Date(),
+          expectedDeliveryDate: input.expectedDeliveryDate
+            ? new Date(input.expectedDeliveryDate)
+            : null,
+          status: SalesOrderStatus.DRAFT,
+          subtotal: computed.subtotal,
+          discountAmount: computed.discountAmount,
+          taxAmount: computed.taxAmount,
+          totalAmount: computed.totalAmount,
+          notes: input.notes ?? null,
+          deliveryInstructions: input.deliveryInstructions ?? null,
+          createdById: user.userId,
+          lines: { create: computed.preparedLines },
+          statusHistory: {
+            create: {
+              fromStatus: null,
+              toStatus: SalesOrderStatus.DRAFT,
+              changedById: user.userId,
+              reason: 'Sales order created',
+            },
+          },
+        },
+        include: ORDER_INCLUDE,
+      });
+
+      return order;
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.CREATE,
+      entityType: 'SalesOrder',
+      entityId: created.id,
+      newState: toPlainJson(created),
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return created;
+  }
+
+  static async updateOrder(
+    id: string,
+    input: UpdateSalesOrderInput,
+    user: UserContext,
+    meta: AuditMeta,
+  ) {
+    const existing = await prisma.salesOrder.findUnique({
+      where: { id },
+      include: { lines: true },
+    });
+    if (!existing) throw new AppError('Sales order not found.', 404);
+    await assertWarehouseAccess(user, existing.warehouseId, 'READ_WRITE');
+
+    if (existing.status !== 'DRAFT' && existing.status !== 'REJECTED') {
+      throw new AppError(
+        `Only DRAFT or REJECTED sales orders can be modified (current status: ${existing.status}).`,
+        400,
+      );
+    }
+
+    const targetCustomerId = input.customerId || existing.customerId;
+    const targetWarehouseId = input.warehouseId || existing.warehouseId;
+
+    if (input.warehouseId) {
+      await assertWarehouseAccess(user, targetWarehouseId, 'READ_WRITE');
+      const wh = await prisma.warehouse.findUnique({ where: { id: targetWarehouseId } });
+      if (!wh || !wh.isActive) throw new AppError('Active warehouse not found.', 404);
+    }
+
+    if (input.customerId) {
+      const cust = await prisma.customer.findUnique({ where: { id: targetCustomerId } });
+      if (!cust || !cust.isActive) throw new AppError('Active customer not found.', 404);
+    }
+
+    if (input.shippingAddressId) {
+      const addr = await prisma.customerAddress.findUnique({
+        where: { id: input.shippingAddressId },
+      });
+      if (!addr || addr.customerId !== targetCustomerId) {
+        throw new AppError('Shipping address does not belong to the selected customer.', 400);
+      }
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      let lineUpdateData: Record<string, unknown> = {};
+
+      if (input.lines) {
+        await tx.salesOrderLine.deleteMany({ where: { salesOrderId: id } });
+        const computed = await this.buildOrderLines(tx, input.lines);
+        lineUpdateData = {
+          subtotal: computed.subtotal,
+          discountAmount: computed.discountAmount,
+          taxAmount: computed.taxAmount,
+          totalAmount: computed.totalAmount,
+          lines: { create: computed.preparedLines },
+        };
+      }
+
+      return tx.salesOrder.update({
+        where: { id },
+        data: {
+          customerId: targetCustomerId,
+          warehouseId: targetWarehouseId,
+          ...(input.shippingAddressId !== undefined
+            ? { shippingAddressId: input.shippingAddressId }
+            : {}),
+          ...(input.expectedDeliveryDate !== undefined
+            ? {
+                expectedDeliveryDate: input.expectedDeliveryDate
+                  ? new Date(input.expectedDeliveryDate)
+                  : null,
+              }
+            : {}),
+          ...(input.notes !== undefined ? { notes: input.notes } : {}),
+          ...(input.deliveryInstructions !== undefined
+            ? { deliveryInstructions: input.deliveryInstructions }
+            : {}),
+          ...lineUpdateData,
+        },
+        include: ORDER_INCLUDE,
+      });
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.UPDATE,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: existing.status, totalAmount: existing.totalAmount },
+      newState: { status: updated.status, totalAmount: updated.totalAmount },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return updated;
+  }
+
+  static async submitOrder(id: string, user: UserContext, meta: AuditMeta) {
+    const existing = await prisma.salesOrder.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Sales order not found.', 404);
+    await assertWarehouseAccess(user, existing.warehouseId, 'READ_WRITE');
+
+    if (existing.status !== 'DRAFT' && existing.status !== 'REJECTED') {
+      throw new AppError(
+        `Only DRAFT or REJECTED orders can be submitted (current status: ${existing.status}).`,
+        400,
+      );
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      const order = await tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: SalesOrderStatus.SUBMITTED,
+          submittedById: user.userId,
+          submittedAt: new Date(),
+        },
+        include: ORDER_INCLUDE,
+      });
+
+      await tx.salesOrderStatusHistory.create({
+        data: {
+          salesOrderId: id,
+          fromStatus: existing.status,
+          toStatus: SalesOrderStatus.SUBMITTED,
+          changedById: user.userId,
+          reason: 'Submitted for approval',
+        },
+      });
+
+      return order;
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.SUBMIT,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: existing.status },
+      newState: { status: updated.status },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return updated;
+  }
+
+  static async approveOrder(id: string, user: UserContext, meta: AuditMeta) {
+    const existing = await prisma.salesOrder.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Sales order not found.', 404);
+    await assertWarehouseAccess(user, existing.warehouseId, 'READ_WRITE');
+
+    if (existing.status !== 'SUBMITTED') {
+      throw new AppError(
+        `Only SUBMITTED orders can be approved (current status: ${existing.status}).`,
+        400,
+      );
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      const order = await tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: SalesOrderStatus.APPROVED,
+          approvedById: user.userId,
+          approvedAt: new Date(),
+        },
+        include: ORDER_INCLUDE,
+      });
+
+      await tx.salesOrderStatusHistory.create({
+        data: {
+          salesOrderId: id,
+          fromStatus: existing.status,
+          toStatus: SalesOrderStatus.APPROVED,
+          changedById: user.userId,
+          reason: 'Order approved',
+        },
+      });
+
+      return order;
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.APPROVE,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: existing.status },
+      newState: { status: updated.status },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return updated;
+  }
+
+  static async rejectOrder(id: string, reason: string, user: UserContext, meta: AuditMeta) {
+    const existing = await prisma.salesOrder.findUnique({ where: { id } });
+    if (!existing) throw new AppError('Sales order not found.', 404);
+    await assertWarehouseAccess(user, existing.warehouseId, 'READ_WRITE');
+
+    if (existing.status !== 'SUBMITTED') {
+      throw new AppError(
+        `Only SUBMITTED orders can be rejected (current status: ${existing.status}).`,
+        400,
+      );
+    }
+
+    const updated = await prisma.$transaction(async tx => {
+      const order = await tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: SalesOrderStatus.REJECTED,
+          rejectedById: user.userId,
+          rejectedAt: new Date(),
+          rejectionReason: reason,
+        },
+        include: ORDER_INCLUDE,
+      });
+
+      await tx.salesOrderStatusHistory.create({
+        data: {
+          salesOrderId: id,
+          fromStatus: existing.status,
+          toStatus: SalesOrderStatus.REJECTED,
+          changedById: user.userId,
+          reason,
+        },
+      });
+
+      return order;
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.REJECT,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: existing.status },
+      newState: { status: updated.status, rejectionReason: reason },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      remarks: reason,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Confirm an APPROVED sales order and atomically reserve available stock in the order's warehouse.
+   */
+  static async confirmOrder(
+    id: string,
+    idempotencyKey: string | undefined,
+    user: UserContext,
+    meta: AuditMeta,
+  ) {
+    const effectiveKey = idempotencyKey || `CONFIRM-SO-${id}`;
+
+    const existingIdempotent = await prisma.salesOrder.findUnique({
+      where: { idempotencyKey: effectiveKey },
+      include: ORDER_INCLUDE,
+    });
+    if (existingIdempotent && existingIdempotent.status === 'CONFIRMED') {
+      await assertWarehouseAccess(user, existingIdempotent.warehouseId, 'READ_WRITE');
+      return existingIdempotent;
+    }
+
+    const confirmed = await prisma.$transaction(async tx => {
+      const locked = await tx.$queryRaw<{ id: string; status: string }[]>`
+        SELECT id, status FROM sales_orders WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Sales order not found.', 404);
+
+      const order = await tx.salesOrder.findUniqueOrThrow({
+        where: { id },
+        include: { lines: { orderBy: { lineNumber: 'asc' } } },
+      });
+
+      await assertWarehouseAccess(user, order.warehouseId, 'READ_WRITE');
+
+      if (order.status === 'CONFIRMED') {
+        if (order.idempotencyKey === effectiveKey) {
+          return tx.salesOrder.findUniqueOrThrow({ where: { id }, include: ORDER_INCLUDE });
+        }
+        throw new AppError('Sales order has already been confirmed.', 409);
+      }
+
+      if (order.status !== 'APPROVED') {
+        throw new AppError(
+          `Sales order must be APPROVED before confirmation (current status: ${order.status}).`,
+          400,
+        );
+      }
+
+      // Reserve stock transactionally via InventoryReservationService
+      await InventoryReservationService.reserveStockInTx(
+        tx,
+        order.warehouseId,
+        order.lines.map(l => ({
+          inventoryItemId: l.inventoryItemId,
+          baseQuantity: new Prisma.Decimal(l.baseQuantity),
+        })),
+      );
+
+      for (const line of order.lines) {
+        await tx.salesOrderLine.update({
+          where: { id: line.id },
+          data: { reservedBaseQuantity: line.baseQuantity },
+        });
+      }
+
+      const updatedOrder = await tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: SalesOrderStatus.CONFIRMED,
+          confirmedById: user.userId,
+          confirmedAt: new Date(),
+          idempotencyKey: effectiveKey,
+        },
+        include: ORDER_INCLUDE,
+      });
+
+      await tx.salesOrderStatusHistory.create({
+        data: {
+          salesOrderId: id,
+          fromStatus: order.status,
+          toStatus: SalesOrderStatus.CONFIRMED,
+          changedById: user.userId,
+          reason: 'Order confirmed and stock reserved',
+        },
+      });
+
+      return updatedOrder;
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.CONFIRM,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: 'APPROVED' },
+      newState: { status: confirmed.status, orderNumber: confirmed.orderNumber },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      remarks: `Confirmed sales order ${confirmed.orderNumber} and reserved inventory`,
+    });
+
+    return confirmed;
+  }
+
+  /**
+   * Cancel a sales order and release any reserved stock if the order was CONFIRMED.
+   */
+  static async cancelOrder(id: string, reason: string, user: UserContext, meta: AuditMeta) {
+    const cancelled = await prisma.$transaction(async tx => {
+      const locked = await tx.$queryRaw<{ id: string; status: string }[]>`
+        SELECT id, status FROM sales_orders WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Sales order not found.', 404);
+
+      const order = await tx.salesOrder.findUniqueOrThrow({
+        where: { id },
+        include: { lines: { orderBy: { lineNumber: 'asc' } } },
+      });
+
+      await assertWarehouseAccess(user, order.warehouseId, 'READ_WRITE');
+
+      if (
+        order.status === 'PARTIALLY_FULFILLED' ||
+        order.status === 'FULFILLED' ||
+        order.status === 'CANCELLED'
+      ) {
+        throw new AppError(`Cannot cancel sales order in status ${order.status}.`, 400);
+      }
+
+      if (order.status === 'CONFIRMED') {
+        const toRelease = order.lines
+          .filter(l => new Prisma.Decimal(l.reservedBaseQuantity).gt(ZERO))
+          .map(l => ({
+            inventoryItemId: l.inventoryItemId,
+            baseQuantity: new Prisma.Decimal(l.reservedBaseQuantity),
+          }));
+
+        await InventoryReservationService.releaseReservedStockInTx(tx, order.warehouseId, toRelease);
+
+        for (const line of order.lines) {
+          await tx.salesOrderLine.update({
+            where: { id: line.id },
+            data: { reservedBaseQuantity: ZERO },
+          });
+        }
+      }
+
+      const updatedOrder = await tx.salesOrder.update({
+        where: { id },
+        data: {
+          status: SalesOrderStatus.CANCELLED,
+          cancelledById: user.userId,
+          cancelledAt: new Date(),
+          cancellationReason: reason,
+        },
+        include: ORDER_INCLUDE,
+      });
+
+      await tx.salesOrderStatusHistory.create({
+        data: {
+          salesOrderId: id,
+          fromStatus: order.status,
+          toStatus: SalesOrderStatus.CANCELLED,
+          changedById: user.userId,
+          reason,
+        },
+      });
+
+      return { updatedOrder, previousStatus: order.status };
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.CANCEL,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: cancelled.previousStatus },
+      newState: { status: cancelled.updatedOrder.status, cancellationReason: reason },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+      remarks: reason,
+    });
+
+    return cancelled.updatedOrder;
+  }
+
+  /**
+   * Fulfill a CONFIRMED or PARTIALLY_FULFILLED sales order via InventoryReservationService.
+   */
+  static async fulfillOrder(
+    id: string,
+    input: FulfillSalesOrderInput,
+    user: UserContext,
+    meta: AuditMeta,
+  ) {
+    const effectiveKey = input.idempotencyKey || `FULFILL-SO-${id}-${Date.now()}`;
+
+    if (input.idempotencyKey) {
+      const existingFulfillment = await prisma.salesOrderFulfillment.findUnique({
+        where: { idempotencyKey: input.idempotencyKey },
+      });
+      if (existingFulfillment) {
+        const order = await prisma.salesOrder.findUniqueOrThrow({
+          where: { id },
+          include: ORDER_INCLUDE,
+        });
+        await assertWarehouseAccess(user, order.warehouseId, 'READ_WRITE');
+        return { order, fulfillment: existingFulfillment };
+      }
+    }
+
+    const result = await prisma.$transaction(async tx => {
+      const locked = await tx.$queryRaw<{ id: string; status: string }[]>`
+        SELECT id, status FROM sales_orders WHERE id = ${id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new AppError('Sales order not found.', 404);
+
+      const order = await tx.salesOrder.findUniqueOrThrow({
+        where: { id },
+        include: { lines: { orderBy: { lineNumber: 'asc' } } },
+      });
+
+      await assertWarehouseAccess(user, order.warehouseId, 'READ_WRITE');
+
+      if (order.status !== 'CONFIRMED' && order.status !== 'PARTIALLY_FULFILLED') {
+        throw new AppError(
+          `Only CONFIRMED or PARTIALLY_FULFILLED orders can be fulfilled (current status: ${order.status}).`,
+          400,
+        );
+      }
+
+      const lineMap = new Map(order.lines.map(l => [l.id, l]));
+      const fulfillmentRequests: Array<{
+        orderLine: (typeof order.lines)[0];
+        requestedQty: Prisma.Decimal;
+        baseQty: Prisma.Decimal;
+      }> = [];
+
+      if (input.lines && input.lines.length > 0) {
+        for (const reqLine of input.lines) {
+          const orderLine = lineMap.get(reqLine.salesOrderLineId);
+          if (!orderLine) {
+            throw new AppError(`Sales order line ${reqLine.salesOrderLineId} not found.`, 404);
+          }
+          const reqQty = new Prisma.Decimal(reqLine.quantity);
+          const { converted: baseQty } = await convertQuantityDecimal(
+            tx,
+            reqQty,
+            orderLine.uomId,
+            orderLine.inventoryItemId
+              ? (await tx.inventoryItem.findUniqueOrThrow({ where: { id: orderLine.inventoryItemId } }))
+                  .uomId
+              : orderLine.uomId,
+          );
+
+          const remainingBase = new Prisma.Decimal(orderLine.baseQuantity).sub(
+            orderLine.fulfilledBaseQuantity,
+          );
+          if (baseQty.gt(remainingBase)) {
+            throw new AppError(
+              `Line ${orderLine.lineNumber}: Fulfillment quantity exceeds remaining unfulfilled quantity (${remainingBase.toString()}).`,
+              400,
+            );
+          }
+
+          fulfillmentRequests.push({ orderLine, requestedQty: reqQty, baseQty });
+        }
+      } else {
+        // Fulfill all remaining quantities
+        for (const orderLine of order.lines) {
+          const remainingBase = new Prisma.Decimal(orderLine.baseQuantity).sub(
+            orderLine.fulfilledBaseQuantity,
+          );
+          if (remainingBase.lte(ZERO)) continue;
+
+          const ratio = new Prisma.Decimal(orderLine.orderedQuantity).div(orderLine.baseQuantity);
+          const remainingOrdered = remainingBase.mul(ratio).toDecimalPlaces(4);
+          fulfillmentRequests.push({
+            orderLine,
+            requestedQty: remainingOrdered,
+            baseQty: remainingBase,
+          });
+        }
+      }
+
+      if (fulfillmentRequests.length === 0) {
+        throw new AppError('No remaining quantities to fulfill on this sales order.', 400);
+      }
+
+      const { inventoryIssue } = await InventoryReservationService.fulfillReservedStockInTx(tx, {
+        warehouseId: order.warehouseId,
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+        idempotencyKey: effectiveKey,
+        userId: user.userId,
+        notes: input.notes ?? null,
+        lines: fulfillmentRequests.map(f => ({
+          inventoryItemId: f.orderLine.inventoryItemId,
+          uomId: f.orderLine.uomId,
+          requestedQuantity: f.requestedQty,
+          baseQuantity: f.baseQty,
+        })),
+      });
+
+      // Update order lines fulfilled and reserved quantities
+      for (const f of fulfillmentRequests) {
+        const newFulfilled = new Prisma.Decimal(f.orderLine.fulfilledBaseQuantity).add(f.baseQty);
+        const newReserved = Prisma.Decimal.max(
+          ZERO,
+          new Prisma.Decimal(f.orderLine.reservedBaseQuantity).sub(f.baseQty),
+        );
+
+        await tx.salesOrderLine.update({
+          where: { id: f.orderLine.id },
+          data: {
+            fulfilledBaseQuantity: newFulfilled,
+            reservedBaseQuantity: newReserved,
+          },
+        });
+      }
+
+      const refreshedLines = await tx.salesOrderLine.findMany({ where: { salesOrderId: id } });
+      const allFulfilled = refreshedLines.every(l =>
+        new Prisma.Decimal(l.fulfilledBaseQuantity).gte(l.baseQuantity),
+      );
+      const nextStatus = allFulfilled
+        ? SalesOrderStatus.FULFILLED
+        : SalesOrderStatus.PARTIALLY_FULFILLED;
+
+      const fulfillment = await tx.salesOrderFulfillment.create({
+        data: {
+          fulfillmentNumber: generateDocNumber('FUL'),
+          salesOrderId: order.id,
+          inventoryIssueId: inventoryIssue.id,
+          idempotencyKey: effectiveKey,
+          fulfilledById: user.userId,
+          notes: input.notes ?? null,
+        },
+      });
+
+      const updatedOrder = await tx.salesOrder.update({
+        where: { id },
+        data: { status: nextStatus },
+        include: ORDER_INCLUDE,
+      });
+
+      await tx.salesOrderStatusHistory.create({
+        data: {
+          salesOrderId: id,
+          fromStatus: order.status,
+          toStatus: nextStatus,
+          changedById: user.userId,
+          reason: `Fulfilled via ${fulfillment.fulfillmentNumber} (Issue: ${inventoryIssue.issueNumber})`,
+        },
+      });
+
+      return { order: updatedOrder, fulfillment, previousStatus: order.status };
+    });
+
+    await AuditService.log({
+      userId: meta.userId,
+      action: AuditAction.FULFILL,
+      entityType: 'SalesOrder',
+      entityId: id,
+      previousState: { status: result.previousStatus },
+      newState: {
+        status: result.order.status,
+        fulfillmentNumber: result.fulfillment.fulfillmentNumber,
+      },
+      ipAddress: meta.ipAddress,
+      userAgent: meta.userAgent,
+    });
+
+    return { order: result.order, fulfillment: result.fulfillment };
+  }
+}

@@ -28,6 +28,13 @@ import { StockAdjustmentsPage } from './inventory/StockAdjustmentsPage';
 import { BatchExpiryPage } from './inventory/BatchExpiryPage';
 import { InventoryValuationPage } from './inventory/InventoryValuationPage';
 import { InventoryTransactionsPage } from './inventory/InventoryTransactionsPage';
+import { SalesLayout } from '../components/sales/SalesLayout';
+import { SalesDashboardPage } from './sales/SalesDashboardPage';
+import { SalesOrdersPage } from './sales/SalesOrdersPage';
+import { SalesOrderFormPage } from './sales/SalesOrderFormPage';
+import { SalesOrderDetailPage } from './sales/SalesOrderDetailPage';
+import { PendingApprovalsPage } from './sales/PendingApprovalsPage';
+import { OrderFulfillmentPage } from './sales/OrderFulfillmentPage';
 
 export const router = createBrowserRouter([
   {
@@ -72,20 +79,20 @@ export const router = createBrowserRouter([
       {
         path: 'sales',
         element: (
-          <ProtectedRoute requiredRoles={['SALESMAN', 'ADMIN', 'OWNER']}>
-            <ModulePlaceholder
-              moduleName="Sales & Customer Order Management"
-              phase="Phase 2 Implementation"
-              summary="Manages customer distribution networks, price books, GST sales invoicing, and customer payment collections."
-              scopePoints={[
-                'Customer master registry with GSTIN and billing/shipping addresses',
-                'Sales order intake, approval workflows, and status tracking',
-                'GST-compliant tax invoices with HSN/SAC codes and CGST/SGST/IGST breakdown',
-                'Customer payment receipts, outstanding balances, and aging ledgers',
-              ]}
-            />
+          <ProtectedRoute requiredRoles={['SALESMAN', 'ADMIN', 'OWNER', 'PRODUCTION', 'AUDITOR']}>
+            <SalesLayout />
           </ProtectedRoute>
         ),
+        children: [
+          { index: true, element: <Navigate to="/sales/dashboard" replace /> },
+          { path: 'dashboard', element: <SalesDashboardPage /> },
+          { path: 'orders', element: <SalesOrdersPage /> },
+          { path: 'orders/new', element: <SalesOrderFormPage /> },
+          { path: 'orders/:id', element: <SalesOrderDetailPage /> },
+          { path: 'orders/:id/edit', element: <SalesOrderFormPage /> },
+          { path: 'approvals', element: <PendingApprovalsPage /> },
+          { path: 'fulfillment', element: <OrderFulfillmentPage /> },
+        ],
       },
       {
         path: 'inventory',

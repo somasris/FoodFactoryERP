@@ -71,7 +71,13 @@ enum AuditAction {
   CREATE
   UPDATE
   DELETE
+  SUBMIT
   APPROVE
+  REJECT
+  CONFIRM
+  RESERVE
+  RELEASE
+  FULFILL
   POST
   CANCEL
   DISPATCH
@@ -81,6 +87,17 @@ enum AuditAction {
   LOGOUT
   LOGIN_FAILED
   SECURITY_ALERT
+}
+
+enum SalesOrderStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CONFIRMED
+  PARTIALLY_FULFILLED
+  FULFILLED
+  CANCELLED
 }
 
 enum InventoryDocumentStatus {
@@ -203,6 +220,7 @@ model Warehouse {
   transfersFrom        InventoryTransfer[]    @relation("TransferSourceWarehouse")
   transfersTo          InventoryTransfer[]    @relation("TransferDestWarehouse")
   inventoryAdjustments InventoryAdjustment[]
+  salesOrders          SalesOrder[]
 
   @@map("warehouses")
 }
@@ -229,6 +247,8 @@ model User {
   refreshTokens   RefreshToken[]
   auditLogs       AuditLog[]
   postedInventoryTransactions InventoryTransaction[] @relation("TxPostedBy")
+  salesOrders                 SalesOrder[]           @relation("SalesmanOrders")
+  salesOrderStatusChanges     SalesOrderStatusHistory[]
 
   @@map("users")
 }
@@ -379,6 +399,7 @@ model UnitOfMeasure {
   issueLines      InventoryIssueLine[]
   transferLines   InventoryTransferLine[]
   adjustmentLines InventoryAdjustmentLine[]
+  salesOrderLines SalesOrderLine[]
 
   @@map("units_of_measure")
 }
@@ -414,6 +435,7 @@ model TaxRate {
   rawMaterials   RawMaterial[]
   products       Product[]
   configurations TaxConfiguration[]
+  salesOrderLines SalesOrderLine[]
 
   @@map("tax_rates")
 }
@@ -532,6 +554,7 @@ model ProductVariant {
   uom           UnitOfMeasure  @relation(fields: [uomId], references: [id])
   inventoryItem InventoryItem?
   boms          BOM[]
+  salesOrderLines SalesOrderLine[]
 
   @@index([productId])
   @@index([uomId])
@@ -563,6 +586,7 @@ model InventoryItem {
   issueLines       InventoryIssueLine[]
   transferLines    InventoryTransferLine[]
   adjustmentLines  InventoryAdjustmentLine[]
+  salesOrderLines  SalesOrderLine[]
 
   @@map("inventory_items")
 }
@@ -621,7 +645,8 @@ model Customer {
   createdAt        DateTime     @default(now()) @map("created_at")
   updatedAt        DateTime     @updatedAt @map("updated_at")
 
-  addresses CustomerAddress[]
+  addresses   CustomerAddress[]
+  salesOrders SalesOrder[]
 
   @@map("customers")
 }
@@ -637,7 +662,8 @@ model CustomerAddress {
   pincode      String      @db.VarChar(10)
   isDefault    Boolean     @default(true) @map("is_default")
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer    Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  salesOrders SalesOrder[]
 
   @@index([customerId])
   @@map("customer_addresses")
@@ -1047,4 +1073,123 @@ model InventoryAdjustmentLine {
   @@unique([adjustmentId, lineNumber])
   @@index([inventoryItemId])
   @@map("inventory_adjustment_lines")
+}
+
+
+// ------------------------------------------------------------------------------
+// 7. SALES & ORDERS (PHASE 2)
+// ------------------------------------------------------------------------------
+
+model SalesOrder {
+  id                   String           @id @default(uuid())
+  orderNumber          String           @unique @map("order_number") @db.VarChar(40)
+  customerId           String           @map("customer_id")
+  shippingAddressId    String?          @map("shipping_address_id")
+  warehouseId          String           @map("warehouse_id")
+  salesmanId           String?          @map("salesman_id")
+  orderDate            DateTime         @default(now()) @map("order_date")
+  expectedDeliveryDate DateTime?        @map("expected_delivery_date") @db.Date
+  status               SalesOrderStatus @default(DRAFT)
+  subtotal             Decimal          @default(0) @db.Decimal(14, 2)
+  discountAmount       Decimal          @default(0) @map("discount_amount") @db.Decimal(14, 2)
+  taxAmount            Decimal          @default(0) @map("tax_amount") @db.Decimal(14, 2)
+  totalAmount          Decimal          @default(0) @map("total_amount") @db.Decimal(14, 2)
+  notes                String?          @db.Text
+  deliveryInstructions String?          @map("delivery_instructions") @db.Text
+  idempotencyKey       String?          @unique @map("idempotency_key") @db.VarChar(100)
+  createdById          String           @map("created_by_id")
+  submittedById        String?          @map("submitted_by_id")
+  submittedAt          DateTime?        @map("submitted_at")
+  approvedById         String?          @map("approved_by_id")
+  approvedAt           DateTime?        @map("approved_at")
+  rejectedById         String?          @map("rejected_by_id")
+  rejectedAt           DateTime?        @map("rejected_at")
+  rejectionReason      String?          @map("rejection_reason") @db.Text
+  confirmedById        String?          @map("confirmed_by_id")
+  confirmedAt          DateTime?        @map("confirmed_at")
+  cancelledById        String?          @map("cancelled_by_id")
+  cancelledAt          DateTime?        @map("cancelled_at")
+  cancellationReason   String?          @map("cancellation_reason") @db.Text
+  createdAt            DateTime         @default(now()) @map("created_at")
+  updatedAt            DateTime         @updatedAt @map("updated_at")
+
+  customer        Customer                  @relation(fields: [customerId], references: [id])
+  shippingAddress CustomerAddress?          @relation(fields: [shippingAddressId], references: [id])
+  warehouse       Warehouse                 @relation(fields: [warehouseId], references: [id])
+  salesman        User?                     @relation("SalesmanOrders", fields: [salesmanId], references: [id])
+  lines           SalesOrderLine[]
+  statusHistory   SalesOrderStatusHistory[]
+  fulfillments    SalesOrderFulfillment[]
+
+  @@index([customerId])
+  @@index([warehouseId])
+  @@index([salesmanId])
+  @@index([status])
+  @@index([orderDate])
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id                    String   @id @default(uuid())
+  salesOrderId          String   @map("sales_order_id")
+  lineNumber            Int      @map("line_number")
+  productVariantId      String   @map("product_variant_id")
+  inventoryItemId       String   @map("inventory_item_id")
+  uomId                 String   @map("uom_id")
+  orderedQuantity       Decimal  @map("ordered_quantity") @db.Decimal(14, 4)
+  baseQuantity          Decimal  @map("base_quantity") @db.Decimal(14, 4)
+  reservedBaseQuantity  Decimal  @default(0) @map("reserved_base_quantity") @db.Decimal(14, 4)
+  fulfilledBaseQuantity Decimal  @default(0) @map("fulfilled_base_quantity") @db.Decimal(14, 4)
+  unitPrice             Decimal  @map("unit_price") @db.Decimal(12, 2)
+  discountPercent       Decimal  @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  taxRateId             String   @map("tax_rate_id")
+  taxPercentage         Decimal  @map("tax_percentage") @db.Decimal(5, 2)
+  taxableAmount         Decimal  @map("taxable_amount") @db.Decimal(14, 2)
+  taxAmount             Decimal  @map("tax_amount") @db.Decimal(14, 2)
+  lineTotal             Decimal  @map("line_total") @db.Decimal(14, 2)
+  notes                 String?  @db.Text
+
+  salesOrder     SalesOrder     @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  productVariant ProductVariant @relation(fields: [productVariantId], references: [id])
+  inventoryItem  InventoryItem  @relation(fields: [inventoryItemId], references: [id])
+  uom            UnitOfMeasure  @relation(fields: [uomId], references: [id])
+  taxRate        TaxRate        @relation(fields: [taxRateId], references: [id])
+
+  @@unique([salesOrderId, lineNumber])
+  @@index([productVariantId])
+  @@index([inventoryItemId])
+  @@map("sales_order_lines")
+}
+
+model SalesOrderStatusHistory {
+  id           String            @id @default(uuid())
+  salesOrderId String            @map("sales_order_id")
+  fromStatus   SalesOrderStatus? @map("from_status")
+  toStatus     SalesOrderStatus  @map("to_status")
+  changedById  String            @map("changed_by_id")
+  reason       String?           @db.Text
+  createdAt    DateTime          @default(now()) @map("created_at")
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  changedBy  User       @relation(fields: [changedById], references: [id])
+
+  @@index([salesOrderId])
+  @@map("sales_order_status_history")
+}
+
+model SalesOrderFulfillment {
+  id                String   @id @default(uuid())
+  fulfillmentNumber String   @unique @map("fulfillment_number") @db.VarChar(40)
+  salesOrderId      String   @map("sales_order_id")
+  inventoryIssueId  String   @unique @map("inventory_issue_id")
+  idempotencyKey    String   @unique @map("idempotency_key") @db.VarChar(100)
+  fulfilledById     String   @map("fulfilled_by_id")
+  fulfilledAt       DateTime @default(now()) @map("fulfilled_at")
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+
+  @@index([salesOrderId])
+  @@map("sales_order_fulfillments")
 }

@@ -40,7 +40,7 @@ const navItems = [
     path: '/sales',
     icon: ShoppingCart,
     badge: 'Phase 2',
-    badgeVariant: 'outline' as const,
+    badgeVariant: 'teal' as const,
   },
   {
     name: 'Inventory & Stock',
