@@ -261,27 +261,27 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
-        {/* Traditional Green Header */}
-        <div className="bg-[#008000] px-6 py-7 text-center text-white">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/15">
-            <Factory className="h-7 w-7 text-white" />
+    <div className="min-h-screen flex items-center justify-center bg-[#F7F8F2] px-4 py-8">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-[#E1E7DD] overflow-hidden">
+        {/* Traditional Forest Green Header */}
+        <div className="bg-[#245C3A] px-6 py-7 text-center text-white">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 border border-[#E8D7AA]/30">
+            <Factory className="h-7 w-7 text-[#E8D7AA]" />
           </div>
           <h1 className="text-xl font-bold tracking-tight">FoodFactory ERP</h1>
-          <p className="mt-1 text-xs text-emerald-100">
+          <p className="mt-1 text-xs text-[#F4F0E4]/90">
             Manufacturing, Inventory &amp; Compliance Platform
           </p>
         </div>
 
         {/* Mode Tabs */}
-        <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50 text-sm font-medium">
+        <div className="grid grid-cols-2 border-b border-[#E1E7DD] bg-[#FAFBF8] text-sm font-medium">
           <button
             type="button"
             onClick={() => switchMode('signin')}
             className={`py-3 transition-colors ${
               mode === 'signin'
-                ? 'border-b-2 border-[#008000] bg-white text-[#008000]'
+                ? 'border-b-2 border-[#245C3A] bg-white text-[#245C3A]'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -292,7 +292,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
             onClick={() => switchMode('signup')}
             className={`py-3 transition-colors ${
               mode === 'signup'
-                ? 'border-b-2 border-[#008000] bg-white text-[#008000]'
+                ? 'border-b-2 border-[#245C3A] bg-white text-[#245C3A]'
                 : 'text-slate-500 hover:text-slate-700'
             }`}
           >
@@ -350,7 +350,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                       setSelectedDemoRole(null);
                     }}
                     placeholder="Enter username or email"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                   />
                   {fieldErrors.usernameOrEmail && (
                     <p className="mt-1 text-xs text-red-600">{fieldErrors.usernameOrEmail}</p>
@@ -375,7 +375,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                         setSelectedDemoRole(null);
                       }}
                       placeholder="Enter password"
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                     />
                     <button
                       type="button"
@@ -394,7 +394,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#008000] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#006600] disabled:opacity-60"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#245C3A] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#17452C] disabled:opacity-60"
                 >
                   {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                   {isSubmitting ? 'Signing In...' : 'Sign In'}
@@ -405,7 +405,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                   <button
                     type="button"
                     onClick={() => switchMode('signup')}
-                    className="font-medium text-[#008000] hover:underline"
+                    className="font-medium text-[#245C3A] hover:underline"
                   >
                     Create an account
                   </button>
@@ -460,13 +460,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                               isLastOdd ? 'sm:col-span-2' : ''
                             } ${
                               isSelected
-                                ? 'border-[#008000] bg-[#008000]/5 ring-1 ring-[#008000]'
+                                ? 'border-[#245C3A] bg-[#245C3A]/5 ring-1 ring-[#245C3A]'
                                 : 'border-slate-200 bg-slate-50/70 hover:border-slate-300 hover:bg-slate-100/70'
                             }`}
                           >
                             <Icon
                               className={`mt-0.5 h-4 w-4 shrink-0 ${
-                                isSelected ? 'text-[#008000]' : 'text-slate-500'
+                                isSelected ? 'text-[#245C3A]' : 'text-slate-500'
                               }`}
                             />
                             <div className="min-w-0 flex-1">
@@ -475,7 +475,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                                   {demo.label}
                                 </span>
                                 {isSelected && (
-                                  <span className="text-[10px] font-semibold text-[#008000]">
+                                  <span className="text-[10px] font-semibold text-[#245C3A]">
                                     Selected
                                   </span>
                                 )}
@@ -508,7 +508,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                   value={fullName}
                   onChange={e => setFullName(e.target.value)}
                   placeholder="Enter your full name"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                 />
                 {fieldErrors.name && (
                   <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
@@ -529,7 +529,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                 />
                 {fieldErrors.email && (
                   <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
@@ -550,7 +550,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                   value={phoneNumber}
                   onChange={e => setPhoneNumber(e.target.value)}
                   placeholder="+91 98765 43210"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                 />
                 {fieldErrors.phoneNumber && (
                   <p className="mt-1 text-xs text-red-600">{fieldErrors.phoneNumber}</p>
@@ -574,13 +574,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                         onClick={() => setRequestedRole(option.role)}
                         className={`flex items-start gap-2.5 rounded-md border px-3 py-2 text-left transition-colors ${
                           isSelected
-                            ? 'border-[#008000] bg-[#008000]/5 ring-1 ring-[#008000]'
+                            ? 'border-[#245C3A] bg-[#245C3A]/5 ring-1 ring-[#245C3A]'
                             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
                         <Icon
                           className={`mt-0.5 h-4 w-4 shrink-0 ${
-                            isSelected ? 'text-[#008000]' : 'text-slate-400'
+                            isSelected ? 'text-[#245C3A]' : 'text-slate-400'
                           }`}
                         />
                         <div className="min-w-0 flex-1">
@@ -589,7 +589,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                               {option.label}
                             </span>
                             {isSelected && (
-                              <span className="text-[10px] font-semibold text-[#008000]">
+                              <span className="text-[10px] font-semibold text-[#245C3A]">
                                 Selected
                               </span>
                             )}
@@ -620,7 +620,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                     value={signUpPassword}
                     onChange={e => setSignUpPassword(e.target.value)}
                     placeholder="Min 8 chars, upper, lower, number, symbol"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                   />
                   <button
                     type="button"
@@ -655,7 +655,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                     value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)}
                     placeholder="Re-enter password"
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#008000] focus:outline-none focus:ring-1 focus:ring-[#008000]"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:border-[#245C3A] focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
                   />
                   <button
                     type="button"
@@ -680,7 +680,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#008000] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#006600] disabled:opacity-60"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#245C3A] py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#17452C] disabled:opacity-60"
               >
                 {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
                 {isSubmitting ? 'Creating Account...' : 'Create Account'}
@@ -691,7 +691,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                 <button
                   type="button"
                   onClick={() => switchMode('signin')}
-                  className="font-medium text-[#008000] hover:underline"
+                  className="font-medium text-[#245C3A] hover:underline"
                 >
                   Back to Sign In
                 </button>

@@ -132,7 +132,7 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="border-b border-[#E1E7DD] bg-[#FAFBF8] text-xs uppercase text-[#66756A]">
                 <tr>
                   {columns.map((col, idx) => (
                     <th key={idx} className={`px-3 py-2.5 font-semibold ${col.className || ''}`}>

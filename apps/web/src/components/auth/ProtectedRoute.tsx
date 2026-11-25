@@ -21,9 +21,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50">
-        <div className="flex items-center gap-3 text-slate-700">
-          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F8F2]">
+        <div className="flex items-center gap-3 text-[#24352A]">
+          <Loader2 className="w-8 h-8 animate-spin text-[#245C3A]" />
           <span className="font-semibold text-lg tracking-wide">
             Verifying FoodFactory Session...
           </span>

@@ -54,7 +54,7 @@ export const UnauthorizedPage: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate(homePath)}
-            className="px-4 py-2 bg-brand-navy hover:bg-[#006600] text-white font-medium text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
+            className="px-4 py-2 bg-[#245C3A] hover:bg-[#17452C] text-white font-medium text-xs rounded-md transition-colors flex items-center justify-center gap-1.5"
           >
             <Home className="w-3.5 h-3.5" />
             <span>My Dashboard</span>
