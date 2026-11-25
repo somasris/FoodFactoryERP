@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Download, Search } from 'lucide-react';
 import { Button } from '../common/Button';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,12 +21,33 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
   showSearch = true,
 }) => {
   const { hasPermission } = useAuth();
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const canExport = Boolean(reportType) && hasPermission('production.reports.export');
 
-  const handleExport = (format: 'csv' | 'excel' | 'pdf') => {
+  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
     if (!reportType) return;
-    const url = productionService.reports.exportUrl(reportType, format, query);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    setExporting(true);
+    setExportError(null);
+    try {
+      const { blob, filename } = await productionService.reports.downloadExport(
+        reportType,
+        format,
+        query,
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
@@ -109,16 +130,34 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
       </div>
 
       {canExport && (
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => handleExport('csv')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> CSV
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => handleExport('excel')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> Excel
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => handleExport('pdf')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> PDF
-          </Button>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={() => handleExport('csv')}
+            >
+              <Download className="mr-1 h-3.5 w-3.5" /> CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={() => handleExport('excel')}
+            >
+              <Download className="mr-1 h-3.5 w-3.5" /> Excel
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exporting}
+              onClick={() => handleExport('pdf')}
+            >
+              <Download className="mr-1 h-3.5 w-3.5" /> PDF
+            </Button>
+          </div>
+          {exportError && <p className="text-[11px] text-rose-600">{exportError}</p>}
         </div>
       )}
     </div>

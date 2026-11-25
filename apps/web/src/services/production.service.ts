@@ -1,4 +1,5 @@
-import { apiClient } from './api-client';
+import { apiClient, getAccessToken } from './api-client';
+import { config } from '../config/env';
 import { PaginatedResponse } from '../types/master-data';
 import {
   BatchCostingDetailResponse,
@@ -380,9 +381,37 @@ export const productionService = {
       format: 'csv' | 'excel' | 'pdf',
       params: ProductionReportQuery = {},
     ) =>
-      `/api/v1/production/reports/export/${reportType}${buildQuery({
+      `${config.apiBaseUrl}/production/reports/export/${reportType}${buildQuery({
         ...(params as Record<string, string | number | boolean | undefined>),
         format,
       })}`,
+    downloadExport: async (
+      reportType: string,
+      format: 'csv' | 'excel' | 'pdf',
+      params: ProductionReportQuery = {},
+    ): Promise<{ blob: Blob; filename: string }> => {
+      const token = getAccessToken();
+      const headers: Record<string, string> = { 'X-Requested-With': 'XMLHttpRequest' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const qs = buildQuery({
+        ...(params as Record<string, string | number | boolean | undefined>),
+        format,
+      });
+      const res = await fetch(`${config.apiBaseUrl}/production/reports/export/${reportType}${qs}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers,
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => null);
+        throw new Error(errBody?.message || `Failed to export ${reportType} (${format})`);
+      }
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      const ext = format === 'excel' ? 'xls' : format;
+      const filename = match?.[1] || `production-${reportType}.${ext}`;
+      const blob = await res.blob();
+      return { blob, filename };
+    },
   },
 };
