@@ -418,10 +418,11 @@ export class ReportsService {
       productId: filter.productId,
       page: 1,
       limit: 20,
+      sortOrder: 'desc' as const,
     };
 
     const [dashboard, planVsActual] = await Promise.all([
-      ProductionReportsService.getDashboard(query),
+      ProductionReportsService.getDashboard(query, false),
       ProductionReportsService.getPlanVsActualReport(query),
     ]);
 

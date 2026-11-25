@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { ClipboardCheck, FileSpreadsheet } from 'lucide-react';
+import { BarChart3, ClipboardCheck, FileSpreadsheet, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { cn } from '../../lib/utils';
 
@@ -8,6 +8,23 @@ export const ReportsComplianceLayout: React.FC = () => {
   const { hasPermission } = useAuth();
 
   const tabs = [
+    {
+      label: 'Executive Dashboard',
+      to: '/reports/executive',
+      icon: LayoutDashboard,
+      show: hasPermission('analytics.dashboard.read'),
+    },
+    {
+      label: 'Business Intelligence',
+      to: '/reports/bi',
+      icon: BarChart3,
+      show:
+        hasPermission('analytics.sales.read') ||
+        hasPermission('analytics.inventory.read') ||
+        hasPermission('analytics.production.read') ||
+        hasPermission('analytics.profitability.read') ||
+        hasPermission('analytics.factory.read'),
+    },
     {
       label: 'Financial Compliance',
       to: '/reports/compliance',

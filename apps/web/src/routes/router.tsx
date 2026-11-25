@@ -72,6 +72,8 @@ import { SystemSettingsPage } from './admin/SystemSettingsPage';
 import { ReportsComplianceLayout } from '../components/reports/ReportsComplianceLayout';
 import { FinancialCompliancePage } from './compliance/FinancialCompliancePage';
 import { StockAuditPage } from './compliance/StockAuditPage';
+import { ExecutiveDashboardPage } from './reports/ExecutiveDashboardPage';
+import { BusinessIntelligencePage } from './reports/BusinessIntelligencePage';
 
 export const router = createBrowserRouter([
   {
@@ -194,12 +196,14 @@ export const router = createBrowserRouter([
       {
         path: 'reports',
         element: (
-          <ProtectedRoute requiredRoles={['OWNER', 'ADMIN', 'AUDITOR', 'PRODUCTION']}>
+          <ProtectedRoute requiredRoles={['OWNER', 'ADMIN', 'AUDITOR', 'PRODUCTION', 'SALESMAN']}>
             <ReportsComplianceLayout />
           </ProtectedRoute>
         ),
         children: [
           { index: true, element: <Navigate to="/reports/compliance" replace /> },
+          { path: 'executive', element: <ExecutiveDashboardPage /> },
+          { path: 'bi', element: <BusinessIntelligencePage /> },
           { path: 'compliance', element: <FinancialCompliancePage /> },
           { path: 'stock-audit', element: <StockAuditPage /> },
         ],

@@ -60,7 +60,7 @@ const navItems = [
     name: 'Compliance & BI',
     path: '/reports',
     icon: BarChart3,
-    badge: 'Phase 4.2',
+    badge: 'Phase 4.3',
     badgeVariant: 'teal' as const,
   },
   {
