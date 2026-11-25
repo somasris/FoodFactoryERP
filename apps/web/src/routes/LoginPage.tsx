@@ -261,111 +261,46 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   };
 
   return (
-    <div className="min-h-screen flex bg-[#F4F6F9]">
-      {/* Left Enterprise Context Panel (Desktop) */}
-      <div className="hidden lg:flex lg:w-[44%] flex-col justify-between bg-brand-navy px-12 py-12 text-white">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 border border-white/15">
-              <Factory className="h-5 w-5 text-teal-300" />
-            </div>
-            <div>
-              <div className="text-base font-bold tracking-tight">FoodFactory ERP</div>
-              <div className="text-[11px] text-slate-300">Enterprise Manufacturing Platform</div>
-            </div>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
+      <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+        {/* Navy Header */}
+        <div className="bg-[#172F50] px-6 py-7 text-center text-white">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10">
+            <Factory className="h-7 w-7 text-teal-300" />
           </div>
-
-          <div className="mt-14 max-w-md space-y-4">
-            <h2 className="text-2xl font-semibold tracking-tight text-white">
-              Unified Operations for Food Manufacturing
-            </h2>
-            <p className="text-sm leading-relaxed text-slate-300">
-              Manage recipe-driven production, FEFO batch inventory, sales order fulfillment,
-              unit costing, and statutory compliance from a single role-secured workspace.
-            </p>
-            <div className="mt-6 grid grid-cols-2 gap-3 pt-4 border-t border-white/15 text-xs text-slate-200">
-              <div>
-                <div className="font-semibold text-white">Batch Traceability</div>
-                <div className="text-slate-300 mt-0.5">Raw material to finished goods</div>
-              </div>
-              <div>
-                <div className="font-semibold text-white">FEFO &amp; Quality</div>
-                <div className="text-slate-300 mt-0.5">Expiry &amp; quarantine control</div>
-              </div>
-              <div>
-                <div className="font-semibold text-white">Recipe Costing</div>
-                <div className="text-slate-300 mt-0.5">Standard vs actual variance</div>
-              </div>
-              <div>
-                <div className="font-semibold text-white">Audit Governance</div>
-                <div className="text-slate-300 mt-0.5">Immutable transaction trails</div>
-              </div>
-            </div>
-          </div>
+          <h1 className="text-xl font-bold tracking-tight">FoodFactory ERP</h1>
+          <p className="mt-1 text-xs text-slate-300">
+            Manufacturing, Inventory &amp; Compliance Platform
+          </p>
         </div>
 
-        <div className="text-xs text-slate-400">
-          Role-based access is resolved automatically from your organization account.
+        {/* Mode Tabs */}
+        <div className="grid grid-cols-2 border-b border-slate-200 bg-slate-50 text-sm font-medium">
+          <button
+            type="button"
+            onClick={() => switchMode('signin')}
+            className={`py-3 transition-colors ${
+              mode === 'signin'
+                ? 'border-b-2 border-[#172F50] bg-white text-[#172F50]'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode('signup')}
+            className={`py-3 transition-colors ${
+              mode === 'signup'
+                ? 'border-b-2 border-[#172F50] bg-white text-[#172F50]'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            Sign Up
+          </button>
         </div>
-      </div>
 
-      {/* Right Authentication Form Panel */}
-      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-8">
-        <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="border-b border-slate-200 bg-white px-6 py-5 lg:hidden">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-md bg-brand-navy text-white">
-                <Factory className="h-5 w-5 text-teal-300" />
-              </div>
-              <div>
-                <h1 className="text-base font-bold tracking-tight text-brand-navy">
-                  FoodFactory ERP
-                </h1>
-                <p className="text-[11px] text-slate-500">
-                  Manufacturing, Inventory &amp; Compliance
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="hidden lg:block px-6 pt-6 pb-2">
-            <h1 className="text-lg font-semibold text-slate-900">
-              {mode === 'signin' ? 'Sign in to your workspace' : 'Request an ERP account'}
-            </h1>
-            <p className="mt-0.5 text-xs text-slate-500">
-              {mode === 'signin'
-                ? 'Enter your credentials. Your role and permissions are loaded automatically.'
-                : 'New registrations require administrator approval and role assignment.'}
-            </p>
-          </div>
-
-          {/* Mode Tabs */}
-          <div className="mt-2 grid grid-cols-2 border-b border-slate-200 bg-slate-50 text-xs font-semibold">
-            <button
-              type="button"
-              onClick={() => switchMode('signin')}
-              className={`py-2.5 transition-colors ${
-                mode === 'signin'
-                  ? 'border-b-2 border-brand-navy bg-white text-brand-navy'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode('signup')}
-              className={`py-2.5 transition-colors ${
-                mode === 'signup'
-                  ? 'border-b-2 border-brand-navy bg-white text-brand-navy'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              Sign Up
-            </button>
-          </div>
-
-          <div className="p-6">
+        <div className="p-6">
           {signUpSuccess && mode === 'signin' && (
             <div
               role="status"
@@ -397,13 +332,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
 
           {mode === 'signin' ? (
             <div className="space-y-5">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">Welcome back</h2>
-                <p className="text-xs text-slate-500">
-                  Sign in with your organization credentials to continue.
-                </p>
-              </div>
-
               <form onSubmit={handleSignInSubmit} className="space-y-4" noValidate>
                 <div>
                   <label
@@ -770,7 +698,6 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
               </p>
             </form>
           )}
-          </div>
         </div>
       </div>
     </div>
