@@ -82,22 +82,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isSystemError = apiError || dbError;
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between border-b border-[#E1E7DD] bg-white px-4 md:px-6">
-      <div className="flex items-center gap-3 min-w-0">
+    <header className="sticky top-0 z-30 flex h-14 w-full items-center justify-between gap-2 border-b border-[#E1E7DD] bg-white px-3 sm:px-4 md:px-6">
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0">
         <button
           type="button"
           onClick={onToggleSidebar}
           aria-label="Toggle navigation menu"
-          className="rounded-md p-1.5 text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] md:hidden"
+          className="rounded-md p-1.5 text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] md:hidden shrink-0"
         >
           <Menu className="h-5 w-5" />
         </button>
 
-        <Link to={homePath} className="flex items-center gap-2.5 shrink-0">
+        <Link to={homePath} className="flex items-center gap-2 shrink-0">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#245C3A] text-[#E8D7AA] border border-[#17452C]">
             <Factory className="h-4 w-4" />
           </div>
-          <span className="text-sm font-bold tracking-tight text-[#17452C] sm:text-base">
+          <span className="hidden sm:inline text-sm font-bold tracking-tight text-[#17452C] sm:text-base">
             FoodFactory ERP
           </span>
         </Link>
@@ -113,14 +113,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Compact Header Actions */}
-      <div className="flex items-center gap-2 sm:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {user && onOpenCommandCenter && (
           <button
             type="button"
             data-tour="command-center"
             onClick={onOpenCommandCenter}
             aria-label="Open Command Center"
-            className="flex items-center gap-2 rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-1.5 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
+            className="flex items-center gap-2 rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] px-2 sm:px-3 py-1.5 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
           >
             <Search className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t('common.search')}</span>
@@ -203,7 +203,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        <OfflineStatusBadge />
+        <div className="hidden sm:inline-flex">
+          <OfflineStatusBadge />
+        </div>
 
         {user && <NotificationBell />}
 
@@ -234,7 +236,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {menuOpen && (
               <div
                 role="menu"
-                className="absolute right-0 mt-1.5 w-60 rounded-lg border border-[#E1E7DD] bg-white py-1.5 shadow-lg z-50"
+                className="absolute right-0 mt-1.5 w-60 max-w-[calc(100vw-1.5rem)] rounded-lg border border-[#E1E7DD] bg-white py-1.5 shadow-lg z-50"
               >
                 <div className="border-b border-[#E1E7DD] px-3.5 py-2.5">
                   <div className="text-xs font-semibold text-[#24352A] truncate">

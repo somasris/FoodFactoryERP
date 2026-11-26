@@ -42,7 +42,7 @@ export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
         </div>
         <nav
           aria-label={ariaLabel}
-          className="-mb-px flex items-center gap-2 overflow-x-auto"
+          className="-mb-px flex max-w-full items-center gap-2 overflow-x-auto pb-0.5"
         >
           {tabs.map(tab => {
             const Icon = tab.icon;

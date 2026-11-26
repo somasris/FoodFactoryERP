@@ -182,7 +182,7 @@ export const AuditGovernancePage: React.FC = () => {
 
       {tab === 'approvals' && approvalsQuery.data && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="rounded-lg border bg-white p-4">
               <div className="text-xs text-slate-500">Pending Approvals</div>
               <div className="text-xl font-bold text-amber-700">

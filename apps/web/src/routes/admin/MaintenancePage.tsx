@@ -65,7 +65,7 @@ export const MaintenancePage: React.FC = () => {
             disabled={!canManage}
             value={message}
             onChange={e => setMessage(e.target.value)}
-            className="flex-1 min-w-[260px] rounded border border-slate-300 px-3 py-1.5 text-sm disabled:bg-slate-50"
+            className="w-full sm:w-auto sm:flex-1 sm:min-w-[260px] rounded border border-slate-300 px-3 py-1.5 text-sm disabled:bg-slate-50"
           />
           {canManage && maintQuery.data && (
             <button

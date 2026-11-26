@@ -266,7 +266,7 @@ export const BomsPage: React.FC = () => {
         </Button>
       </div>
       {items.map((item, idx) => (
-        <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+        <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
           <div className="col-span-5">
             <FormField label="Material / Component">
               <select
@@ -369,7 +369,7 @@ export const BomsPage: React.FC = () => {
         </Button>
       </div>
       {overheads.map((oh, idx) => (
-        <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+        <div key={idx} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
           <div className="col-span-4">
             <FormField label="Cost Type">
               <select
