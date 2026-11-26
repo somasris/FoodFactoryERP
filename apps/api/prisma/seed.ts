@@ -1450,10 +1450,14 @@ async function main() {
         where: {
           OR: [{ email: demo.email.toLowerCase() }, { username: demo.username.toLowerCase() }],
         },
+        include: {
+          userRoles: true,
+        },
       });
 
-      // Never overwrite an existing real user's password or role
+      // Never overwrite an existing user's password; only repair missing demo role assignment when role is active
       if (!existingDemo) {
+        if (!role.isActive) continue;
         const demoHash = await hashPassword(demo.password);
         const createdDemo = await prisma.user.create({
           data: {
@@ -1499,6 +1503,23 @@ async function main() {
           });
         }
         console.info(`  ✅ Demo ${demo.role} account created: ${demo.email}`);
+      } else if (role.isActive) {
+        const hasTargetRole = existingDemo.userRoles.some(ur => ur.roleId === role.id);
+        if (!hasTargetRole) {
+          await prisma.$transaction(async tx => {
+            await tx.userRole.upsert({
+              where: {
+                userId_roleId: { userId: existingDemo.id, roleId: role.id },
+              },
+              update: {},
+              create: {
+                userId: existingDemo.id,
+                roleId: role.id,
+              },
+            });
+          });
+          console.info(`  🔧 Restored missing ${demo.role} role assignment for demo account: ${demo.email}`);
+        }
       }
     }
   }
