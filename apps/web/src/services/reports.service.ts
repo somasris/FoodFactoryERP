@@ -1,4 +1,5 @@
-import { apiClient, getAccessToken } from './api-client';
+import { getAccessToken } from './api-client';
+import { cachedApiGet } from '../offline/offline-cache';
 import { ApiResponse } from '../types/api';
 import { config } from '../config/env';
 
@@ -45,17 +46,42 @@ const toQuery = (f?: AnalyticsFilters) => {
 
 export const reportsService = {
   getExecutiveDashboard: (f?: AnalyticsFilters) =>
-    unwrap(apiClient<ExecutiveDashboardData>(`/reports/executive-dashboard${toQuery(f)}`)),
+    unwrap(
+      cachedApiGet<ExecutiveDashboardData>(
+        'REPORTS_EXECUTIVE',
+        `/reports/executive-dashboard${toQuery(f)}`,
+      ),
+    ),
   getSalesAnalytics: (f?: AnalyticsFilters) =>
-    unwrap(apiClient<Record<string, unknown>>(`/reports/sales${toQuery(f)}`)),
+    unwrap(cachedApiGet<Record<string, unknown>>('REPORTS_SALES', `/reports/sales${toQuery(f)}`)),
   getInventoryAnalytics: (f?: AnalyticsFilters) =>
-    unwrap(apiClient<Record<string, unknown>>(`/reports/inventory${toQuery(f)}`)),
+    unwrap(
+      cachedApiGet<Record<string, unknown>>(
+        'REPORTS_INVENTORY',
+        `/reports/inventory${toQuery(f)}`,
+      ),
+    ),
   getProductionAnalytics: (f?: AnalyticsFilters) =>
-    unwrap(apiClient<Record<string, unknown>>(`/reports/production${toQuery(f)}`)),
+    unwrap(
+      cachedApiGet<Record<string, unknown>>(
+        'REPORTS_PRODUCTION',
+        `/reports/production${toQuery(f)}`,
+      ),
+    ),
   getProfitability: (f?: AnalyticsFilters) =>
-    unwrap(apiClient<Record<string, unknown>>(`/reports/profitability${toQuery(f)}`)),
+    unwrap(
+      cachedApiGet<Record<string, unknown>>(
+        'REPORTS_PROFITABILITY',
+        `/reports/profitability${toQuery(f)}`,
+      ),
+    ),
   getFactoryPerformance: (f?: AnalyticsFilters) =>
-    unwrap(apiClient<Record<string, unknown>>(`/reports/factory-performance${toQuery(f)}`)),
+    unwrap(
+      cachedApiGet<Record<string, unknown>>(
+        'REPORTS_FACTORY',
+        `/reports/factory-performance${toQuery(f)}`,
+      ),
+    ),
   downloadExport: async (
     reportType: 'sales' | 'inventory' | 'profitability' | 'factory-performance',
     format: 'csv' | 'excel' | 'pdf',

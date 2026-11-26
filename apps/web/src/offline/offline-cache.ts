@@ -1,15 +1,20 @@
 import { offlineRepo, isQuotaExceededError } from './offline-repository';
-import { ApiError } from '../services/api-client';
+import { apiClient, ApiError } from '../services/api-client';
+import { ApiResponse } from '../types/api';
 
-export interface OfflineCachedResult<T> {
-  data: T;
-  isOfflineCached: boolean;
-  cachedAt: string;
+let activeOfflineUserId: string | null = null;
+
+export function setActiveOfflineUserId(userId: string | null): void {
+  activeOfflineUserId = userId;
+}
+
+export function getActiveOfflineUserId(): string | null {
+  return activeOfflineUserId;
 }
 
 function isNetworkFailure(err: unknown): boolean {
   if (err instanceof ApiError) return false;
-  if (err instanceof TypeError) return true; // fetch network failure
+  if (err instanceof TypeError) return true;
   if (err instanceof Error && /network|fetch|offline|aborted/i.test(err.message)) return true;
   return false;
 }
@@ -51,7 +56,6 @@ export async function fetchWithOfflineCache<T>(params: {
       if (!isNetworkFailure(err) || !userId) {
         throw err;
       }
-      // Fall through to offline cache on network failure
     }
   }
 
@@ -66,4 +70,21 @@ export async function fetchWithOfflineCache<T>(params: {
     'You are offline and this data has not been cached on this device yet.',
     503,
   );
+}
+
+/**
+ * Cached GET helper for read-only ERP endpoints (never used for auth/admin/compliance).
+ */
+export function cachedApiGet<T>(
+  entityType: string,
+  endpoint: string,
+  ttlMs?: number,
+): Promise<ApiResponse<T>> {
+  return fetchWithOfflineCache<ApiResponse<T>>({
+    userId: activeOfflineUserId ?? undefined,
+    entityType,
+    cacheKey: endpoint,
+    fetcher: () => apiClient<T>(endpoint),
+    ttlMs,
+  });
 }

@@ -4,10 +4,11 @@ import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
+import { OfflineDataBanner } from '../common/OfflineDataBanner';
 import { useOffline } from '../../context/OfflineContext';
 
 export const AppShell: React.FC = () => {
-  const { swUpdateAvailable, applySwUpdate, storageQuotaError } = useOffline();
+  const { swUpdateAvailable, applySwUpdate, storageQuotaError, counts } = useOffline();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -68,6 +69,7 @@ export const AppShell: React.FC = () => {
         />
         <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-6">
           <div className="mx-auto max-w-[1440px]">
+            <OfflineDataBanner pendingCount={counts.pending} className="mb-4" />
             <Outlet />
           </div>
         </main>

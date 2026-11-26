@@ -1,4 +1,5 @@
 import { apiClient, getAccessToken } from './api-client';
+import { cachedApiGet } from '../offline/offline-cache';
 import { config } from '../config/env';
 import { PaginatedResponse } from '../types/master-data';
 import {
@@ -73,13 +74,17 @@ const buildQuery = (params: object = {}): string => {
 };
 
 export const productionService = {
-  dashboard: () => apiClient<ProductionPlanningDashboard>('/production/planning/dashboard'),
+  dashboard: () =>
+    cachedApiGet<ProductionPlanningDashboard>('PRODUCTION_DASHBOARD', '/production/planning/dashboard'),
   demand: (params: { warehouseId?: string; fromDate?: string; toDate?: string } = {}) =>
-    apiClient<ProductionDemandResponse>(`/production/demand${buildQuery(params)}`),
+    cachedApiGet<ProductionDemandResponse>('PRODUCTION_DEMAND', `/production/demand${buildQuery(params)}`),
   plans: {
     list: (params: ProductionPlanQuery = {}) =>
-      apiClient<PaginatedResponse<ProductionPlan>>(`/production/plans${buildQuery(params)}`),
-    getById: (id: string) => apiClient<ProductionPlan>(`/production/plans/${id}`),
+      cachedApiGet<PaginatedResponse<ProductionPlan>>(
+        'PRODUCTION_PLANS',
+        `/production/plans${buildQuery(params)}`,
+      ),
+    getById: (id: string) => cachedApiGet<ProductionPlan>('PRODUCTION_PLANS', `/production/plans/${id}`),
     getMaterialAvailability: (id: string) =>
       apiClient<MaterialAvailabilityDetail[]>(`/production/plans/${id}/material-availability`),
     create: (payload: Record<string, unknown>) =>

@@ -1,4 +1,5 @@
 import { apiClient } from './api-client';
+import { cachedApiGet } from '../offline/offline-cache';
 import { PaginatedResponse } from '../types/master-data';
 import {
   InventoryAdjustmentRecord,
@@ -37,13 +38,19 @@ const buildQuery = (params: InventoryQuery = {}): string => {
 };
 
 export const inventoryService = {
-  dashboard: () => apiClient<InventoryDashboardSummary>('/inventory/dashboard'),
+  dashboard: () => cachedApiGet<InventoryDashboardSummary>('INVENTORY_DASHBOARD', '/inventory/dashboard'),
 
   balances: (params: InventoryQuery = {}) =>
-    apiClient<PaginatedResponse<InventoryBalanceRecord>>(`/inventory/balances${buildQuery(params)}`),
+    cachedApiGet<PaginatedResponse<InventoryBalanceRecord>>(
+      'INVENTORY_BALANCES',
+      `/inventory/balances${buildQuery(params)}`,
+    ),
 
   batches: (params: InventoryQuery = {}) =>
-    apiClient<PaginatedResponse<InventoryBatchRecord>>(`/inventory/batches${buildQuery(params)}`),
+    cachedApiGet<PaginatedResponse<InventoryBatchRecord>>(
+      'INVENTORY_BATCHES',
+      `/inventory/batches${buildQuery(params)}`,
+    ),
 
   valuation: (params: InventoryQuery = {}) =>
     apiClient<PaginatedResponse<InventoryValuationRecord>>(`/inventory/valuation${buildQuery(params)}`),

@@ -3,6 +3,7 @@ import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { authService, UserProfile } from '../services/auth.service';
 import { setOnAuthFailure } from '../services/api-client';
 import { offlineRepo } from '../offline/offline-repository';
+import { setActiveOfflineUserId } from '../offline/offline-cache';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -21,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const handleAuthFailure = useCallback(() => {
+    setActiveOfflineUserId(null);
     setUser(null);
   }, []);
 
@@ -36,6 +38,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initAuth = async () => {
       try {
         const userProfile = await authService.refresh();
+        setActiveOfflineUserId(userProfile.id);
         await offlineRepo.saveUserSessionSnapshot(userProfile).catch(() => undefined);
         if (isMounted) {
           setUser(userProfile);
@@ -46,12 +49,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isOffline) {
           const snapshot = await offlineRepo.getLastActiveUserSnapshot().catch(() => null);
           if (snapshot && isMounted) {
+            setActiveOfflineUserId(snapshot.userProfileSnapshot.id);
             setUser(snapshot.userProfileSnapshot);
             setIsLoading(false);
             return;
           }
         }
         if (isMounted) {
+          setActiveOfflineUserId(null);
           setUser(null);
         }
       } finally {
@@ -70,6 +75,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (usernameOrEmail: string, password: string): Promise<UserProfile> => {
     const userProfile = await authService.login(usernameOrEmail, password);
+    setActiveOfflineUserId(userProfile.id);
     await offlineRepo.saveUserSessionSnapshot(userProfile).catch(() => undefined);
     setUser(userProfile);
     return userProfile;
@@ -82,6 +88,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Allow safe offline logout even when the server is unreachable
     } finally {
+      setActiveOfflineUserId(null);
       if (currentUserId) {
         await offlineRepo.clearUserDataOnLogout(currentUserId, false).catch(() => undefined);
       }

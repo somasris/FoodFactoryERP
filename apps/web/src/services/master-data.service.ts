@@ -1,4 +1,5 @@
 import { apiClient } from './api-client';
+import { cachedApiGet } from '../offline/offline-cache';
 import {
   BOM,
   BOMAuditLogEntry,
@@ -40,10 +41,11 @@ const buildQuery = (params: ListQuery): string => {
 };
 
 function createCrudApi<T>(basePath: string) {
+  const entityType = `MASTER_${basePath.toUpperCase()}`;
   return {
     list: (params: ListQuery = {}) =>
-      apiClient<PaginatedResponse<T>>(`/master-data/${basePath}${buildQuery(params)}`),
-    getById: (id: string) => apiClient<T>(`/master-data/${basePath}/${id}`),
+      cachedApiGet<PaginatedResponse<T>>(entityType, `/master-data/${basePath}${buildQuery(params)}`),
+    getById: (id: string) => cachedApiGet<T>(entityType, `/master-data/${basePath}/${id}`),
     create: (payload: Record<string, unknown>) =>
       apiClient<T>(`/master-data/${basePath}`, {
         method: 'POST',

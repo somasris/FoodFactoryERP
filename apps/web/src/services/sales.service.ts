@@ -1,4 +1,5 @@
 import { apiClient, getAccessToken } from './api-client';
+import { cachedApiGet } from '../offline/offline-cache';
 import { config } from '../config/env';
 import { PaginatedResponse } from '../types/master-data';
 import {
@@ -33,12 +34,12 @@ const buildQuery = (params: SalesQuery = {}): string => {
 
 export const salesService = {
   dashboard: (params: { fromDate?: string; toDate?: string } = {}) =>
-    apiClient<SalesDashboardSummary>(`/sales/dashboard${buildQuery(params)}`),
+    cachedApiGet<SalesDashboardSummary>('SALES_DASHBOARD', `/sales/dashboard${buildQuery(params)}`),
 
   orders: {
     list: (params: SalesQuery = {}) =>
-      apiClient<PaginatedResponse<SalesOrder>>(`/sales/orders${buildQuery(params)}`),
-    getById: (id: string) => apiClient<SalesOrder>(`/sales/orders/${id}`),
+      cachedApiGet<PaginatedResponse<SalesOrder>>('SALES_ORDERS', `/sales/orders${buildQuery(params)}`),
+    getById: (id: string) => cachedApiGet<SalesOrder>('SALES_ORDERS', `/sales/orders/${id}`),
     getHistory: (id: string) => apiClient<SalesOrderStatusHistoryItem[]>(`/sales/orders/${id}/history`),
     create: (payload: Record<string, unknown>) =>
       apiClient<SalesOrder>('/sales/orders', {
