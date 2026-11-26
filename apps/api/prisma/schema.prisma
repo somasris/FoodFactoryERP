@@ -2713,3 +2713,66 @@ model CycleCountPlan {
   @@index([warehouseId, status, nextRunDate])
   @@map("cycle_count_plans")
 }
+
+// ------------------------------------------------------------------------------
+// 10. OFFLINE PWA SYNCHRONIZATION & IDEMPOTENCY
+// ------------------------------------------------------------------------------
+
+enum SyncOperationStatus {
+  PENDING
+  PROCESSING
+  SYNCED
+  FAILED
+  CONFLICT
+  CANCELLED
+}
+
+enum SyncConflictCategory {
+  RECORD_MODIFIED
+  STOCK_UNAVAILABLE
+  INSUFFICIENT_PERMISSION
+  INVALID_STATE_TRANSITION
+  MASTER_DATA_CHANGED
+  BATCH_ALREADY_COMPLETED
+  DUPLICATE_OPERATION
+  VALIDATION_FAILED
+}
+
+model SyncIdempotencyRecord {
+  id              String              @id @default(uuid())
+  userId          String              @map("user_id")
+  idempotencyKey  String              @map("idempotency_key") @db.VarChar(128)
+  operationId     String              @map("operation_id") @db.VarChar(64)
+  entityType      String              @map("entity_type") @db.VarChar(60)
+  operationType   String              @map("operation_type") @db.VarChar(80)
+  entityId        String?             @map("entity_id") @db.VarChar(64)
+  status          SyncOperationStatus
+  responsePayload Json?               @map("response_payload")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  @@unique([userId, idempotencyKey])
+  @@index([userId, operationId])
+  @@map("sync_idempotency_records")
+}
+
+model SyncConflict {
+  id               String               @id @default(uuid())
+  operationId      String               @map("operation_id") @db.VarChar(64)
+  userId           String               @map("user_id")
+  entityType       String               @map("entity_type") @db.VarChar(60)
+  entityId         String               @map("entity_id") @db.VarChar(64)
+  operationType    String               @map("operation_type") @db.VarChar(80)
+  category         SyncConflictCategory
+  reason           String
+  localPayload     Json                 @map("local_payload")
+  serverSnapshot   Json?                @map("server_snapshot")
+  resolvedAt       DateTime?            @map("resolved_at")
+  resolutionAction String?              @map("resolution_action") @db.VarChar(50)
+  resolvedById     String?              @map("resolved_by_id")
+  createdAt        DateTime             @default(now()) @map("created_at")
+
+  @@index([userId, resolvedAt])
+  @@index([operationId])
+  @@map("sync_conflicts")
+}

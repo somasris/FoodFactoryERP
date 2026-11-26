@@ -13,6 +13,7 @@ import { governanceRouter } from '../modules/governance/governance.routes';
 import { operationsRouter } from '../modules/operations/operations.routes';
 import { notificationRouter } from '../modules/notifications/notification.routes';
 import { warehouseRouter } from '../modules/warehouse/warehouse.routes';
+import { syncRouter } from '../modules/sync/sync.routes';
 
 export const apiRouter: Router = Router();
 
@@ -57,3 +58,6 @@ apiRouter.use('/notifications', notificationRouter);
 
 // Mount Phase 9 Smart Warehouse, Bin Locations & Barcode Operations under /api/v1/warehouse
 apiRouter.use('/warehouse', warehouseRouter);
+
+// Mount Offline PWA Synchronization API under /api/v1/sync
+apiRouter.use('/sync', syncRouter);
