@@ -32,3 +32,24 @@ export async function registerPwaServiceWorker(
     // Graceful no-op when SW virtual module is unavailable (e.g. dev mode with SW disabled)
   }
 }
+
+export async function requestPersistentStorage(): Promise<{
+  persisted: boolean;
+  quotaBytes?: number;
+  usageBytes?: number;
+}> {
+  if (typeof navigator === 'undefined' || !navigator.storage) {
+    return { persisted: false };
+  }
+  try {
+    const persisted = navigator.storage.persist ? await navigator.storage.persist() : false;
+    const estimate = navigator.storage.estimate ? await navigator.storage.estimate() : undefined;
+    return {
+      persisted,
+      quotaBytes: estimate?.quota,
+      usageBytes: estimate?.usage,
+    };
+  } catch {
+    return { persisted: false };
+  }
+}

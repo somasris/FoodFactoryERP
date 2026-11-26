@@ -2,7 +2,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { ConnectivityState, OfflineQueueCounts } from '../offline/types';
 import { getNextBackoffMs, probeApiServer } from '../offline/connection-state';
-import { registerPwaServiceWorker } from '../offline/pwa';
+import { registerPwaServiceWorker, requestPersistentStorage } from '../offline/pwa';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -88,7 +88,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return result.reachable;
   }, []);
 
-  // Register Service Worker & PWA install prompt listener
+  // Register Service Worker, persistent storage & PWA install prompt listener
   useEffect(() => {
     registerPwaServiceWorker({
       onNeedRefresh: updateFn => {
@@ -96,6 +96,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSwUpdateAvailable(true);
       },
     });
+    void requestPersistentStorage();
 
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
