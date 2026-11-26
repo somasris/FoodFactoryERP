@@ -80,6 +80,16 @@ import { ExecutiveDashboardPage } from './reports/ExecutiveDashboardPage';
 import { BusinessIntelligencePage } from './reports/BusinessIntelligencePage';
 import { NotificationsPage } from './notifications/NotificationsPage';
 import { NotificationPreferencesPage } from './notifications/NotificationPreferencesPage';
+import { WarehouseLayoutPage } from './warehouse/WarehouseLayoutPage';
+import { ZoneBinManagementPage } from './warehouse/ZoneBinManagementPage';
+import { LocationStockPage } from './warehouse/LocationStockPage';
+import { BarcodeLabelsPage } from './warehouse/BarcodeLabelsPage';
+import { ScanOperationsPage } from './warehouse/ScanOperationsPage';
+import { PutAwayPage } from './warehouse/PutAwayPage';
+import { PickingPage } from './warehouse/PickingPage';
+import { BinTransfersPage } from './warehouse/BinTransfersPage';
+import { CycleCountSchedulePage } from './warehouse/CycleCountSchedulePage';
+import { WarehouseAnalyticsPage } from './warehouse/WarehouseAnalyticsPage';
 
 export const router = createBrowserRouter([
   {
@@ -346,6 +356,86 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute requiredPermissions={['inventory.read']}>
                 <StockBalancesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'warehouse-layout',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <WarehouseLayoutPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'zones-bins',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <ZoneBinManagementPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'location-stock',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <LocationStockPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'barcodes',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <BarcodeLabelsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'scan',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <ScanOperationsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'put-away',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.transfer.create']}>
+                <PutAwayPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'picking',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.issue.create']}>
+                <PickingPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'bin-transfers',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.transfer.create']}>
+                <BinTransfersPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'cycle-counts',
+            element: (
+              <ProtectedRoute requiredPermissions={['compliance.stock_audit.read']}>
+                <CycleCountSchedulePage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'analytics',
+            element: (
+              <ProtectedRoute requiredPermissions={['inventory.read']}>
+                <WarehouseAnalyticsPage />
               </ProtectedRoute>
             ),
           },

@@ -192,6 +192,56 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         path: '/inventory/transactions',
         requiredPermissions: ['inventory.read'],
       },
+      {
+        label: 'Warehouse Layout',
+        path: '/inventory/warehouse-layout',
+        requiredPermissions: ['inventory.read'],
+      },
+      {
+        label: 'Zones & Bins',
+        path: '/inventory/zones-bins',
+        requiredPermissions: ['inventory.read'],
+      },
+      {
+        label: 'Location Stock',
+        path: '/inventory/location-stock',
+        requiredPermissions: ['inventory.read'],
+      },
+      {
+        label: 'Barcode Labels',
+        path: '/inventory/barcodes',
+        requiredPermissions: ['inventory.read'],
+      },
+      {
+        label: 'Scan Operations',
+        path: '/inventory/scan',
+        requiredPermissions: ['inventory.read'],
+      },
+      {
+        label: 'Put-Away',
+        path: '/inventory/put-away',
+        requiredPermissions: ['inventory.transfer.create'],
+      },
+      {
+        label: 'Picking (FEFO)',
+        path: '/inventory/picking',
+        requiredPermissions: ['inventory.issue.create'],
+      },
+      {
+        label: 'Bin Transfers',
+        path: '/inventory/bin-transfers',
+        requiredPermissions: ['inventory.transfer.create'],
+      },
+      {
+        label: 'Cycle Counts',
+        path: '/inventory/cycle-counts',
+        requiredPermissions: ['compliance.stock_audit.read'],
+      },
+      {
+        label: 'Warehouse Analytics',
+        path: '/inventory/analytics',
+        requiredPermissions: ['inventory.read'],
+      },
     ],
   },
   {
