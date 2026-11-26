@@ -46,6 +46,36 @@ enum AllergenDeclarationStatus {
   NOT_APPLICABLE
 }
 
+enum ShiftHandoverStatus {
+  DRAFT
+  SUBMITTED
+  ACKNOWLEDGED
+  RETURNED
+  CLOSED
+}
+
+enum ShiftHandoverPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SubstitutionCompatibility {
+  COMPATIBLE
+  COMPATIBLE_WITH_WARNING
+  REQUIRES_REVIEW
+  NOT_COMPATIBLE
+}
+
+enum SubstitutionRequestStatus {
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  APPLIED
+  CANCELLED
+}
+
 enum CustomerType {
   RETAILER
   DISTRIBUTOR
@@ -2846,4 +2876,103 @@ model SavedView {
   @@index([userId, module])
   @@unique([userId, module, name])
   @@map("saved_views")
+}
+
+// ------------------------------------------------------------------------------
+// 13. PHASE 7 – DIGITAL SHIFT HANDOVER & MATERIAL SUBSTITUTION CHECKER
+// ------------------------------------------------------------------------------
+
+model ShiftHandover {
+  id                       String                @id @default(uuid())
+  handoverNumber           String                @unique @map("handover_number") @db.VarChar(40)
+  factoryId                String                @map("factory_id")
+  warehouseId              String?               @map("warehouse_id")
+  productionLine           String?               @map("production_line") @db.VarChar(80)
+  shiftName                String                @map("shift_name") @db.VarChar(40)
+  shiftDate                DateTime              @map("shift_date") @db.Date
+  outgoingUserId           String                @map("outgoing_user_id")
+  incomingUserId           String?               @map("incoming_user_id")
+  status                   ShiftHandoverStatus   @default(DRAFT)
+  priority                 ShiftHandoverPriority @default(NORMAL)
+  revisionNumber           Int                   @default(1) @map("revision_number")
+  activeBatchesSummary     Json?                 @map("active_batches_summary")
+  pendingWorkOrdersSummary Json?                 @map("pending_work_orders_summary")
+  materialShortagesSummary Json?                 @map("material_shortages_summary")
+  equipmentIssues          String?               @map("equipment_issues") @db.Text
+  pendingQualityNotes      String?               @map("pending_quality_notes") @db.Text
+  productionDelays         String?               @map("production_delays") @db.Text
+  safetyObservations       String?               @map("safety_observations") @db.Text
+  notes                    String?               @db.Text
+  submittedAt              DateTime?             @map("submitted_at")
+  acknowledgedById         String?               @map("acknowledged_by_id")
+  acknowledgedAt           DateTime?             @map("acknowledged_at")
+  acknowledgementNotes     String?               @map("acknowledgement_notes") @db.Text
+  returnedById             String?               @map("returned_by_id")
+  returnedAt               DateTime?             @map("returned_at")
+  returnReason             String?               @map("return_reason") @db.Text
+  closedById               String?               @map("closed_by_id")
+  closedAt                 DateTime?             @map("closed_at")
+  createdAt                DateTime              @default(now()) @map("created_at")
+  updatedAt                DateTime              @updatedAt @map("updated_at")
+
+  histories ShiftHandoverHistory[]
+
+  @@index([factoryId, shiftDate, status])
+  @@index([status, priority])
+  @@map("shift_handovers")
+}
+
+model ShiftHandoverHistory {
+  id             String               @id @default(uuid())
+  handoverId     String               @map("handover_id")
+  revisionNumber Int                  @map("revision_number")
+  action         String               @db.VarChar(30)
+  fromStatus     ShiftHandoverStatus? @map("from_status")
+  toStatus       ShiftHandoverStatus  @map("to_status")
+  actorId        String               @map("actor_id")
+  remarks        String?              @db.Text
+  snapshot       Json
+  createdAt      DateTime             @default(now()) @map("created_at")
+
+  handover ShiftHandover @relation(fields: [handoverId], references: [id], onDelete: Cascade)
+
+  @@index([handoverId, createdAt])
+  @@map("shift_handover_histories")
+}
+
+model MaterialSubstitutionRequest {
+  id                  String                    @id @default(uuid())
+  requestNumber       String                    @unique @map("request_number") @db.VarChar(40)
+  factoryId           String                    @map("factory_id")
+  warehouseId         String                    @map("warehouse_id")
+  bomId               String                    @map("bom_id")
+  bomVersionId        String                    @map("bom_version_id")
+  productionBatchId   String?                   @map("production_batch_id")
+  workOrderId         String?                   @map("work_order_id")
+  originalItemId      String                    @map("original_item_id")
+  substituteItemId    String                    @map("substitute_item_id")
+  requiredQuantity    Decimal                   @map("required_quantity") @db.Decimal(14, 4)
+  uomId               String                    @map("uom_id")
+  compatibilityStatus SubstitutionCompatibility @map("compatibility_status")
+  evaluationReasons   Json                      @map("evaluation_reasons")
+  allergenComparison  Json                      @map("allergen_comparison")
+  status              SubstitutionRequestStatus @default(PENDING_APPROVAL)
+  reason              String                    @db.Text
+  requestedById       String                    @map("requested_by_id")
+  requestedAt         DateTime                  @default(now()) @map("requested_at")
+  approvedById        String?                   @map("approved_by_id")
+  approvedAt          DateTime?                 @map("approved_at")
+  approvalNotes       String?                   @map("approval_notes") @db.Text
+  rejectedById        String?                   @map("rejected_by_id")
+  rejectedAt          DateTime?                 @map("rejected_at")
+  rejectionReason     String?                   @map("rejection_reason") @db.Text
+  appliedById         String?                   @map("applied_by_id")
+  appliedAt           DateTime?                 @map("applied_at")
+  applicationNotes    String?                   @map("application_notes") @db.Text
+  createdAt           DateTime                  @default(now()) @map("created_at")
+  updatedAt           DateTime                  @updatedAt @map("updated_at")
+
+  @@index([warehouseId, status])
+  @@index([productionBatchId])
+  @@map("material_substitution_requests")
 }
