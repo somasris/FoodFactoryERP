@@ -481,6 +481,11 @@ Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 - **Scope:** Installable `vite-plugin-pwa` app shell & `/offline.html` fallback (`NetworkOnly` for `/api/*`), `Dexie` user-partitioned IndexedDB persistence (`FoodFactoryOfflineDB`), `OfflineContext` 5-state connectivity manager, durable `OfflineOperationQueue` with dependency ordering & multi-tab `withSyncLock`, authenticated `/api/v1/sync/*` push/pull APIs with `SyncIdempotencyRecord` & `SyncConflict` models, read-only offline caching, allowlisted offline draft queuing across Inventory/Sales/Production/Quality, and `/sync` Synchronization Center.
 - **Verification:** `OFFLINE_ERP_ARCHITECTURE_AUDIT.md`, `OFFLINE_ERP_IMPLEMENTATION_REPORT.md`, `OFFLINE_ERP_USER_GUIDE.md`; automated API (`test/sync.test.ts`) and Web (`pwa-foundation`, `offline-storage`, `sync-queue`, `offline-cache`, `offline-operations`, `sync-center`) test suites passing; `MANUAL_UI_VERIFIED` pending live multi-device walkthrough.
 
+### Smart ERP Enhancements (Command Center, Live Factory Pulse, TV Mode, QR Traceability, English/Tamil Localization)
+- **Status:** `TESTED` (2026-11-26)
+- **Scope:** `GET /api/v1/search` + `Ctrl+K`/`Cmd+K` Command Center (`CommandCenterModal.tsx`), `GET /api/v1/production/factory-pulse` + `/production/factory-pulse` (`FactoryPulsePage.tsx`) with full-screen 16:9 TV Mode (`FactoryPulseTvView.tsx`), opaque `BatchQrReference` + printable QR labels (`BatchQrLabelModal.tsx`) + `/trace/batch/:reference` (`QrTraceabilityPage.tsx`) + `ScannerInput` camera/manual scan, and English/Tamil bilingual localization (`I18nContext.tsx`, `en.ts`, `ta.ts`, `EN | தமிழ்` switcher).
+- **Verification:** `FEATURES_IMPLEMENTATION_AUDIT.md`, `COMMAND_CENTER_VERIFICATION_REPORT.md`, `FACTORY_PULSE_VERIFICATION_REPORT.md`, `TV_MODE_VERIFICATION_REPORT.md`, `QR_TRACEABILITY_VERIFICATION_REPORT.md`, `LOCALIZATION_VERIFICATION_REPORT.md`, `FEATURES_PRODUCTION_READINESS_REPORT.md`; automated API + Web suites passing; `MANUAL_UI_VERIFIED` pending live browser/device walkthrough.
+
 ---
 
 ## 8. Roadmap Governance Rules
