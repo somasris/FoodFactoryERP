@@ -31,6 +31,7 @@ export const ProductionLayout: React.FC = () => {
     { label: 'Reconciliation', to: '/production/reconciliation', icon: Scale, permission: 'production.batches.read' },
     { label: 'Shift Handovers', to: '/production/handovers', icon: ClipboardList, permission: 'production.batches.read' },
     { label: 'Substitutions', to: '/production/substitutions', icon: GitBranch, permission: 'bom.read' },
+    { label: 'Batch Labels', to: '/production/labels', icon: ClipboardList, permission: 'production.batches.read' },
     { label: 'Quality', to: '/production/quality', icon: ShieldCheck, permission: 'production.quality.read' },
     { label: 'Traceability', to: '/production/traceability', icon: GitBranch, permission: 'production.batches.read' },
     { label: 'Costing', to: '/production/costing', icon: Calculator, permission: 'production.costing.read' },

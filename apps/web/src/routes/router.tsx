@@ -68,6 +68,7 @@ import { ProductionQualityReportPage } from './production/ProductionQualityRepor
 import { ProductionCostAnalyticsPage } from './production/ProductionCostAnalyticsPage';
 import { ShiftHandoverDashboardPage } from './production/ShiftHandoverDashboardPage';
 import { MaterialSubstitutionPage } from './production/MaterialSubstitutionPage';
+import { BatchLabelDesignerPage } from './production/BatchLabelDesignerPage';
 import { AdministrationLayout } from '../components/admin/AdministrationLayout';
 import { OrganizationPage } from './admin/OrganizationPage';
 import { FactoriesPage } from './admin/FactoriesPage';
@@ -633,6 +634,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute requiredPermissions={['bom.read']}>
                 <MaterialSubstitutionPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'labels',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <BatchLabelDesignerPage />
               </ProtectedRoute>
             ),
           },

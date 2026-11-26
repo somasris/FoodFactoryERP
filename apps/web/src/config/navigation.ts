@@ -135,6 +135,11 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         requiredPermissions: ['bom.read'],
       },
       {
+        label: 'Batch Label Designer',
+        path: '/production/labels',
+        requiredPermissions: ['production.batches.read'],
+      },
+      {
         label: 'Quality Inspections',
         path: '/production/quality',
         requiredPermissions: ['production.quality.read'],
