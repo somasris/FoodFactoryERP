@@ -40,6 +40,12 @@ enum MaterialType {
   PACKAGING_SECONDARY
 }
 
+enum AllergenDeclarationStatus {
+  KNOWN
+  UNKNOWN
+  NOT_APPLICABLE
+}
+
 enum CustomerType {
   RETAILER
   DISTRIBUTOR
@@ -703,9 +709,12 @@ model RawMaterial {
   uomId           String       @map("uom_id")
   hsnCode         String       @map("hsn_code") @db.VarChar(10)
   taxRateId       String       @map("tax_rate_id")
-  minStockAlert   Decimal      @default(0) @map("min_stock_alert") @db.Decimal(14, 4)
-  reorderQuantity Decimal?     @map("reorder_quantity") @db.Decimal(14, 4)
-  isActive        Boolean      @default(true) @map("is_active")
+  minStockAlert         Decimal                   @default(0) @map("min_stock_alert") @db.Decimal(14, 4)
+  reorderQuantity       Decimal?                  @map("reorder_quantity") @db.Decimal(14, 4)
+  allergenStatus        AllergenDeclarationStatus @default(UNKNOWN) @map("allergen_status")
+  allergens             String[]                  @default([])
+  crossContactAllergens String[]                  @default([]) @map("cross_contact_allergens")
+  isActive              Boolean                   @default(true) @map("is_active")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
@@ -1870,6 +1879,7 @@ model ProductionBatch {
   finishedGoodsBatchId       String?               @map("finished_goods_batch_id")
   finishedGoodsReceiptId     String?               @map("finished_goods_receipt_id")
   finishedGoodsTransactionId String?               @map("finished_goods_transaction_id")
+  allergenSnapshot           Json?                 @map("allergen_snapshot")
   idempotencyKey             String?               @unique @map("idempotency_key") @db.VarChar(100)
   completionIdempotencyKey   String?               @unique @map("completion_idempotency_key") @db.VarChar(100)
   createdAt                  DateTime              @default(now()) @map("created_at")
