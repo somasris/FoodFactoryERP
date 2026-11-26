@@ -2976,3 +2976,94 @@ model MaterialSubstitutionRequest {
   @@index([productionBatchId])
   @@map("material_substitution_requests")
 }
+
+// ------------------------------------------------------------------------------
+// 14. PHASE 8 – SMART BATCH LABEL DESIGNER & TRACEABLE PRINTING
+// ------------------------------------------------------------------------------
+
+enum LabelSizePreset {
+  SMALL_PRODUCT
+  STANDARD_BATCH
+  LARGE_CARTON
+  CUSTOM
+}
+
+enum LabelGenerationType {
+  ORIGINAL
+  REPRINT
+}
+
+model BatchLabelTemplate {
+  id                         String          @id @default(uuid())
+  code                       String          @unique @db.VarChar(40)
+  name                       String          @db.VarChar(120)
+  description                String?         @db.Text
+  sizePreset                 LabelSizePreset @default(STANDARD_BATCH) @map("size_preset")
+  widthMm                    Decimal         @map("width_mm") @db.Decimal(6, 2)
+  heightMm                   Decimal         @map("height_mm") @db.Decimal(6, 2)
+  logoPlacement              String          @default("TOP_LEFT") @map("logo_placement") @db.VarChar(20)
+  includeQr                  Boolean         @default(true) @map("include_qr")
+  includeBarcode             Boolean         @default(true) @map("include_barcode")
+  layoutConfig               Json            @map("layout_config")
+  defaultStorageInstructions String?         @map("default_storage_instructions") @db.VarChar(255)
+  versionNumber              Int             @default(1) @map("version_number")
+  isActive                   Boolean         @default(true) @map("is_active")
+  isDefault                  Boolean         @default(false) @map("is_default")
+  createdById                String          @map("created_by_id")
+  updatedById                String?         @map("updated_by_id")
+  createdAt                  DateTime        @default(now()) @map("created_at")
+  updatedAt                  DateTime        @updatedAt @map("updated_at")
+
+  versions BatchLabelTemplateVersion[]
+  labels   BatchLabelRecord[]
+
+  @@index([isActive, sizePreset])
+  @@map("batch_label_templates")
+}
+
+model BatchLabelTemplateVersion {
+  id                         String          @id @default(uuid())
+  templateId                 String          @map("template_id")
+  versionNumber              Int             @map("version_number")
+  sizePreset                 LabelSizePreset @map("size_preset")
+  widthMm                    Decimal         @map("width_mm") @db.Decimal(6, 2)
+  heightMm                   Decimal         @map("height_mm") @db.Decimal(6, 2)
+  logoPlacement              String          @map("logo_placement") @db.VarChar(20)
+  includeQr                  Boolean         @map("include_qr")
+  includeBarcode             Boolean         @map("include_barcode")
+  layoutConfig               Json            @map("layout_config")
+  defaultStorageInstructions String?         @map("default_storage_instructions") @db.VarChar(255)
+  createdById                String          @map("created_by_id")
+  createdAt                  DateTime        @default(now()) @map("created_at")
+
+  template BatchLabelTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, versionNumber])
+  @@map("batch_label_template_versions")
+}
+
+model BatchLabelRecord {
+  id                    String              @id @default(uuid())
+  labelNumber           String              @unique @map("label_number") @db.VarChar(40)
+  productionBatchId     String              @map("production_batch_id")
+  factoryId             String              @map("factory_id")
+  warehouseId           String              @map("warehouse_id")
+  templateId            String              @map("template_id")
+  templateVersionNumber Int                 @map("template_version_number")
+  generationType        LabelGenerationType @default(ORIGINAL) @map("generation_type")
+  parentLabelId         String?             @map("parent_label_id")
+  copies                Int                 @default(1)
+  qualityStatusSnapshot String              @map("quality_status_snapshot") @db.VarChar(40)
+  qrReferenceToken      String?             @map("qr_reference_token") @db.VarChar(64)
+  barcodeValue          String?             @map("barcode_value") @db.VarChar(80)
+  labelSnapshot         Json                @map("label_snapshot")
+  generatedById         String              @map("generated_by_id")
+  generatedAt           DateTime            @default(now()) @map("generated_at")
+  idempotencyKey        String?             @unique @map("idempotency_key") @db.VarChar(100)
+
+  template BatchLabelTemplate @relation(fields: [templateId], references: [id])
+
+  @@index([productionBatchId, generatedAt])
+  @@index([factoryId, generatedAt])
+  @@map("batch_label_records")
+}
