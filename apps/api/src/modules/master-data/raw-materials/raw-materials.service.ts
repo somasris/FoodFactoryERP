@@ -220,6 +220,9 @@ export class RawMaterialsService {
             reorderQuantity: input.reorderQuantity
               ? new Prisma.Decimal(input.reorderQuantity)
               : null,
+            allergenStatus: input.allergenStatus ?? 'UNKNOWN',
+            allergens: Array.from(new Set(input.allergens ?? [])),
+            crossContactAllergens: Array.from(new Set(input.crossContactAllergens ?? [])),
           },
         });
 
@@ -282,6 +285,13 @@ export class RawMaterialsService {
               reorderQuantity: input.reorderQuantity
                 ? new Prisma.Decimal(input.reorderQuantity)
                 : null,
+            }),
+            ...(input.allergenStatus !== undefined && { allergenStatus: input.allergenStatus }),
+            ...(input.allergens !== undefined && {
+              allergens: Array.from(new Set(input.allergens)),
+            }),
+            ...(input.crossContactAllergens !== undefined && {
+              crossContactAllergens: Array.from(new Set(input.crossContactAllergens)),
             }),
           },
         });

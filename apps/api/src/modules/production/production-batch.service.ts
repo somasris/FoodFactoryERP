@@ -32,6 +32,7 @@ import {
   ZERO,
 } from '../inventory/inventory.utils';
 import { InventoryReservationService } from '../inventory/inventory-reservation.service';
+import { AllergenService } from '../manufacturing-intelligence/allergen.service';
 import { getIndianFinancialYear } from '../sales/sales-invoice.service';
 import {
   CompleteBatchInput,
@@ -390,6 +391,11 @@ export class ProductionBatchService {
         },
       });
 
+      const allergenSnapshot = await AllergenService.deriveBomVersionAllergenProfile(
+        wo.bomVersionId,
+        tx,
+      );
+
       const batch = await tx.productionBatch.create({
         data: {
           batchNumber,
@@ -408,6 +414,7 @@ export class ProductionBatchService {
           manufacturingDate: mfgDate,
           expiryDate: expDate,
           notes: input.notes ?? null,
+          allergenSnapshot: toPlainJson(allergenSnapshot) as Prisma.InputJsonValue,
           idempotencyKey: input.idempotencyKey ?? null,
           statusHistory: {
             create: {

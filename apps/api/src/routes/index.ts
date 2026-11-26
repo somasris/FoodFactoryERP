@@ -20,6 +20,7 @@ import {
   preferencesRouter,
   savedViewsRouter,
 } from '../modules/ux/ux.routes';
+import { manufacturingIntelligenceRouter } from '../modules/manufacturing-intelligence/mi.routes';
 
 export const apiRouter: Router = Router();
 
@@ -75,3 +76,6 @@ apiRouter.use('/search', searchRouter);
 apiRouter.use('/preferences', preferencesRouter);
 apiRouter.use('/saved-views', savedViewsRouter);
 apiRouter.use('/activity-timeline', activityTimelineRouter);
+
+// Mount Phase 6 Manufacturing Intelligence routes
+apiRouter.use('/manufacturing-intelligence', manufacturingIntelligenceRouter);

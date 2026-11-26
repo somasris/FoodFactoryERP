@@ -20,6 +20,21 @@ export const createRawMaterialCategorySchema = z.object({
 
 export const updateRawMaterialCategorySchema = createRawMaterialCategorySchema.partial();
 
+export const ALLERGEN_CODES = [
+  'MILK',
+  'PEANUTS',
+  'TREE_NUTS',
+  'SOY',
+  'WHEAT_GLUTEN',
+  'EGGS',
+  'FISH',
+  'CRUSTACEANS',
+  'SESAME',
+] as const;
+
+export const allergenCodeEnum = z.enum(ALLERGEN_CODES);
+export const allergenDeclarationStatusEnum = z.enum(['KNOWN', 'UNKNOWN', 'NOT_APPLICABLE']);
+
 export const createRawMaterialSchema = z.object({
   categoryId: z.string().uuid('Invalid category ID'),
   code: z
@@ -36,6 +51,9 @@ export const createRawMaterialSchema = z.object({
   taxRateId: z.string().uuid('Invalid tax rate ID'),
   minStockAlert: decimalNonNegative.default('0'),
   reorderQuantity: decimalNonNegative.optional().nullable(),
+  allergenStatus: allergenDeclarationStatusEnum.optional().default('UNKNOWN'),
+  allergens: z.array(allergenCodeEnum).optional().default([]),
+  crossContactAllergens: z.array(allergenCodeEnum).optional().default([]),
 });
 
 export const updateRawMaterialSchema = createRawMaterialSchema.partial();
