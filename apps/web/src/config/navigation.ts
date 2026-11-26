@@ -125,6 +125,16 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         requiredPermissions: ['production.batches.read'],
       },
       {
+        label: 'Shift Handovers',
+        path: '/production/handovers',
+        requiredPermissions: ['production.batches.read'],
+      },
+      {
+        label: 'Material Substitutions',
+        path: '/production/substitutions',
+        requiredPermissions: ['bom.read'],
+      },
+      {
         label: 'Quality Inspections',
         path: '/production/quality',
         requiredPermissions: ['production.quality.read'],

@@ -66,6 +66,8 @@ import { BatchYieldReportPage } from './production/BatchYieldReportPage';
 import { MaterialConsumptionReportPage } from './production/MaterialConsumptionReportPage';
 import { ProductionQualityReportPage } from './production/ProductionQualityReportPage';
 import { ProductionCostAnalyticsPage } from './production/ProductionCostAnalyticsPage';
+import { ShiftHandoverDashboardPage } from './production/ShiftHandoverDashboardPage';
+import { MaterialSubstitutionPage } from './production/MaterialSubstitutionPage';
 import { AdministrationLayout } from '../components/admin/AdministrationLayout';
 import { OrganizationPage } from './admin/OrganizationPage';
 import { FactoriesPage } from './admin/FactoriesPage';
@@ -615,6 +617,22 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute requiredPermissions={['production.batches.read']}>
                 <MaterialReconciliationPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'handovers',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <ShiftHandoverDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'substitutions',
+            element: (
+              <ProtectedRoute requiredPermissions={['bom.read']}>
+                <MaterialSubstitutionPage />
               </ProtectedRoute>
             ),
           },
