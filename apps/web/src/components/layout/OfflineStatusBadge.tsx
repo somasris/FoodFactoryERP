@@ -3,42 +3,43 @@ import { Link } from 'react-router-dom';
 import { Wifi, WifiOff, CloudOff, RefreshCw, AlertTriangle, Download } from 'lucide-react';
 import { useOffline } from '../../context/OfflineContext';
 import { ConnectivityState } from '../../offline/types';
+import { useTranslation } from '../../i18n/I18nContext';
 
 const STATE_CONFIG: Record<
   ConnectivityState,
   {
-    label: string;
+    labelKey: string;
     dotClass: string;
     pillClass: string;
     Icon: React.FC<{ className?: string }>;
   }
 > = {
   ONLINE: {
-    label: 'Online',
+    labelKey: 'offline.online',
     dotClass: 'bg-[#27834A]',
     pillClass: 'border-[#E1E7DD] bg-[#FAFBF8] text-[#17452C]',
     Icon: Wifi,
   },
   OFFLINE: {
-    label: 'Offline',
+    labelKey: 'offline.offline',
     dotClass: 'bg-[#C58A25]',
     pillClass: 'border-[#C58A25]/40 bg-[#F4F0E4] text-[#8A5D12]',
     Icon: WifiOff,
   },
   SERVER_UNAVAILABLE: {
-    label: 'Server Unavailable',
+    labelKey: 'offline.serverUnavailable',
     dotClass: 'bg-[#C74440]',
     pillClass: 'border-[#C74440]/40 bg-[#C74440]/10 text-[#C74440]',
     Icon: CloudOff,
   },
   SYNCING: {
-    label: 'Syncing',
+    labelKey: 'offline.syncing',
     dotClass: 'bg-[#3977A8]',
     pillClass: 'border-[#3977A8]/40 bg-[#3977A8]/10 text-[#215780]',
     Icon: RefreshCw,
   },
   SYNC_ERROR: {
-    label: 'Sync Failed',
+    labelKey: 'offline.syncFailed',
     dotClass: 'bg-[#C74440]',
     pillClass: 'border-[#C74440]/40 bg-[#C74440]/10 text-[#C74440]',
     Icon: AlertTriangle,
@@ -46,6 +47,7 @@ const STATE_CONFIG: Record<
 };
 
 export const OfflineStatusBadge: React.FC = () => {
+  const { t } = useTranslation();
   const {
     connectivityState,
     counts,
@@ -56,6 +58,7 @@ export const OfflineStatusBadge: React.FC = () => {
 
   const cfg = STATE_CONFIG[connectivityState];
   const Icon = cfg.Icon;
+  const label = t(cfg.labelKey);
   const totalAttention = counts.pending + counts.failed + counts.conflict;
 
   return (
@@ -68,7 +71,7 @@ export const OfflineStatusBadge: React.FC = () => {
           title="Install FoodFactory ERP as an offline-capable app"
         >
           <Download className="h-3.5 w-3.5" />
-          <span>Install App</span>
+          <span>{t('offline.installApp')}</span>
         </button>
       )}
 
@@ -77,8 +80,8 @@ export const OfflineStatusBadge: React.FC = () => {
         className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors hover:opacity-90 ${cfg.pillClass}`}
         title={
           lastSuccessfulSyncAt
-            ? `${cfg.label} | Last sync: ${new Date(lastSuccessfulSyncAt).toLocaleString()}`
-            : cfg.label
+            ? `${label} | ${new Date(lastSuccessfulSyncAt).toLocaleString()}`
+            : label
         }
         data-testid="offline-status-badge"
       >
@@ -86,7 +89,7 @@ export const OfflineStatusBadge: React.FC = () => {
         <Icon
           className={`h-3.5 w-3.5 ${connectivityState === 'SYNCING' ? 'animate-spin' : ''}`}
         />
-        <span className="hidden sm:inline">{cfg.label}</span>
+        <span className="hidden sm:inline">{label}</span>
         {totalAttention > 0 && (
           <span className="ml-0.5 rounded-full bg-[#245C3A] px-1.5 py-0.2 text-[10px] font-semibold text-white">
             {totalAttention}

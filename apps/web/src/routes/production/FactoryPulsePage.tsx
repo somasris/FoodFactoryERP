@@ -183,31 +183,31 @@ export const FactoryPulsePage: React.FC = () => {
           {/* Overview KPIs */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             <div className="rounded-xl border border-[#E1E7DD] bg-white p-4">
-              <div className="text-xs text-[#66756A]">Active Batches</div>
+              <div className="text-xs text-[#66756A]">{t('dashboard.activeBatches')}</div>
               <div className="mt-1 text-2xl font-bold text-[#17452C]">
                 {data.overview.activeBatchesCount}
               </div>
             </div>
             <div className="rounded-xl border border-[#E1E7DD] bg-white p-4">
-              <div className="text-xs text-[#66756A]">Running Work Orders</div>
+              <div className="text-xs text-[#66756A]">{t('dashboard.runningWorkOrders')}</div>
               <div className="mt-1 text-2xl font-bold text-[#24352A]">
                 {data.overview.runningWorkOrdersCount}
               </div>
             </div>
             <div className="rounded-xl border border-[#E1E7DD] bg-white p-4">
-              <div className="text-xs text-[#66756A]">Completed Today</div>
+              <div className="text-xs text-[#66756A]">{t('dashboard.completedToday')}</div>
               <div className="mt-1 text-2xl font-bold text-[#27834A]">
                 {data.overview.completedTodayCount}
               </div>
             </div>
             <div className="rounded-xl border border-[#E1E7DD] bg-white p-4">
-              <div className="text-xs text-[#66756A]">Delayed Work Orders</div>
+              <div className="text-xs text-[#66756A]">{t('dashboard.delayedWorkOrders')}</div>
               <div className="mt-1 text-2xl font-bold text-[#C74440]">
                 {data.overview.delayedWorkOrdersCount}
               </div>
             </div>
             <div className="rounded-xl border border-[#E1E7DD] bg-white p-4 col-span-2 sm:col-span-1">
-              <div className="text-xs text-[#66756A]">Active Output / Planned</div>
+              <div className="text-xs text-[#66756A]">{t('dashboard.activeOutputPlanned')}</div>
               <div className="mt-1 text-lg font-bold text-[#24352A]">
                 {data.overview.actualGoodQtyTotal} / {data.overview.plannedQtyTotal}
               </div>

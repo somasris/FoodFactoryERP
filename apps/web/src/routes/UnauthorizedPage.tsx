@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { ShieldAlert, ArrowLeft, Home } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { getDefaultDashboardPath } from '../config/navigation';
+import { useTranslation } from '../i18n/I18nContext';
 
 export const UnauthorizedPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const homePath = getDefaultDashboardPath(user);
 
   return (
@@ -16,9 +18,11 @@ export const UnauthorizedPage: React.FC = () => {
           <ShieldAlert className="w-8 h-8 text-[#C58A25]" />
         </div>
 
-        <h1 className="text-lg font-semibold text-[#24352A] tracking-tight">Access Restricted</h1>
+        <h1 className="text-lg font-semibold text-[#24352A] tracking-tight">
+          {t('auth.accessRestricted')}
+        </h1>
         <p className="text-xs text-[#66756A] mt-1.5 leading-relaxed">
-          Your account does not have permission to view this page.
+          {t('auth.unauthorizedMessage')}
         </p>
 
         {user && (

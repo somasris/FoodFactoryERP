@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, X } from 'lucide-react';
 import { Button } from './Button';
+import { useTranslation } from '../../i18n/I18nContext';
 
 export interface ConfirmDialogProps {
   isOpen: boolean;
@@ -21,13 +22,16 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
   description,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   variant = 'danger',
   isLoading = false,
   onConfirm,
   onCancel,
 }) => {
+  const { t } = useTranslation();
+  const effectiveConfirm = confirmLabel ?? t('common.confirm');
+  const effectiveCancel = cancelLabel ?? t('common.cancel');
   useEffect(() => {
     if (!isOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -72,7 +76,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <div className="px-5 py-4 text-xs leading-relaxed text-[#66756A]">{description}</div>
         <div className="flex items-center justify-end gap-2 border-t border-[#E1E7DD] bg-[#FAFBF8] px-5 py-3 rounded-b-lg">
           <Button type="button" variant="outline" size="sm" onClick={onCancel} disabled={isLoading}>
-            {cancelLabel}
+            {effectiveCancel}
           </Button>
           <Button
             type="button"
@@ -81,7 +85,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             onClick={onConfirm}
             isLoading={isLoading}
           >
-            {confirmLabel}
+            {effectiveConfirm}
           </Button>
         </div>
       </div>

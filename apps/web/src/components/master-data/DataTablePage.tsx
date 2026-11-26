@@ -5,6 +5,7 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { EmptyState, ErrorState, LoadingState } from '../common/StateViews';
 import { PaginationMeta } from '../../types/master-data';
+import { useTranslation } from '../../i18n/I18nContext';
 
 export interface ColumnDef<T> {
   header: string;
@@ -63,6 +64,8 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
   onToggleStatus,
   extraRowActions,
 }: DataTablePageProps<T>) {
+  const { t } = useTranslation();
+  const effectiveCreateLabel = createLabel ?? t('common.addNew');
   return (
     <Card>
       <CardHeader className="pb-4">
@@ -74,12 +77,12 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" onClick={onRefresh}>
               <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              Refresh
+              {t('common.refresh')}
             </Button>
             {canCreate && onCreate && (
               <Button type="button" size="sm" onClick={onCreate}>
                 <Plus className="mr-1.5 h-3.5 w-3.5" />
-                {createLabel}
+                {effectiveCreateLabel}
               </Button>
             )}
           </div>
@@ -93,7 +96,7 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
               type="text"
               value={search}
               onChange={e => onSearchChange(e.target.value)}
-              placeholder="Search..."
+              placeholder={t('common.searchPlaceholder')}
               className="w-full rounded-md border border-[#E1E7DD] bg-[#FAFBF8] pl-8 pr-3 py-1.5 text-sm text-[#24352A] placeholder:text-[#8A958C] focus:border-[#245C3A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
             />
           </div>
@@ -105,9 +108,9 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
               onChange={e => onStatusFilterChange(e.target.value)}
               className="rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-1.5 text-sm text-[#24352A] focus:border-[#245C3A] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#245C3A]"
             >
-              <option value="">All Statuses</option>
-              <option value="true">Active</option>
-              <option value="false">Inactive</option>
+              <option value="">{t('common.allStatuses')}</option>
+              <option value="true">{t('common.active')}</option>
+              <option value="false">{t('common.inactive')}</option>
             </select>
           )}
 
@@ -123,12 +126,9 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
         )}
 
         {isLoading ? (
-          <LoadingState label="Loading records..." />
+          <LoadingState />
         ) : items.length === 0 ? (
-          <EmptyState
-            title="No records found"
-            description="Try adjusting your search or filters, or create a new entry."
-          />
+          <EmptyState />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -139,7 +139,7 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
                       {col.header}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 text-right font-semibold">Actions</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7DD]">

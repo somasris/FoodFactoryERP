@@ -9,6 +9,7 @@ import {
   CircleDot,
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { useTranslation } from '../../i18n/I18nContext';
 
 type StatusTone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
 
@@ -74,9 +75,11 @@ export interface StatusBadgeProps {
  * Accessible status indicator combining icon, text label, and restrained semantic color.
  */
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, tone, className }) => {
+  const { t, language } = useTranslation();
   const normalized = status?.toUpperCase().replace(/\s+/g, '_') || 'UNKNOWN';
   const resolvedTone = tone || STATUS_TONE_MAP[normalized] || 'neutral';
-  const displayLabel = status.replace(/_/g, ' ');
+  const fallbackLabel = status.replace(/_/g, ' ');
+  const displayLabel = language === 'ta' ? t(`status.${normalized}`, fallbackLabel) : fallbackLabel;
 
   return (
     <span

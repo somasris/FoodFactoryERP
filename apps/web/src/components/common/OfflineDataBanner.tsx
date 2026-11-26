@@ -1,6 +1,7 @@
 import React from 'react';
 import { Database, WifiOff } from 'lucide-react';
 import { useOffline } from '../../context/OfflineContext';
+import { useTranslation } from '../../i18n/I18nContext';
 
 interface OfflineDataBannerProps {
   lastUpdatedAt?: string | null;
@@ -13,6 +14,7 @@ export const OfflineDataBanner: React.FC<OfflineDataBannerProps> = ({
   pendingCount = 0,
   className = '',
 }) => {
+  const { t } = useTranslation();
   const { connectivityState, lastSuccessfulSyncAt } = useOffline();
   const isOfflineMode =
     connectivityState === 'OFFLINE' || connectivityState === 'SERVER_UNAVAILABLE';
@@ -35,10 +37,8 @@ export const OfflineDataBanner: React.FC<OfflineDataBannerProps> = ({
           <Database className="h-4 w-4 shrink-0 text-[#245C3A]" />
         )}
         <span>
-          <strong className="font-semibold">Last synchronized data</strong>
-          {timestamp ? ` (as of ${new Date(timestamp).toLocaleString()})` : ''}.
-          {isOfflineMode &&
-            ' Live updates and server-authoritative approvals are paused until connectivity returns.'}
+          <strong className="font-semibold">{t('offline.lastSyncData')}</strong>
+          {timestamp ? ` (${new Date(timestamp).toLocaleString()})` : ''}.
         </span>
       </div>
       {pendingCount > 0 && (

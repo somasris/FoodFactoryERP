@@ -16,11 +16,13 @@ import { offlineRepo } from '../offline/offline-repository';
 import { offlineQueue } from '../offline/operation-queue';
 import { offlineDb, PendingOperationRecord, SyncConflictRecord } from '../offline/db';
 import { syncApiService } from '../services/sync.service';
+import { useTranslation } from '../i18n/I18nContext';
 
 type SyncTab = 'conflicts' | 'pending' | 'failed' | 'synced';
 
 export const SyncCenterPage: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const { connectivityState, isSyncing, lastSuccessfulSyncAt, counts } = useOffline();
   const { syncNow, refreshCounts } = useOfflineSync();
 
@@ -119,12 +121,10 @@ export const SyncCenterPage: React.FC = () => {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#E1E7DD] bg-white p-4 shadow-xs">
         <div>
-          <h1 className="text-lg font-bold text-[#17452C]">Offline Synchronization Center</h1>
+          <h1 className="text-lg font-bold text-[#17452C]">{t('offline.syncCenter')}</h1>
           <p className="text-xs text-[#66756A]">
-            Status: <span className="font-semibold text-[#24352A]">{connectivityState}</span>
-            {lastSuccessfulSyncAt
-              ? ` • Last sync: ${new Date(lastSuccessfulSyncAt).toLocaleString()}`
-              : ' • Not yet synchronized in this session'}
+            {t('common.lastUpdated')}:{' '}
+            {lastSuccessfulSyncAt ? new Date(lastSuccessfulSyncAt).toLocaleString() : '—'}
           </p>
         </div>
 
@@ -135,7 +135,7 @@ export const SyncCenterPage: React.FC = () => {
           className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-[#245C3A] px-4 py-2 text-xs font-semibold text-white hover:bg-[#17452C] disabled:opacity-50 transition-colors"
         >
           <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          <span>{isSyncing ? 'Synchronizing...' : 'Sync Now'}</span>
+          <span>{isSyncing ? t('offline.syncing') : t('offline.syncNow')}</span>
         </button>
       </div>
 

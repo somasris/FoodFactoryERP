@@ -112,7 +112,8 @@ export const QrTraceabilityPage: React.FC = () => {
           <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#17452C]">
             <Package className="h-4 w-4 text-[#245C3A]" />
             <span>
-              Recipe & Input Materials (BOM {recipeAndInputs.bomCode} v{recipeAndInputs.bomVersionNumber})
+              {t('traceability.recipeAndInputs')} (BOM {recipeAndInputs.bomCode} v
+              {recipeAndInputs.bomVersionNumber})
             </span>
           </h2>
           <div className="space-y-2 text-xs">
@@ -144,7 +145,7 @@ export const QrTraceabilityPage: React.FC = () => {
           <div>
             <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-[#17452C]">
               <ShieldCheck className="h-4 w-4 text-[#245C3A]" />
-              <span>Quality History</span>
+              <span>{t('traceability.qualityHistory')}</span>
             </h2>
             {qualityHistory ? (
               <div className="rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] p-3 text-xs space-y-1">
@@ -164,7 +165,7 @@ export const QrTraceabilityPage: React.FC = () => {
           <div>
             <h2 className="mb-2 flex items-center gap-2 text-sm font-bold text-[#17452C]">
               <Truck className="h-4 w-4 text-[#245C3A]" />
-              <span>Finished Goods & Dispatch</span>
+              <span>{t('traceability.finishedGoodsDispatch')}</span>
             </h2>
             <div className="text-xs text-[#66756A]">
               FG Batch:{' '}
@@ -203,7 +204,7 @@ export const QrTraceabilityPage: React.FC = () => {
       <div className="rounded-xl border border-[#E1E7DD] bg-white p-4">
         <h2 className="mb-3 flex items-center gap-2 text-sm font-bold text-[#17452C]">
           <Clock className="h-4 w-4 text-[#245C3A]" />
-          <span>End-to-End Traceability Timeline</span>
+          <span>{t('traceability.timeline')}</span>
         </h2>
         <div className="space-y-2.5">
           {timeline.map((step, i) => (

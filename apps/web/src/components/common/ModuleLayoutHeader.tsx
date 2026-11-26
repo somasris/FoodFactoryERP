@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { cn } from '../../lib/utils';
+import { useTranslation } from '../../i18n/I18nContext';
 
 export interface ModuleTab {
   label: string;
@@ -25,12 +26,19 @@ export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
   tabs,
   ariaLabel,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-[#E1E7DD] bg-white px-5 pt-4 shadow-[0_1px_2px_rgba(16,59,40,0.04)]">
         <div className="pb-3">
-          <h1 className="text-lg font-semibold tracking-tight text-[#24352A]">{title}</h1>
-          {description && <p className="mt-0.5 text-xs text-[#66756A]">{description}</p>}
+          <h1 className="text-lg font-semibold tracking-tight text-[#24352A]">
+            {t(`navigation.${title}`, title)}
+          </h1>
+          {description && (
+            <p className="mt-0.5 text-xs text-[#66756A]">
+              {t(`moduleDescriptions.${title}`, description)}
+            </p>
+          )}
         </div>
         <nav
           aria-label={ariaLabel}
@@ -53,7 +61,7 @@ export const ModuleLayoutHeader: React.FC<ModuleLayoutHeaderProps> = ({
                 }
               >
                 <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span>{tab.label}</span>
+                <span>{t(`navigation.${tab.label}`, tab.label)}</span>
               </NavLink>
             );
           })}
