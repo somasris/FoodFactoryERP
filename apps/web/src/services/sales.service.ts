@@ -1,5 +1,6 @@
 import { apiClient, getAccessToken } from './api-client';
 import { cachedApiGet } from '../offline/offline-cache';
+import { executeOrQueueOffline } from '../offline/offline-mutation';
 import { config } from '../config/env';
 import { PaginatedResponse } from '../types/master-data';
 import {
@@ -42,17 +43,38 @@ export const salesService = {
     getById: (id: string) => cachedApiGet<SalesOrder>('SALES_ORDERS', `/sales/orders/${id}`),
     getHistory: (id: string) => apiClient<SalesOrderStatusHistoryItem[]>(`/sales/orders/${id}/history`),
     create: (payload: Record<string, unknown>) =>
-      apiClient<SalesOrder>('/sales/orders', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<SalesOrder>({
+        entityType: 'SALES_ORDER',
+        operationType: 'SALES_ORDER_DRAFT_CREATE',
+        payload,
+        onlineCall: () =>
+          apiClient<SalesOrder>('/sales/orders', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
-    update: (id: string, payload: Record<string, unknown>) =>
-      apiClient<SalesOrder>(`/sales/orders/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(payload),
+    update: (id: string, payload: Record<string, unknown>, baseServerVersion?: string | null) =>
+      executeOrQueueOffline<SalesOrder>({
+        entityType: 'SALES_ORDER',
+        entityId: id,
+        operationType: 'SALES_ORDER_DRAFT_UPDATE',
+        payload,
+        baseServerVersion,
+        onlineCall: () =>
+          apiClient<SalesOrder>(`/sales/orders/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          }),
       }),
     submit: (id: string) =>
-      apiClient<SalesOrder>(`/sales/orders/${id}/submit`, { method: 'POST', body: '{}' }),
+      executeOrQueueOffline<SalesOrder>({
+        entityType: 'SALES_ORDER',
+        entityId: id,
+        operationType: 'SALES_ORDER_SUBMIT',
+        payload: {},
+        onlineCall: () =>
+          apiClient<SalesOrder>(`/sales/orders/${id}/submit`, { method: 'POST', body: '{}' }),
+      }),
     approve: (id: string) =>
       apiClient<SalesOrder>(`/sales/orders/${id}/approve`, { method: 'POST', body: '{}' }),
     reject: (id: string, reason: string) =>

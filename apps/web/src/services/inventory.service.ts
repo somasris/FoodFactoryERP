@@ -1,5 +1,6 @@
 import { apiClient } from './api-client';
 import { cachedApiGet } from '../offline/offline-cache';
+import { executeOrQueueOffline } from '../offline/offline-mutation';
 import { PaginatedResponse } from '../types/master-data';
 import {
   InventoryAdjustmentRecord,
@@ -87,9 +88,15 @@ export const inventoryService = {
     list: (params: InventoryQuery = {}) =>
       apiClient<PaginatedResponse<InventoryReceiptRecord>>(`/inventory/receipts${buildQuery(params)}`),
     create: (payload: Record<string, unknown>) =>
-      apiClient<InventoryReceiptRecord>('/inventory/receipts', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<InventoryReceiptRecord>({
+        entityType: 'INVENTORY_RECEIPT',
+        operationType: 'INVENTORY_RECEIPT_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<InventoryReceiptRecord>('/inventory/receipts', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     submit: (id: string) =>
       apiClient<InventoryReceiptRecord>(`/inventory/receipts/${id}/submit`, { method: 'POST', body: '{}' }),
@@ -105,9 +112,15 @@ export const inventoryService = {
     list: (params: InventoryQuery = {}) =>
       apiClient<PaginatedResponse<InventoryIssueRecord>>(`/inventory/issues${buildQuery(params)}`),
     create: (payload: Record<string, unknown>) =>
-      apiClient<InventoryIssueRecord>('/inventory/issues', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<InventoryIssueRecord>({
+        entityType: 'INVENTORY_ISSUE',
+        operationType: 'INVENTORY_ISSUE_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<InventoryIssueRecord>('/inventory/issues', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     submit: (id: string) =>
       apiClient<InventoryIssueRecord>(`/inventory/issues/${id}/submit`, { method: 'POST', body: '{}' }),
@@ -123,9 +136,15 @@ export const inventoryService = {
     list: (params: InventoryQuery = {}) =>
       apiClient<PaginatedResponse<InventoryTransferRecord>>(`/inventory/transfers${buildQuery(params)}`),
     create: (payload: Record<string, unknown>) =>
-      apiClient<InventoryTransferRecord>('/inventory/transfers', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<InventoryTransferRecord>({
+        entityType: 'WAREHOUSE_TRANSFER',
+        operationType: 'WAREHOUSE_TRANSFER_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<InventoryTransferRecord>('/inventory/transfers', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     approve: (id: string) =>
       apiClient<InventoryTransferRecord>(`/inventory/transfers/${id}/approve`, { method: 'POST', body: '{}' }),
@@ -141,9 +160,15 @@ export const inventoryService = {
     list: (params: InventoryQuery = {}) =>
       apiClient<PaginatedResponse<InventoryAdjustmentRecord>>(`/inventory/adjustments${buildQuery(params)}`),
     create: (payload: Record<string, unknown>) =>
-      apiClient<InventoryAdjustmentRecord>('/inventory/adjustments', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<InventoryAdjustmentRecord>({
+        entityType: 'INVENTORY_ADJUSTMENT',
+        operationType: 'INVENTORY_ADJUSTMENT_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<InventoryAdjustmentRecord>('/inventory/adjustments', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     submit: (id: string) =>
       apiClient<InventoryAdjustmentRecord>(`/inventory/adjustments/${id}/submit`, { method: 'POST', body: '{}' }),

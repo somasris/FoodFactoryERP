@@ -1,5 +1,6 @@
 import { apiClient, getAccessToken } from './api-client';
 import { cachedApiGet } from '../offline/offline-cache';
+import { executeOrQueueOffline } from '../offline/offline-mutation';
 import { config } from '../config/env';
 import { PaginatedResponse } from '../types/master-data';
 import {
@@ -88,9 +89,15 @@ export const productionService = {
     getMaterialAvailability: (id: string) =>
       apiClient<MaterialAvailabilityDetail[]>(`/production/plans/${id}/material-availability`),
     create: (payload: Record<string, unknown>) =>
-      apiClient<ProductionPlan>('/production/plans', {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<ProductionPlan>({
+        entityType: 'PRODUCTION_PLAN',
+        operationType: 'PRODUCTION_PLAN_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<ProductionPlan>('/production/plans', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     update: (id: string, payload: Record<string, unknown>) =>
       apiClient<ProductionPlan>(`/production/plans/${id}`, {
@@ -173,14 +180,29 @@ export const productionService = {
         body: JSON.stringify(warehouseId ? { warehouseId } : {}),
       }),
     consume: (id: string, payload: Record<string, unknown>) =>
-      apiClient<ProductionBatch>(`/production/batches/${id}/consume`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<ProductionBatch>({
+        entityType: 'MATERIAL_CONSUMPTION',
+        entityId: id,
+        operationType: 'BATCH_MATERIAL_CONSUMPTION_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<ProductionBatch>(`/production/batches/${id}/consume`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
-    recordOutput: (id: string, payload: Record<string, unknown>) =>
-      apiClient<ProductionBatch>(`/production/batches/${id}/output`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
+    recordOutput: (id: string, payload: Record<string, unknown>, baseServerVersion?: string | null) =>
+      executeOrQueueOffline<ProductionBatch>({
+        entityType: 'PRODUCTION_BATCH',
+        entityId: id,
+        operationType: 'BATCH_PROGRESS_LOG',
+        payload,
+        baseServerVersion,
+        onlineCall: () =>
+          apiClient<ProductionBatch>(`/production/batches/${id}/output`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     complete: (id: string, payload: Record<string, unknown> = {}) =>
       apiClient<ProductionBatch>(`/production/batches/${id}/complete`, {
@@ -198,9 +220,16 @@ export const productionService = {
     getByBatchId: (batchId: string) =>
       apiClient<BatchReconciliation>(`/production/batches/${batchId}/reconciliation`),
     returnMaterials: (batchId: string, payload: Record<string, unknown>) =>
-      apiClient<BatchReconciliation>(`/production/batches/${batchId}/return-materials`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<BatchReconciliation>({
+        entityType: 'MATERIAL_RETURN',
+        entityId: batchId,
+        operationType: 'BATCH_MATERIAL_RETURN_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<BatchReconciliation>(`/production/batches/${batchId}/return-materials`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     releaseReservation: (batchId: string, warehouseId?: string) =>
       apiClient<BatchReconciliation>(`/production/batches/${batchId}/release-reservation`, {
@@ -219,9 +248,16 @@ export const productionService = {
         `/production/quality-inspections${buildQuery(params)}`,
       ),
     inspect: (id: string, payload: Record<string, unknown>) =>
-      apiClient<QualityInspectionItem>(`/production/quality-inspections/${id}/inspect`, {
-        method: 'POST',
-        body: JSON.stringify(payload),
+      executeOrQueueOffline<QualityInspectionItem>({
+        entityType: 'QUALITY_INSPECTION',
+        entityId: id,
+        operationType: 'QUALITY_OBSERVATION_DRAFT',
+        payload,
+        onlineCall: () =>
+          apiClient<QualityInspectionItem>(`/production/quality-inspections/${id}/inspect`, {
+            method: 'POST',
+            body: JSON.stringify(payload),
+          }),
       }),
     release: (id: string, releaseNotes: string) =>
       apiClient<QualityInspectionItem>(`/production/quality-inspections/${id}/release`, {
