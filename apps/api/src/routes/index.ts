@@ -21,6 +21,7 @@ import {
   savedViewsRouter,
 } from '../modules/ux/ux.routes';
 import { manufacturingIntelligenceRouter } from '../modules/manufacturing-intelligence/mi.routes';
+import { collaborationRouter } from '../modules/collaboration/collaboration.routes';
 
 export const apiRouter: Router = Router();
 
@@ -79,3 +80,6 @@ apiRouter.use('/activity-timeline', activityTimelineRouter);
 
 // Mount Phase 6 Manufacturing Intelligence routes
 apiRouter.use('/manufacturing-intelligence', manufacturingIntelligenceRouter);
+
+// Mount Phase 7 Factory Collaboration & Decision Support routes
+apiRouter.use('/collaboration', collaborationRouter);
