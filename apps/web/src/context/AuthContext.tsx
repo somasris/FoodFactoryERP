@@ -4,6 +4,10 @@ import { authService, UserProfile } from '../services/auth.service';
 import { setOnAuthFailure } from '../services/api-client';
 import { offlineRepo } from '../offline/offline-repository';
 import { setActiveOfflineUserId } from '../offline/offline-cache';
+import {
+  broadcastSessionEvent,
+  subscribeSessionEvents,
+} from '../services/session-sync';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -53,6 +57,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     setOnAuthFailure(handleAuthFailure);
   }, [handleAuthFailure]);
+
+  // Synchronize logout across browser tabs without calling logout API repeatedly
+  useEffect(() => {
+    return subscribeSessionEvents(event => {
+      if (event.type === 'LOGOUT' || event.type === 'SESSION_EXPIRED') {
+        if (event.type === 'SESSION_EXPIRED') {
+          try {
+            window.sessionStorage.setItem('ff_session_expired', '1');
+          } catch {
+            // Ignore storage error
+          }
+        }
+        setSessionHint(false);
+        setActiveOfflineUserId(null);
+        setUser(null);
+      }
+    });
+  }, []);
 
   // Initial silent authentication check via HTTP-only refresh cookie (only when a session hint exists)
   useEffect(() => {
@@ -138,6 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUserId) {
         await offlineRepo.clearUserDataOnLogout(currentUserId, false).catch(() => undefined);
       }
+      broadcastSessionEvent({ type: 'LOGOUT' });
       setUser(null);
     }
   };

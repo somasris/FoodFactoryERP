@@ -204,6 +204,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   const navigate = useNavigate();
   const location = useLocation();
   const { login, isAuthenticated, user } = useAuth();
+  const { t } = useTranslation();
 
   const resolvePostLoginDestination = useCallback(
     (targetUser: UserProfile | null): string => {
@@ -251,6 +252,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
     setMode(initialMode);
   }, [initialMode]);
 
+  const [sessionExpiredNotice, setSessionExpiredNotice] = useState<boolean>(() => {
+    try {
+      const flagged = window.sessionStorage.getItem('ff_session_expired') === '1';
+      if (flagged) window.sessionStorage.removeItem('ff_session_expired');
+      return flagged;
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
     let active = true;
     authService.getDemoAccounts().then(cfg => {
@@ -271,6 +282,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
     setMode(nextMode);
     setFieldErrors({});
     setServerError(null);
+    setSessionExpiredNotice(false);
     if (nextMode === 'signup') {
       setSignUpSuccess(null);
     }
@@ -282,6 +294,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
 
     setFieldErrors({});
     setServerError(null);
+    setSessionExpiredNotice(false);
 
     const parsed = loginSchema.safeParse({ usernameOrEmail, password });
     if (!parsed.success) {
@@ -310,6 +323,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
 
     setFieldErrors({});
     setServerError(null);
+    setSessionExpiredNotice(false);
 
     const parsed = signUpSchema.safeParse({
       name: fullName,
@@ -393,6 +407,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                   </span>
                 )}
               </div>
+            </div>
+          )}
+
+          {sessionExpiredNotice && !serverError && (
+            <div
+              role="status"
+              className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                {t(
+                  'session.expiredMessage',
+                  'Your session expired due to inactivity. Please sign in again.',
+                )}
+              </span>
             </div>
           )}
 

@@ -112,6 +112,56 @@ export const authService = {
     }
   },
 
+  async getSessionStatus(): Promise<{
+    sessionId: string | null;
+    lastActivityAt: string;
+    inactivityExpiresAt: string;
+    absoluteExpiresAt: string;
+    timeoutMinutes: number;
+    warningMinutes: number;
+    serverTime: string;
+  }> {
+    const response = await apiClient<{
+      sessionId: string | null;
+      lastActivityAt: string;
+      inactivityExpiresAt: string;
+      absoluteExpiresAt: string;
+      timeoutMinutes: number;
+      warningMinutes: number;
+      serverTime: string;
+    }>('/auth/session');
+    return response.data!;
+  },
+
+  async extendSession(): Promise<{
+    sessionId: string;
+    lastActivityAt: string;
+    inactivityExpiresAt: string;
+    absoluteExpiresAt: string;
+    timeoutMinutes: number;
+    warningMinutes: number;
+    serverTime: string;
+    accessToken: string;
+  }> {
+    const response = await apiClient<{
+      sessionId: string;
+      lastActivityAt: string;
+      inactivityExpiresAt: string;
+      absoluteExpiresAt: string;
+      timeoutMinutes: number;
+      warningMinutes: number;
+      serverTime: string;
+      accessToken: string;
+    }>('/auth/session/extend', {
+      method: 'POST',
+      body: JSON.stringify({}),
+    });
+    if (response.data?.accessToken) {
+      setAccessToken(response.data.accessToken);
+    }
+    return response.data!;
+  },
+
   async getMe(): Promise<UserProfile> {
     const response = await apiClient<UserProfile>('/auth/me', {
       method: 'GET',

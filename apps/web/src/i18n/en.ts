@@ -490,6 +490,16 @@ export const en = {
     generatedAt: 'Generated At',
     reprint: 'Reprint',
   },
+  session: {
+    warningTitle: 'Your session is about to expire',
+    warningBody: 'You have been inactive for some time. For your security, you will be automatically signed out soon.',
+    expiresIn: 'Session expires in',
+    continueSession: 'Continue Session',
+    extending: 'Extending...',
+    logoutNow: 'Logout Now',
+    expiredMessage: 'Your session expired due to inactivity. Please sign in again.',
+    extendFailed: 'Unable to extend session. Please sign in again.',
+  },
 } as const;
 
 export type TranslationDictionary = typeof en;

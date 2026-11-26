@@ -9,6 +9,7 @@ import { OfflineDataBanner } from '../common/OfflineDataBanner';
 import { CommandCenterModal } from '../command-center/CommandCenterModal';
 import { KeyboardShortcutsModal } from '../ux/KeyboardShortcutsModal';
 import { ProductTourModal } from '../ux/ProductTourModal';
+import { SessionTimeoutManager } from '../auth/SessionTimeoutManager';
 import { useOffline } from '../../context/OfflineContext';
 import { useAuth } from '../../hooks/useAuth';
 import { isEditableTarget, SHORTCUT_DEFINITIONS } from '../../config/shortcuts';
@@ -153,6 +154,7 @@ export const AppShell: React.FC = () => {
         />
       </div>
       <CommandCenterModal isOpen={commandOpen} onClose={handleCloseCommand} />
+      <SessionTimeoutManager />
       <KeyboardShortcutsModal
         isOpen={shortcutsOpen}
         onClose={() => setShortcutsOpen(false)}
