@@ -195,9 +195,9 @@ export const AppShell: React.FC = () => {
           onToggleCollapse={handleToggleCollapse}
           onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 min-w-0 overflow-x-hidden p-4 md:p-6">
-          <div className="mx-auto max-w-[1440px]">
-            <OfflineDataBanner pendingCount={counts.pending} className="mb-4" />
+        <main className="flex-1 min-w-0 overflow-x-hidden px-4 py-5 sm:px-6 md:px-9 md:py-7">
+          <div className="mx-auto max-w-[1440px] space-y-6">
+            <OfflineDataBanner pendingCount={counts.pending} />
             <Outlet />
           </div>
         </main>

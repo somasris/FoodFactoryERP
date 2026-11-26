@@ -10,7 +10,7 @@ export interface PageHeaderProps {
 }
 
 /**
- * Standardized enterprise page header for consistent hierarchy across all ERP modules.
+ * Spacious enterprise page header with consistent typography and breathing room.
  */
 export const PageHeader: React.FC<PageHeaderProps> = ({
   title,
@@ -22,20 +22,22 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-[#E1E7DD] pb-4',
+        'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pb-5',
         className,
       )}
     >
-      <div className="min-w-0">
+      <div className="min-w-0 space-y-1">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h1 className="text-lg font-semibold tracking-tight text-[#24352A] sm:text-xl">
+          <h1 className="text-xl font-semibold tracking-tight text-[#17452C] sm:text-2xl">
             {title}
           </h1>
           {badge}
         </div>
-        {description && <p className="mt-1 text-xs text-[#66756A] max-w-3xl">{description}</p>}
+        {description && (
+          <p className="text-[13px] leading-relaxed text-[#66756A] max-w-2xl">{description}</p>
+        )}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0 flex-wrap">{actions}</div>}
+      {actions && <div className="flex items-center gap-2.5 shrink-0 flex-wrap">{actions}</div>}
     </div>
   );
 };

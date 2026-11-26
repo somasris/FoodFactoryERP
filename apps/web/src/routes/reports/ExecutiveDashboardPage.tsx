@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   Clock,
   Factory,
   IndianRupee,
@@ -36,6 +38,7 @@ const EXECUTIVE_WIDGET_DEFS = [
 
 export const ExecutiveDashboardPage: React.FC = () => {
   const [financialYear, setFinancialYear] = useState('');
+  const [showOperational, setShowOperational] = useState(true);
   const {
     orderedWidgets,
     isCustomized,
@@ -75,7 +78,7 @@ export const ExecutiveDashboardPage: React.FC = () => {
   const { businessKpis, operationalKpis } = data;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Executive Dashboard"
         actions={
@@ -182,18 +185,26 @@ export const ExecutiveDashboardPage: React.FC = () => {
                 />
               );
             })}
-        </div>
+          </div>
       </section>
 
-      <section aria-labelledby="operational-kpis-heading" className="space-y-3">
-        <h2
-          id="operational-kpis-heading"
-          className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500"
+      <section aria-labelledby="operational-kpis-heading" className="space-y-4">
+        <button
+          type="button"
+          onClick={() => setShowOperational(v => !v)}
+          aria-expanded={showOperational}
+          className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#66756A] hover:text-[#17452C] transition-colors"
         >
+          {showOperational ? (
+            <ChevronDown className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5" />
+          )}
           <Activity className="h-3.5 w-3.5" />
-          Plant &amp; Inventory Operations
-        </h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <span id="operational-kpis-heading">Plant &amp; Inventory Operations</span>
+        </button>
+        {showOperational && (
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {orderedWidgets
             .filter(w =>
               [
@@ -271,7 +282,8 @@ export const ExecutiveDashboardPage: React.FC = () => {
                 />
               );
             })}
-        </div>
+          </div>
+        )}
       </section>
     </div>
   );

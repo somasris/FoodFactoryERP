@@ -135,22 +135,22 @@ export function DataTablePage<T extends { id: string; isActive?: boolean }>({
               <thead className="border-b border-[#E1E7DD] bg-[#FAFBF8] text-xs uppercase text-[#66756A]">
                 <tr>
                   {columns.map((col, idx) => (
-                    <th key={idx} className={`px-3 py-2.5 font-semibold ${col.className || ''}`}>
+                    <th key={idx} className={`px-4 py-3 font-semibold ${col.className || ''}`}>
                       {col.header}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 text-right font-semibold">{t('common.actions')}</th>
+                  <th className="px-4 py-3 text-right font-semibold">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E1E7DD]">
                 {items.map(row => (
-                  <tr key={row.id} className="hover:bg-[#EAF1E8]/35">
+                  <tr key={row.id} className="hover:bg-[#EAF1E8]/35 transition-colors">
                     {columns.map((col, idx) => (
-                      <td key={idx} className={`px-3 py-2.5 text-[#24352A] ${col.className || ''}`}>
+                      <td key={idx} className={`px-4 py-3.5 text-[#24352A] ${col.className || ''}`}>
                         {col.render(row)}
                       </td>
                     ))}
-                    <td className="px-3 py-2.5 text-right">
+                    <td className="px-4 py-3.5 text-right">
                       <div className="inline-flex items-center gap-1">
                         {extraRowActions && extraRowActions(row)}
                         {onView && (

@@ -112,40 +112,27 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* System Status, Offline Indicator & User Profile Menu */}
-      <div className="flex items-center gap-2.5">
+      {/* Compact Header Actions */}
+      <div className="flex items-center gap-2 sm:gap-3">
         {user && onOpenCommandCenter && (
           <button
             type="button"
             data-tour="command-center"
             onClick={onOpenCommandCenter}
             aria-label="Open Command Center"
-            className="flex items-center gap-2 rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
+            className="flex items-center gap-2 rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-1.5 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
           >
             <Search className="h-3.5 w-3.5" />
             <span className="hidden md:inline">{t('common.search')}</span>
-            <kbd className="hidden md:inline rounded border border-[#E1E7DD] bg-white px-1 py-0.5 font-mono text-[10px] text-[#8A958C]">
+            <kbd className="hidden lg:inline rounded border border-[#E1E7DD] bg-white px-1.5 py-0.5 font-mono text-[10px] text-[#8A958C]">
               Ctrl+K
             </kbd>
           </button>
         )}
 
-        {user && onOpenShortcuts && (
-          <button
-            type="button"
-            data-tour="shortcuts-trigger"
-            onClick={onOpenShortcuts}
-            aria-label={t('shortcuts.title', 'Keyboard Shortcuts')}
-            title={t('shortcuts.title', 'Keyboard Shortcuts')}
-            className="hidden sm:flex items-center justify-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-1.5 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
-          >
-            <Keyboard className="h-3.5 w-3.5" />
-          </button>
-        )}
-
         <div
           data-tour="theme-switcher"
-          className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
+          className="inline-flex items-center rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
           role="group"
           aria-label="Theme switcher"
         >
@@ -218,29 +205,6 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <OfflineStatusBadge />
 
-        <div
-          className="hidden lg:flex items-center gap-2 rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1 text-[11px] text-[#66756A]"
-          title={`API: ${apiHealth?.status || (apiError ? 'offline' : 'connecting')} | DB: ${dbHealth?.status || (dbError ? 'offline' : 'checking')}`}
-        >
-          <span
-            className={`h-2 w-2 rounded-full ${
-              isSystemHealthy
-                ? 'bg-[#27834A]'
-                : isSystemError
-                  ? 'bg-[#C74440]'
-                  : 'bg-[#C58A25]'
-            }`}
-            aria-hidden="true"
-          />
-          <span className="font-medium">
-            {isSystemHealthy
-              ? t('common.systemsOperational')
-              : isSystemError
-                ? t('common.serviceDegraded')
-                : t('common.connecting')}
-          </span>
-        </div>
-
         {user && <NotificationBell />}
 
         {user && (
@@ -298,6 +262,21 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <Activity className="h-3.5 w-3.5 text-[#245C3A]" />
                   <span>{t('ux.activityTimeline', 'Activity Timeline')}</span>
                 </Link>
+                {onOpenShortcuts && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-tour="shortcuts-trigger"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onOpenShortcuts();
+                    }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-[#24352A] hover:bg-[#EAF1E8] transition-colors"
+                  >
+                    <Keyboard className="h-3.5 w-3.5 text-[#245C3A]" />
+                    <span>{t('shortcuts.title', 'Keyboard Shortcuts')}</span>
+                  </button>
+                )}
                 {onStartTour && (
                   <button
                     type="button"
@@ -312,6 +291,24 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span>{t('tour.restartTour', 'Restart Product Tour')}</span>
                   </button>
                 )}
+                <div className="border-t border-[#E1E7DD] px-3.5 py-2 text-[11px] text-[#66756A] flex items-center gap-2">
+                  <span
+                    className={`h-2 w-2 rounded-full ${
+                      isSystemHealthy
+                        ? 'bg-[#27834A]'
+                        : isSystemError
+                          ? 'bg-[#C74440]'
+                          : 'bg-[#C58A25]'
+                    }`}
+                  />
+                  <span>
+                    {isSystemHealthy
+                      ? t('common.systemsOperational')
+                      : isSystemError
+                        ? t('common.serviceDegraded')
+                        : t('common.connecting')}
+                  </span>
+                </div>
                 <button
                   type="button"
                   role="menuitem"

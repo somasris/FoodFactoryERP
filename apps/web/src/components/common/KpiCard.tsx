@@ -10,16 +10,16 @@ export interface KpiCardProps {
   className?: string;
 }
 
-const toneBar: Record<NonNullable<KpiCardProps['tone']>, string> = {
-  neutral: 'bg-[#6F9478]',
-  info: 'bg-[#3977A8]',
-  success: 'bg-[#27834A]',
-  warning: 'bg-[#C58A25]',
-  danger: 'bg-[#C74440]',
+const toneIcon: Record<NonNullable<KpiCardProps['tone']>, string> = {
+  neutral: 'bg-[#EAF1E8] text-[#245C3A]',
+  info: 'bg-[#3977A8]/10 text-[#3977A8]',
+  success: 'bg-[#27834A]/10 text-[#27834A]',
+  warning: 'bg-[#C58A25]/10 text-[#C58A25]',
+  danger: 'bg-[#C74440]/10 text-[#C74440]',
 };
 
 /**
- * Compact, restrained enterprise KPI summary card with tabular-nums alignment.
+ * Spacious, minimal enterprise KPI summary card with tabular-nums alignment.
  */
 export const KpiCard: React.FC<KpiCardProps> = ({
   label,
@@ -32,23 +32,22 @@ export const KpiCard: React.FC<KpiCardProps> = ({
   return (
     <div
       className={cn(
-        'relative overflow-hidden rounded-lg border border-[#E1E7DD] bg-white p-4 shadow-[0_1px_2px_rgba(16,59,40,0.04)]',
+        'rounded-xl border border-[#E1E7DD] bg-white p-5 transition-colors',
         className,
       )}
     >
-      <div className={cn('absolute inset-y-0 left-0 w-1', toneBar[tone])} aria-hidden="true" />
-      <div className="flex items-start justify-between gap-2 pl-2">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#66756A] truncate">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1.5">
+          <div className="text-xs font-medium text-[#66756A] truncate">
             {label}
           </div>
-          <div className="mt-1 text-xl font-semibold tracking-tight text-[#24352A] tabular-nums">
+          <div className="text-2xl font-semibold tracking-tight text-[#24352A] tabular-nums">
             {value}
           </div>
-          {sublabel && <div className="mt-0.5 text-xs text-[#66756A] truncate">{sublabel}</div>}
+          {sublabel && <div className="text-xs text-[#66756A] truncate">{sublabel}</div>}
         </div>
         {icon && (
-          <div className="rounded-md border border-[#E1E7DD] bg-[#EAF1E8] p-2 text-[#245C3A] shrink-0">
+          <div className={cn('rounded-lg p-2.5 shrink-0', toneIcon[tone])}>
             {icon}
           </div>
         )}
