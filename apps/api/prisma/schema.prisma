@@ -464,6 +464,7 @@ model User {
   userRoles       UserRole[]
   warehouseAccess UserWarehouseAccess[]
   refreshTokens   RefreshToken[]
+  sessions        UserSession[]
   auditLogs       AuditLog[]
   postedInventoryTransactions InventoryTransaction[] @relation("TxPostedBy")
   salesOrders                 SalesOrder[]           @relation("SalesmanOrders")
@@ -591,6 +592,29 @@ model RefreshToken {
   @@index([userId])
   @@index([family])
   @@map("refresh_tokens")
+}
+
+model UserSession {
+  id                  String    @id @default(uuid())
+  userId              String    @map("user_id")
+  family              String    @unique @db.VarChar(64)
+  ipAddress           String?   @map("ip_address") @db.VarChar(45)
+  userAgent           String?   @map("user_agent") @db.Text
+  lastActivityAt      DateTime  @default(now()) @map("last_activity_at")
+  inactivityExpiresAt DateTime  @map("inactivity_expires_at")
+  absoluteExpiresAt   DateTime  @map("absolute_expires_at")
+  isRevoked           Boolean   @default(false) @map("is_revoked")
+  revokedAt           DateTime? @map("revoked_at")
+  revokedById         String?   @map("revoked_by_id")
+  revocationReason    String?   @map("revocation_reason") @db.VarChar(255)
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRevoked])
+  @@index([inactivityExpiresAt])
+  @@map("user_sessions")
 }
 
 // ------------------------------------------------------------------------------
