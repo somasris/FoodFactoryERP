@@ -13,8 +13,13 @@ import {
   Shield,
   ShoppingCart,
   Wrench,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../context/ThemeContext';
+import { useTranslation } from '../i18n/I18nContext';
 import {
   AllowedSignupRole,
   authService,
@@ -100,6 +105,100 @@ const signUpSchema = z
 export interface LoginPageProps {
   initialMode?: 'signin' | 'signup';
 }
+
+const LoginThemeLangBar: React.FC = () => {
+  const { themeMode, setThemeMode } = useTheme();
+  const { language, setLanguage } = useTranslation();
+  return (
+    <div className="flex items-center gap-2">
+      <div className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-white p-0.5 text-[11px]">
+        <button
+          type="button"
+          onClick={() => setThemeMode('light')}
+          aria-label="Light mode"
+          className={`rounded p-1 ${themeMode === 'light' ? 'bg-[#245C3A] text-white' : 'text-[#66756A]'}`}
+        >
+          <Sun className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setThemeMode('dark')}
+          aria-label="Dark mode"
+          className={`rounded p-1 ${themeMode === 'dark' ? 'bg-[#245C3A] text-white' : 'text-[#66756A]'}`}
+        >
+          <Moon className="h-3.5 w-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={() => setThemeMode('system')}
+          aria-label="System theme"
+          className={`rounded p-1 ${themeMode === 'system' ? 'bg-[#245C3A] text-white' : 'text-[#66756A]'}`}
+        >
+          <Monitor className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      <div className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-white p-0.5 text-[11px]">
+        <button
+          type="button"
+          onClick={() => setLanguage('en')}
+          className={`rounded px-1.5 py-0.5 font-semibold ${language === 'en' ? 'bg-[#245C3A] text-white' : 'text-[#66756A]'}`}
+        >
+          EN
+        </button>
+        <button
+          type="button"
+          onClick={() => setLanguage('ta')}
+          className={`rounded px-1.5 py-0.5 font-semibold ${language === 'ta' ? 'bg-[#245C3A] text-white' : 'text-[#66756A]'}`}
+        >
+          தமிழ்
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const LoginHeaderContent: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <>
+      <h1 className="text-xl font-bold tracking-tight">{t('common.appName')}</h1>
+      <p className="mt-1 text-xs text-[#F4F0E4]/90">{t('common.footerTagline')}</p>
+    </>
+  );
+};
+
+const LoginModeTabs: React.FC<{
+  mode: 'signin' | 'signup';
+  onSwitch: (m: 'signin' | 'signup') => void;
+}> = ({ mode, onSwitch }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="grid grid-cols-2 border-b border-[#E1E7DD] bg-[#FAFBF8] text-sm font-medium">
+      <button
+        type="button"
+        onClick={() => onSwitch('signin')}
+        className={`py-3 transition-colors ${
+          mode === 'signin'
+            ? 'border-b-2 border-[#245C3A] bg-white text-[#245C3A]'
+            : 'text-slate-500 hover:text-slate-700'
+        }`}
+      >
+        {t('auth.signIn')}
+      </button>
+      <button
+        type="button"
+        onClick={() => onSwitch('signup')}
+        className={`py-3 transition-colors ${
+          mode === 'signup'
+            ? 'border-b-2 border-[#245C3A] bg-white text-[#245C3A]'
+            : 'text-slate-500 hover:text-slate-700'
+        }`}
+      >
+        {t('auth.signUp')}
+      </button>
+    </div>
+  );
+};
 
 export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) => {
   const navigate = useNavigate();
@@ -261,44 +360,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F7F8F2] px-4 py-8">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F7F8F2] px-4 py-8">
+      <div className="mb-3 flex w-full max-w-md items-center justify-end gap-2">
+        <LoginThemeLangBar />
+      </div>
       <div className="w-full max-w-md bg-white rounded-xl shadow-lg border border-[#E1E7DD] overflow-hidden">
         {/* Traditional Forest Green Header */}
         <div className="bg-[#245C3A] px-6 py-7 text-center text-white">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 border border-[#E8D7AA]/30">
             <Factory className="h-7 w-7 text-[#E8D7AA]" />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">FoodFactory ERP</h1>
-          <p className="mt-1 text-xs text-[#F4F0E4]/90">
-            Manufacturing, Inventory &amp; Compliance Platform
-          </p>
+          <LoginHeaderContent />
         </div>
 
         {/* Mode Tabs */}
-        <div className="grid grid-cols-2 border-b border-[#E1E7DD] bg-[#FAFBF8] text-sm font-medium">
-          <button
-            type="button"
-            onClick={() => switchMode('signin')}
-            className={`py-3 transition-colors ${
-              mode === 'signin'
-                ? 'border-b-2 border-[#245C3A] bg-white text-[#245C3A]'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => switchMode('signup')}
-            className={`py-3 transition-colors ${
-              mode === 'signup'
-                ? 'border-b-2 border-[#245C3A] bg-white text-[#245C3A]'
-                : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
+        <LoginModeTabs mode={mode} onSwitch={switchMode} />
 
         <div className="p-6">
           {signUpSuccess && mode === 'signin' && (

@@ -9,6 +9,9 @@ import {
   ChevronRight,
   Shield,
   Search,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import { useApiHealth, useDatabaseHealth } from '../../hooks/useHealth';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,6 +19,7 @@ import { getDefaultDashboardPath, NAV_GROUPS } from '../../config/navigation';
 import { NotificationBell } from './NotificationBell';
 import { OfflineStatusBadge } from './OfflineStatusBadge';
 import { useTranslation } from '../../i18n/I18nContext';
+import { useTheme } from '../../context/ThemeContext';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -27,6 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
   const { data: dbHealth, isError: dbError } = useDatabaseHealth();
   const { user, logout } = useAuth();
   const { language, setLanguage, t } = useTranslation();
+  const { themeMode, setThemeMode } = useTheme();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -89,9 +94,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
 
         {/* Current Page Breadcrumb */}
         <div className="hidden md:flex items-center gap-1.5 border-l border-[#E1E7DD] pl-3 text-xs text-[#66756A] min-w-0">
-          <span className="truncate">{breadcrumb.group}</span>
+          <span className="truncate">{t(`navigation.${breadcrumb.group}`, breadcrumb.group)}</span>
           <ChevronRight className="h-3.5 w-3.5 text-[#8A958C] shrink-0" />
-          <span className="font-medium text-[#24352A] truncate">{breadcrumb.page}</span>
+          <span className="font-medium text-[#24352A] truncate">
+            {t(`navigation.${breadcrumb.page}`, breadcrumb.page)}
+          </span>
         </div>
       </div>
 
@@ -111,6 +118,52 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
             </kbd>
           </button>
         )}
+
+        <div
+          className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
+          role="group"
+          aria-label="Theme switcher"
+        >
+          <button
+            type="button"
+            onClick={() => setThemeMode('light')}
+            title="Light mode"
+            aria-label="Light mode"
+            className={`rounded p-1 transition-colors ${
+              themeMode === 'light'
+                ? 'bg-[#245C3A] text-white'
+                : 'text-[#66756A] hover:text-[#17452C]'
+            }`}
+          >
+            <Sun className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setThemeMode('dark')}
+            title="Dark mode"
+            aria-label="Dark mode"
+            className={`rounded p-1 transition-colors ${
+              themeMode === 'dark'
+                ? 'bg-[#245C3A] text-white'
+                : 'text-[#66756A] hover:text-[#17452C]'
+            }`}
+          >
+            <Moon className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setThemeMode('system')}
+            title="System theme"
+            aria-label="System theme"
+            className={`rounded p-1 transition-colors ${
+              themeMode === 'system'
+                ? 'bg-[#245C3A] text-white'
+                : 'text-[#66756A] hover:text-[#17452C]'
+            }`}
+          >
+            <Monitor className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
         <div
           className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
@@ -154,7 +207,11 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
             aria-hidden="true"
           />
           <span className="font-medium">
-            {isSystemHealthy ? 'Systems Operational' : isSystemError ? 'Service Degraded' : 'Connecting'}
+            {isSystemHealthy
+              ? t('common.systemsOperational')
+              : isSystemError
+                ? t('common.serviceDegraded')
+                : t('common.connecting')}
           </span>
         </div>
 
@@ -215,7 +272,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
                   className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-[#C74440] hover:bg-[#C74440]/10 transition-colors"
                 >
                   <LogOut className="h-3.5 w-3.5" />
-                  <span>Sign Out</span>
+                  <span>{t('common.signOut')}</span>
                 </button>
               </div>
             )}

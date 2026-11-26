@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
@@ -50,6 +51,7 @@ export default {
       fontFamily: {
         sans: [
           'Inter',
+          'Noto Sans Tamil',
           'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',

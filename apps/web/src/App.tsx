@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from './context/AuthContext';
 import { OfflineProvider } from './context/OfflineContext';
 import { I18nProvider } from './i18n/I18nContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { useOfflineSync } from './hooks/useOfflineSync';
 import { AppRoutes } from './routes';
 
@@ -26,10 +27,12 @@ export const App: React.FC = () => {
     <QueryClientProvider client={queryClient}>
       <OfflineProvider>
         <AuthProvider>
-          <I18nProvider>
-            <OfflineSyncCoordinator />
-            <AppRoutes />
-          </I18nProvider>
+          <ThemeProvider>
+            <I18nProvider>
+              <OfflineSyncCoordinator />
+              <AppRoutes />
+            </I18nProvider>
+          </ThemeProvider>
         </AuthProvider>
       </OfflineProvider>
     </QueryClientProvider>

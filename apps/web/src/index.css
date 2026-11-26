@@ -10,6 +10,8 @@
   --ff-muted-green: #6f9478;
   --ff-bg: #f7f8f2;
   --ff-surface: #ffffff;
+  --ff-surface-elevated: #fafbf8;
+  --ff-header: #ffffff;
   --ff-sidebar: #173f2b;
   --ff-subtle: #eaf1e8;
   --ff-input: #fafbf8;
@@ -17,7 +19,9 @@
   --ff-gold-light: #e8d7aa;
   --ff-cream: #f4f0e4;
   --ff-border: #e1e7dd;
+  --ff-border-strong: #c8d3c2;
   --ff-text: #24352a;
+  --ff-text-heading: #17452c;
   --ff-text-secondary: #66756a;
   --ff-text-muted: #8a958c;
   --ff-success: #27834a;
@@ -27,6 +31,7 @@
 
   font-family:
     'Inter',
+    'Noto Sans Tamil',
     system-ui,
     -apple-system,
     BlinkMacSystemFont,
@@ -34,6 +39,36 @@
     Roboto,
     sans-serif;
   color-scheme: light;
+}
+
+html.dark {
+  --ff-primary: #63a879;
+  --ff-primary-dark: #4f8f63;
+  --ff-forest: #0b1410;
+  --ff-secondary: #86b995;
+  --ff-muted-green: #6f9478;
+  --ff-bg: #101a15;
+  --ff-surface: #1b2b21;
+  --ff-surface-elevated: #22352a;
+  --ff-header: #17241c;
+  --ff-sidebar: #111e17;
+  --ff-subtle: #22352a;
+  --ff-input: #15221a;
+  --ff-gold: #d4b36a;
+  --ff-gold-light: #e8d7aa;
+  --ff-cream: #243328;
+  --ff-border: #34483a;
+  --ff-border-strong: #445e4b;
+  --ff-text: #e7f0e8;
+  --ff-text-heading: #e7f0e8;
+  --ff-text-secondary: #b2c2b5;
+  --ff-text-muted: #87978a;
+  --ff-success: #4cc378;
+  --ff-warning: #e0aa45;
+  --ff-error: #e36d69;
+  --ff-info: #62a3d9;
+
+  color-scheme: dark;
 }
 
 body {
@@ -44,6 +79,82 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition:
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+/* Global dark-mode semantic mapping for legacy utility surfaces, inputs, tables, and borders */
+html.dark .bg-white {
+  background-color: var(--ff-surface) !important;
+}
+html.dark .bg-slate-50,
+html.dark .bg-slate-100,
+html.dark .bg-\[\#FAFBF8\] {
+  background-color: var(--ff-surface-elevated) !important;
+}
+html.dark .hover\:bg-\[\#EAF1E8\]:hover,
+html.dark .hover\:bg-\[\#FAFBF8\]:hover,
+html.dark .hover\:bg-slate-50:hover {
+  background-color: var(--ff-surface-elevated) !important;
+}
+html.dark .bg-red-50 {
+  background-color: rgba(227, 109, 105, 0.14) !important;
+}
+html.dark .bg-amber-50 {
+  background-color: rgba(224, 170, 69, 0.14) !important;
+}
+html.dark .bg-emerald-50 {
+  background-color: rgba(76, 195, 120, 0.14) !important;
+}
+html.dark .bg-\[\#173F2B\] {
+  background-color: var(--ff-sidebar) !important;
+}
+html.dark .bg-\[\#F7F8F2\],
+html.dark .bg-brand-bg {
+  background-color: var(--ff-bg) !important;
+}
+html.dark .bg-\[\#EAF1E8\] {
+  background-color: var(--ff-subtle) !important;
+}
+html.dark .bg-\[\#F4F0E4\] {
+  background-color: var(--ff-cream) !important;
+}
+html.dark .text-\[\#24352A\],
+html.dark .text-\[\#17452C\],
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-slate-700,
+html.dark .text-brand-navy,
+html.dark .text-brand-text {
+  color: var(--ff-text) !important;
+}
+html.dark .text-\[\#66756A\],
+html.dark .text-slate-600,
+html.dark .text-slate-500 {
+  color: var(--ff-text-secondary) !important;
+}
+html.dark .text-\[\#8A958C\],
+html.dark .text-slate-400 {
+  color: var(--ff-text-muted) !important;
+}
+html.dark .border-\[\#E1E7DD\],
+html.dark .border-slate-200,
+html.dark .border-slate-300,
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--ff-border) !important;
+}
+html.dark input:not([type='checkbox']):not([type='radio']),
+html.dark select,
+html.dark textarea {
+  background-color: var(--ff-input);
+  color: var(--ff-text);
+  border-color: var(--ff-border);
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: var(--ff-text-muted);
 }
 
 @layer utilities {
