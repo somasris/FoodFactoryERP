@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext, AuthContextType } from '../context/AuthContext';
 import { I18nProvider } from '../i18n/I18nContext';
@@ -175,29 +175,92 @@ describe('Phase 5: Smart User Experience Frontend Suite', () => {
     });
   });
 
-  it('5. ProductTourModal hides unauthorized module steps and completes tour', () => {
+  it('5. ProductTourModal navigates routes, highlights real data-tour targets with spotlight, and adapts per role', async () => {
     const salesman = makeUser(['SALESMAN'], ['sales.orders.read']);
     const onComplete = vi.fn();
     const onSkip = vi.fn();
+    const scrollIntoViewMock = vi.fn();
 
-    renderWithProviders(
-      <ProductTourModal isOpen={true} onComplete={onComplete} onSkip={onSkip} />,
-      salesman,
+    const TestShellWithTargets = () => (
+      <div>
+        <aside data-tour="sidebar">Sidebar</aside>
+        <button data-tour="command-center">Search</button>
+        <button data-tour="notifications">Bell</button>
+        <div data-tour="theme-switcher">Theme</div>
+        <div data-tour="language-switcher">Lang</div>
+        <button data-tour="user-profile">Profile</button>
+        <Routes>
+          <Route path="/" element={<div>Home</div>} />
+          <Route path="/sales/orders" element={<div data-tour="saved-views">Sales Saved Views</div>} />
+          <Route path="/activity" element={<div data-tour="activity-timeline">Timeline</div>} />
+        </Routes>
+        <ProductTourModal isOpen={true} onComplete={onComplete} onSkip={onSkip} />
+      </div>
     );
 
-    // Step 1: Welcome -> Next -> Command Center -> Next -> Timeline -> Next -> Sales Orders
-    expect(screen.getByText('Welcome to FoodFactory ERP')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
-    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
-    expect(screen.getByText('Sales Orders & Saved Views')).toBeTruthy();
+    // Mock non-zero bounding rect so spotlight overlay renders
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      top: 100,
+      left: 50,
+      width: 200,
+      height: 40,
+      bottom: 140,
+      right: 250,
+      x: 50,
+      y: 100,
+      toJSON: () => ({}),
+    });
+    HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
-    // Salesman only has 4 steps (Welcome, Command Center, Timeline, Sales Orders) -> Finish appears
-    fireEvent.click(screen.getByRole('button', { name: /Finish/i }));
-    expect(onComplete).toHaveBeenCalled();
+    renderWithProviders(<TestShellWithTargets />, salesman);
+
+    // Step 1: Sidebar highlighted with spotlight
+    expect(await screen.findByText('Module Navigation Sidebar')).toBeTruthy();
+    expect(screen.getByTestId('product-tour-spotlight')).toBeTruthy();
+    expect(scrollIntoViewMock).toHaveBeenCalled();
+
+    // Next -> Command Center
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    expect(await screen.findByText('Command Center (Ctrl+K)')).toBeTruthy();
+
+    // Next -> skips Executive Dashboard (SALESMAN lacks analytics.dashboard.read) and navigates to /sales/orders Saved Views!
+    fireEvent.click(screen.getByRole('button', { name: /Next/i }));
+    expect(await screen.findByText('Saved Views on Sales Orders')).toBeTruthy();
+    expect(screen.getByText('Sales Saved Views')).toBeTruthy();
+
+    // Previous -> returns to Command Center
+    fireEvent.click(screen.getByRole('button', { name: /Previous/i }));
+    expect(await screen.findByText('Command Center (Ctrl+K)')).toBeTruthy();
+
+    // Escape -> skips/exits tour
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(onSkip).toHaveBeenCalled();
   });
 
-  it('6. ActivityTimelinePage renders verified audit items and category filters', async () => {
+  it('6. ProductTourModal filters steps accurately for PRODUCTION and AUDITOR roles', () => {
+    const prod = makeUser(['PRODUCTION'], ['production.work_orders.read']);
+    renderWithProviders(
+      <div>
+        <aside data-tour="sidebar">Sidebar</aside>
+        <ProductTourModal isOpen={true} onComplete={vi.fn()} onSkip={vi.fn()} />
+      </div>,
+      prod,
+    );
+    expect(screen.getByTestId('product-tour-tooltip').textContent).toContain('1 of 8');
+
+    const auditor = makeUser(['AUDITOR'], ['governance.audit.read', 'analytics.dashboard.read']);
+    renderWithProviders(
+      <div>
+        <aside data-tour="sidebar">Sidebar</aside>
+        <ProductTourModal isOpen={true} onComplete={vi.fn()} onSkip={vi.fn()} />
+      </div>,
+      auditor,
+    );
+    // AUDITOR sees sidebar, command-center, dashboard-kpis, dashboard-customizer, notifications, activity-timeline, theme, language, profile (9 steps)
+    expect(screen.getAllByTestId('product-tour-tooltip')[1].textContent).toContain('1 of 9');
+  });
+
+  it('7. ActivityTimelinePage renders verified audit items and category filters', async () => {
     vi.spyOn(uxService, 'getActivityTimeline').mockResolvedValue({
       items: [
         {
