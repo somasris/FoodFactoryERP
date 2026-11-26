@@ -1314,11 +1314,13 @@ async function main() {
       update: {
         name: role.name,
         description: role.description,
+        isActive: true,
       },
       create: {
         code: role.code,
         name: role.name,
         description: role.description,
+        isActive: true,
       },
     });
     roleRecordMap.set(role.code, record.id);
@@ -1351,10 +1353,10 @@ async function main() {
   }
 
   // 6. Seed Initial OWNER Account if configured via Environment Variables
-  const ownerEmail = env.INITIAL_OWNER_EMAIL;
+  const ownerEmail = env.INITIAL_OWNER_EMAIL?.trim().toLowerCase();
   const ownerPassword = env.INITIAL_OWNER_PASSWORD;
-  const ownerUsername = env.INITIAL_OWNER_USERNAME || 'owner';
-  const ownerFullName = env.INITIAL_OWNER_FULLNAME || 'Managing Director';
+  const ownerUsername = (env.INITIAL_OWNER_USERNAME || 'owner').trim().toLowerCase();
+  const ownerFullName = (env.INITIAL_OWNER_FULLNAME || 'Managing Director').trim();
 
   if (ownerEmail && ownerPassword) {
     console.info(`  -> Provisioning initial OWNER account (${ownerEmail})...`);
@@ -1363,7 +1365,6 @@ async function main() {
       throw new Error(`Initial OWNER password policy failure: ${policyResult.reason}`);
     }
 
-    const passwordHash = await hashPassword(ownerPassword);
     const ownerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
 
     if (!ownerRole) {
@@ -1372,21 +1373,26 @@ async function main() {
 
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email: ownerEmail }, { username: ownerUsername }],
+        OR: [
+          { email: { equals: ownerEmail, mode: 'insensitive' } },
+          { username: { equals: ownerUsername, mode: 'insensitive' } },
+        ],
       },
     });
 
     let ownerUserId = existingUser?.id;
 
     if (!existingUser) {
+      const passwordHash = await hashPassword(ownerPassword);
       const user = await prisma.user.create({
         data: {
           companyId: company.id,
-          email: ownerEmail.toLowerCase(),
-          username: ownerUsername.toLowerCase(),
+          email: ownerEmail,
+          username: ownerUsername,
           passwordHash,
           fullName: ownerFullName,
           isActive: true,
+          registrationStatus: 'APPROVED',
           userRoles: {
             create: {
               roleId: ownerRole.id,
@@ -1397,19 +1403,27 @@ async function main() {
       ownerUserId = user.id;
       console.info(`  ✅ Initial OWNER account created successfully: ${ownerEmail}`);
     } else {
-      // Ensure user has OWNER role
-      await prisma.userRole.upsert({
-        where: {
-          userId_roleId: {
+      // Ensure existing account is active/approved and has OWNER role without overwriting password
+      await prisma.$transaction(async tx => {
+        if (!existingUser.isActive || existingUser.registrationStatus !== 'APPROVED') {
+          await tx.user.update({
+            where: { id: existingUser.id },
+            data: { isActive: true, registrationStatus: 'APPROVED' },
+          });
+        }
+        await tx.userRole.upsert({
+          where: {
+            userId_roleId: {
+              userId: existingUser.id,
+              roleId: ownerRole.id,
+            },
+          },
+          update: {},
+          create: {
             userId: existingUser.id,
             roleId: ownerRole.id,
           },
-        },
-        update: {},
-        create: {
-          userId: existingUser.id,
-          roleId: ownerRole.id,
-        },
+        });
       });
       console.info(`  ℹ️ Existing user ${ownerEmail} verified with OWNER role.`);
     }
