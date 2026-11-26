@@ -2,6 +2,7 @@
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { authService, UserProfile } from '../services/auth.service';
 import { setOnAuthFailure } from '../services/api-client';
+import { offlineRepo } from '../offline/offline-repository';
 
 export interface AuthContextType {
   user: UserProfile | null;
@@ -35,10 +36,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initAuth = async () => {
       try {
         const userProfile = await authService.refresh();
+        await offlineRepo.saveUserSessionSnapshot(userProfile).catch(() => undefined);
         if (isMounted) {
           setUser(userProfile);
         }
       } catch {
+        // Only fall back to a previously authenticated, non-expired offline session when offline
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+        if (isOffline) {
+          const snapshot = await offlineRepo.getLastActiveUserSnapshot().catch(() => null);
+          if (snapshot && isMounted) {
+            setUser(snapshot.userProfileSnapshot);
+            setIsLoading(false);
+            return;
+          }
+        }
         if (isMounted) {
           setUser(null);
         }
@@ -58,14 +70,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (usernameOrEmail: string, password: string): Promise<UserProfile> => {
     const userProfile = await authService.login(usernameOrEmail, password);
+    await offlineRepo.saveUserSessionSnapshot(userProfile).catch(() => undefined);
     setUser(userProfile);
     return userProfile;
   };
 
   const logout = async (): Promise<void> => {
+    const currentUserId = user?.id;
     try {
       await authService.logout();
+    } catch {
+      // Allow safe offline logout even when the server is unreachable
     } finally {
+      if (currentUserId) {
+        await offlineRepo.clearUserDataOnLogout(currentUserId, false).catch(() => undefined);
+      }
       setUser(null);
     }
   };

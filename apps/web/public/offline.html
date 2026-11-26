@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#245C3A" />
+    <title>Offline - FoodFactory ERP</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Inter, system-ui, -apple-system, sans-serif;
+        background: #f7f8f2;
+        color: #24352a;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem;
+      }
+      .card {
+        max-width: 440px;
+        width: 100%;
+        background: #ffffff;
+        border: 1px solid #e1e7dd;
+        border-radius: 12px;
+        padding: 2rem;
+        box-shadow: 0 4px 16px rgba(16, 59, 40, 0.06);
+        text-align: center;
+      }
+      .badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        background: #eaf1e8;
+        color: #17452c;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+      }
+      h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.25rem;
+        color: #17452c;
+      }
+      p {
+        margin: 0 0 1.5rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        color: #66756a;
+      }
+      .actions {
+        display: flex;
+        gap: 0.75rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      button, a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.625rem 1.125rem;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        text-decoration: none;
+      }
+      .primary {
+        background: #245c3a;
+        color: #ffffff;
+        border: 1px solid #17452c;
+      }
+      .secondary {
+        background: #eaf1e8;
+        color: #17452c;
+        border: 1px solid #e1e7dd;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="card">
+      <div class="badge">Offline Mode</div>
+      <h1>You are currently offline</h1>
+      <p>
+        This page has not been cached for offline access yet. Previously visited modules and your
+        pending offline drafts remain safely stored on this device.
+      </p>
+      <div class="actions">
+        <button class="primary" onclick="window.location.reload()">Retry Connection</button>
+        <a class="secondary" href="/">Return to App</a>
+      </div>
+    </main>
+  </body>
+</html>

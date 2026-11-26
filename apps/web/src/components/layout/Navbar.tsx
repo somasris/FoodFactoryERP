@@ -13,6 +13,7 @@ import { useApiHealth, useDatabaseHealth } from '../../hooks/useHealth';
 import { useAuth } from '../../hooks/useAuth';
 import { getDefaultDashboardPath, NAV_GROUPS } from '../../config/navigation';
 import { NotificationBell } from './NotificationBell';
+import { OfflineStatusBadge } from './OfflineStatusBadge';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -90,8 +91,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar }) => {
         </div>
       </div>
 
-      {/* System Status & User Profile Menu */}
-      <div className="flex items-center gap-3">
+      {/* System Status, Offline Indicator & User Profile Menu */}
+      <div className="flex items-center gap-2.5">
+        <OfflineStatusBadge />
+
         <div
           className="hidden lg:flex items-center gap-2 rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1 text-[11px] text-[#66756A]"
           title={`API: ${apiHealth?.status || (apiError ? 'offline' : 'connecting')} | DB: ${dbHealth?.status || (dbError ? 'offline' : 'checking')}`}

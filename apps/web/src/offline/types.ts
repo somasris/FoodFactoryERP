@@ -1,0 +1,61 @@
+export type ConnectivityState =
+  | 'ONLINE'
+  | 'SERVER_UNAVAILABLE'
+  | 'OFFLINE'
+  | 'SYNCING'
+  | 'SYNC_ERROR';
+
+export type OfflineOperationStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'SYNCED'
+  | 'FAILED'
+  | 'CONFLICT'
+  | 'CANCELLED';
+
+export type OfflineEntityType =
+  | 'INVENTORY_RECEIPT'
+  | 'INVENTORY_ISSUE'
+  | 'INVENTORY_ADJUSTMENT'
+  | 'WAREHOUSE_TRANSFER'
+  | 'SALES_ORDER'
+  | 'PRODUCTION_PLAN'
+  | 'WORK_ORDER'
+  | 'PRODUCTION_BATCH'
+  | 'MATERIAL_CONSUMPTION'
+  | 'MATERIAL_RETURN'
+  | 'QUALITY_INSPECTION';
+
+export type OfflineOperationType =
+  | 'INVENTORY_RECEIPT_DRAFT'
+  | 'INVENTORY_ISSUE_DRAFT'
+  | 'INVENTORY_ADJUSTMENT_DRAFT'
+  | 'WAREHOUSE_TRANSFER_DRAFT'
+  | 'SALES_ORDER_DRAFT_CREATE'
+  | 'SALES_ORDER_DRAFT_UPDATE'
+  | 'SALES_ORDER_SUBMIT'
+  | 'PRODUCTION_PLAN_DRAFT'
+  | 'WORK_ORDER_DRAFT_UPDATE'
+  | 'BATCH_PROGRESS_LOG'
+  | 'BATCH_DOWNTIME_LOG'
+  | 'BATCH_MATERIAL_CONSUMPTION_DRAFT'
+  | 'BATCH_MATERIAL_RETURN_DRAFT'
+  | 'QUALITY_OBSERVATION_DRAFT';
+
+export type ConflictCategory =
+  | 'RECORD_MODIFIED'
+  | 'STOCK_UNAVAILABLE'
+  | 'INSUFFICIENT_PERMISSION'
+  | 'INVALID_STATE_TRANSITION'
+  | 'MASTER_DATA_CHANGED'
+  | 'BATCH_ALREADY_COMPLETED'
+  | 'DUPLICATE_OPERATION'
+  | 'VALIDATION_FAILED';
+
+export interface OfflineQueueCounts {
+  pending: number;
+  processing: number;
+  failed: number;
+  conflict: number;
+  synced: number;
+}
