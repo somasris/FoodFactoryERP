@@ -460,6 +460,8 @@ model User {
   binMovementsPerformed       BinMovement[]
   cycleCountPlansCreated      CycleCountPlan[]              @relation("CycleCountCreator")
   cycleCountPlansAssigned     CycleCountPlan[]              @relation("CycleCountAssignee")
+  preference                  UserPreference?
+  savedViews                  SavedView[]
 
   @@map("users")
 }
@@ -2797,4 +2799,41 @@ model BatchQrReference {
 
   @@index([productionBatchId, isActive])
   @@map("batch_qr_references")
+}
+
+// ------------------------------------------------------------------------------
+// 12. PHASE 5 – SMART USER EXPERIENCE (PREFERENCES & SAVED VIEWS)
+// ------------------------------------------------------------------------------
+
+model UserPreference {
+  id              String    @id @default(uuid())
+  userId          String    @unique @map("user_id")
+  dashboardLayout Json?     @map("dashboard_layout")
+  tourCompleted   Boolean   @default(false) @map("tour_completed")
+  tourCompletedAt DateTime? @map("tour_completed_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model SavedView {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  module    String   @db.VarChar(60)
+  name      String   @db.VarChar(80)
+  filters   Json
+  sort      Json?
+  columns   Json?
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, module])
+  @@unique([userId, module, name])
+  @@map("saved_views")
 }
