@@ -493,6 +493,11 @@ Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 - **Scope:** Factory/warehouse-scoped Digital Shift Handover (`ShiftHandover`, `ShiftHandoverHistory`, `/api/v1/collaboration/handovers/*`, `/production/handovers`) with `DRAFT -> SUBMITTED -> ACKNOWLEDGED -> CLOSED` (`RETURNED`) lifecycle and deduplicated notifications; Read-only Material Substitution Compatibility Checker (`MaterialSubstitutionRequest`, `/api/v1/collaboration/substitutions/*`, `/production/substitutions`) checking category/type, UOM conversion, usable accepted stock, and allergen introduction with controlled approve/reject/apply workflow.
 - **Verification:** `32` API test files (`168` tests) and `37` Web test files (`133` tests) passing (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all green); `MANUAL_UI_VERIFIED` pending live browser walkthrough (see `PHASE_7_VERIFICATION_REPORT.md`).
 
+### Phase 8 – Smart Batch Label Designer
+- **Status:** `TESTED` (2026-11-26)
+- **Scope:** Configurable batch label templates (`BatchLabelTemplate`, `BatchLabelTemplateVersion` with `50x30 mm`, `100x70 mm`, `148x105 mm`, and custom dimensions), authoritative ERP data mapping (company, factory, batch dates, QC release gating, historical allergen snapshot), opaque `BatchQrReference` integration, multi-copy `pdfkit` + `qrcode` PDF export, immutable `BatchLabelRecord` (`ORIGINAL`/`REPRINT`) history (`/api/v1/labels/*`), and `/production/labels` UI (`BatchLabelDesignerPage.tsx`).
+- **Verification:** `33` API test files (`172` tests) and `38` Web test files (`135` tests) passing (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all green); `MANUAL_UI_VERIFIED` pending live browser & printer walkthrough (see `PHASE_8_VERIFICATION_REPORT.md`).
+
 ---
 
 ## 8. Roadmap Governance Rules
