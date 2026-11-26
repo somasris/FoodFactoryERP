@@ -44,6 +44,9 @@ importers:
       pdfkit:
         specifier: ^0.21.0
         version: 0.21.0
+      qrcode:
+        specifier: ^1.5.4
+        version: 1.5.4
       zod:
         specifier: ^3.24.2
         version: 3.25.76
@@ -66,6 +69,9 @@ importers:
       '@types/pdfkit':
         specifier: ^0.17.7
         version: 0.17.7
+      '@types/qrcode':
+        specifier: ^1.5.6
+        version: 1.5.6
       '@types/supertest':
         specifier: ^7.2.1
         version: 7.2.1

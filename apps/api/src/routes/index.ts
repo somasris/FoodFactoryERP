@@ -15,6 +15,7 @@ import { notificationRouter } from '../modules/notifications/notification.routes
 import { warehouseRouter } from '../modules/warehouse/warehouse.routes';
 import { syncRouter } from '../modules/sync/sync.routes';
 import { searchRouter } from '../modules/search/search.routes';
+import { labelRouter } from '../modules/labels/label.routes';
 import {
   activityTimelineRouter,
   preferencesRouter,
@@ -72,6 +73,9 @@ apiRouter.use('/sync', syncRouter);
 
 // Mount Global Command Center Search API under /api/v1/search
 apiRouter.use('/search', searchRouter);
+
+// Mount Phase 8 Smart Batch Label Designer API under /api/v1/labels
+apiRouter.use('/labels', labelRouter);
 
 // Mount Phase 5 Smart UX routes
 apiRouter.use('/preferences', preferencesRouter);
