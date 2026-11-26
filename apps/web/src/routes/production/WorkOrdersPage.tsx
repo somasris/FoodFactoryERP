@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { Eye, Search } from 'lucide-react';
 import { productionService } from '../../services/production.service';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
+import { SavedViewsBar } from '../../components/ux/SavedViewsBar';
+import { FilterValue } from '../../services/ux.service';
 
 const WO_STATUSES = ['', 'DRAFT', 'SUBMITTED', 'APPROVED', 'REJECTED', 'RELEASED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const WO_PRIORITIES = ['', 'LOW', 'NORMAL', 'HIGH', 'URGENT'];
@@ -48,8 +50,28 @@ export const WorkOrdersPage: React.FC = () => {
   const rows = data?.data?.items || [];
   const pagination = data?.data?.pagination;
 
+  const handleApplyView = useCallback((filters: Record<string, FilterValue>) => {
+    setSearch(typeof filters.search === 'string' ? filters.search : '');
+    setStatus(typeof filters.status === 'string' ? filters.status : '');
+    setPriority(typeof filters.priority === 'string' ? filters.priority : '');
+    setPage(1);
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setSearch('');
+    setStatus('');
+    setPriority('');
+    setPage(1);
+  }, []);
+
   return (
     <div className="space-y-4">
+      <SavedViewsBar
+        module="work_orders"
+        currentFilters={{ search, status, priority }}
+        onApplyView={handleApplyView}
+        onResetFilters={handleResetFilters}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <div className="relative">

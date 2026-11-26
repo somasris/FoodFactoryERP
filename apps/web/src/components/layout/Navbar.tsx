@@ -12,6 +12,9 @@ import {
   Sun,
   Moon,
   Monitor,
+  Keyboard,
+  Activity,
+  Compass,
 } from 'lucide-react';
 import { useApiHealth, useDatabaseHealth } from '../../hooks/useHealth';
 import { useAuth } from '../../hooks/useAuth';
@@ -24,9 +27,16 @@ import { useTheme } from '../../context/ThemeContext';
 interface NavbarProps {
   onToggleSidebar: () => void;
   onOpenCommandCenter?: () => void;
+  onOpenShortcuts?: () => void;
+  onStartTour?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCenter }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  onToggleSidebar,
+  onOpenCommandCenter,
+  onOpenShortcuts,
+  onStartTour,
+}) => {
   const { data: apiHealth, isError: apiError } = useApiHealth();
   const { data: dbHealth, isError: dbError } = useDatabaseHealth();
   const { user, logout } = useAuth();
@@ -116,6 +126,18 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
             <kbd className="hidden md:inline rounded border border-[#E1E7DD] bg-white px-1 py-0.5 font-mono text-[10px] text-[#8A958C]">
               Ctrl+K
             </kbd>
+          </button>
+        )}
+
+        {user && onOpenShortcuts && (
+          <button
+            type="button"
+            onClick={onOpenShortcuts}
+            aria-label={t('shortcuts.title', 'Keyboard Shortcuts')}
+            title={t('shortcuts.title', 'Keyboard Shortcuts')}
+            className="hidden sm:flex items-center justify-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-1.5 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
+          >
+            <Keyboard className="h-3.5 w-3.5" />
           </button>
         )}
 
@@ -262,6 +284,29 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
                     ))}
                   </div>
                 </div>
+                <Link
+                  to="/activity"
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-[#24352A] hover:bg-[#EAF1E8] transition-colors"
+                >
+                  <Activity className="h-3.5 w-3.5 text-[#245C3A]" />
+                  <span>{t('ux.activityTimeline', 'Activity Timeline')}</span>
+                </Link>
+                {onStartTour && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onStartTour();
+                    }}
+                    className="flex w-full items-center gap-2 px-3.5 py-2 text-xs font-medium text-[#24352A] hover:bg-[#EAF1E8] transition-colors"
+                  >
+                    <Compass className="h-3.5 w-3.5 text-[#245C3A]" />
+                    <span>{t('tour.restartTour', 'Restart Product Tour')}</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   role="menuitem"

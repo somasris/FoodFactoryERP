@@ -6,6 +6,7 @@ import { LoginPage } from './LoginPage';
 import { UnauthorizedPage } from './UnauthorizedPage';
 import { NotFoundPage } from './NotFoundPage';
 import { SyncCenterPage } from './SyncCenterPage';
+import { ActivityTimelinePage } from './ActivityTimelinePage';
 import { MasterDataLayout } from '../components/master-data/MasterDataLayout';
 import { ProductsPage } from './master-data/ProductsPage';
 import { ProductVariantsPage } from './master-data/ProductVariantsPage';
@@ -122,6 +123,10 @@ export const router = createBrowserRouter([
       {
         path: 'dashboard',
         element: <RoleDashboardRedirect />,
+      },
+      {
+        path: 'activity',
+        element: <ActivityTimelinePage />,
       },
       {
         path: 'master-data',

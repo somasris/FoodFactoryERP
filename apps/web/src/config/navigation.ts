@@ -446,7 +446,7 @@ export function canAccessPath(user: UserProfile | null, pathname: string): boole
   if (user.roles.includes('OWNER')) return true;
 
   const cleanPath = pathname.split('?')[0];
-  if (cleanPath === '/' || cleanPath === '/dashboard' || cleanPath === '/unauthorized') {
+  if (cleanPath === '/' || cleanPath === '/dashboard' || cleanPath === '/unauthorized' || cleanPath === '/activity') {
     return true;
   }
 

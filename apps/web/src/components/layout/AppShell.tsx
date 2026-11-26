@@ -1,18 +1,66 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
 import { OfflineDataBanner } from '../common/OfflineDataBanner';
 import { CommandCenterModal } from '../command-center/CommandCenterModal';
+import { KeyboardShortcutsModal } from '../ux/KeyboardShortcutsModal';
+import { ProductTourModal } from '../ux/ProductTourModal';
 import { useOffline } from '../../context/OfflineContext';
+import { useAuth } from '../../hooks/useAuth';
+import { isEditableTarget, SHORTCUT_DEFINITIONS } from '../../config/shortcuts';
+import { uxService } from '../../services/ux.service';
 
 export const AppShell: React.FC = () => {
   const { swUpdateAvailable, applySwUpdate, storageQuotaError, counts } = useOffline();
+  const { user, hasPermission } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const chordPrefixRef = useRef<{ key: string; timestamp: number } | null>(null);
+
+  const { data: prefs } = useQuery({
+    queryKey: ['ux', 'preferences'],
+    queryFn: () => uxService.getPreferences(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  const completeTourMutation = useMutation({
+    mutationFn: () => uxService.updateTourPreference(true),
+    onSuccess: updated => {
+      queryClient.setQueryData(['ux', 'preferences'], updated);
+    },
+  });
+
+  useEffect(() => {
+    if (!user || !prefs) return;
+    const seenLocalKey = `ff_tour_seen_${user.id}`;
+    const seenLocally = window.localStorage.getItem(seenLocalKey) === 'true';
+    if (!prefs.tourCompleted && !seenLocally) {
+      setTourOpen(true);
+    }
+  }, [user, prefs]);
+
+  const handleFinishTour = () => {
+    setTourOpen(false);
+    if (user) {
+      try {
+        window.localStorage.setItem(`ff_tour_seen_${user.id}`, 'true');
+      } catch {
+        // Ignore storage errors
+      }
+      completeTourMutation.mutate();
+    }
+  };
 
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -24,11 +72,48 @@ export const AppShell: React.FC = () => {
           }
           return !prev;
         });
+        return;
+      }
+
+      if (isEditableTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) {
+        return;
+      }
+
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen(prev => !prev);
+        return;
+      }
+
+      const keyLower = e.key.toLowerCase();
+      const now = Date.now();
+      const pending = chordPrefixRef.current;
+
+      if (pending && now - pending.timestamp < 1000) {
+        const chord = `${pending.key} ${keyLower}`;
+        chordPrefixRef.current = null;
+        const match = SHORTCUT_DEFINITIONS.find(
+          s =>
+            s.path &&
+            s.keys.includes(chord) &&
+            (!s.requiredPermissions?.length || s.requiredPermissions.every(p => hasPermission(p))),
+        );
+        if (match?.path) {
+          e.preventDefault();
+          navigate(match.path);
+          return;
+        }
+      }
+
+      if (keyLower === 'g' || keyLower === 'c') {
+        chordPrefixRef.current = { key: keyLower, timestamp: now };
+      } else {
+        chordPrefixRef.current = null;
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, []);
+  }, [hasPermission, navigate]);
 
   const handleCloseCommand = () => {
     setCommandOpen(false);
@@ -62,8 +147,19 @@ export const AppShell: React.FC = () => {
           lastFocusedRef.current = document.activeElement as HTMLElement | null;
           setCommandOpen(true);
         }}
+        onOpenShortcuts={() => setShortcutsOpen(true)}
+        onStartTour={() => setTourOpen(true)}
       />
       <CommandCenterModal isOpen={commandOpen} onClose={handleCloseCommand} />
+      <KeyboardShortcutsModal
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
+      <ProductTourModal
+        isOpen={tourOpen}
+        onComplete={handleFinishTour}
+        onSkip={handleFinishTour}
+      />
       {swUpdateAvailable && (
         <div
           role="status"

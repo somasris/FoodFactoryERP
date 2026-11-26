@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Search, Eye } from 'lucide-react';
@@ -6,6 +6,8 @@ import { salesService } from '../../services/sales.service';
 import { useAuth } from '../../hooks/useAuth';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
 import { Button } from '../../components/common/Button';
+import { SavedViewsBar } from '../../components/ux/SavedViewsBar';
+import { FilterValue } from '../../services/ux.service';
 
 export const SalesOrdersPage: React.FC = () => {
   const { hasPermission } = useAuth();
@@ -29,8 +31,26 @@ export const SalesOrdersPage: React.FC = () => {
   const pagination = data?.data?.pagination;
   const canCreate = hasPermission('sales.orders.create');
 
+  const handleApplyView = useCallback((filters: Record<string, FilterValue>) => {
+    setSearch(typeof filters.search === 'string' ? filters.search : '');
+    setStatus(typeof filters.status === 'string' ? filters.status : '');
+    setPage(1);
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setSearch('');
+    setStatus('');
+    setPage(1);
+  }, []);
+
   return (
     <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <SavedViewsBar
+        module="sales_orders"
+        currentFilters={{ search, status }}
+        onApplyView={handleApplyView}
+        onResetFilters={handleResetFilters}
+      />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-semibold text-brand-navy">Sales Orders</h2>
