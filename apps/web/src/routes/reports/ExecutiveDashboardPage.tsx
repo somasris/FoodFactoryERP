@@ -103,7 +103,7 @@ export const ExecutiveDashboardPage: React.FC = () => {
         }
       />
 
-      <section aria-labelledby="business-kpis-heading" className="space-y-3">
+      <section aria-labelledby="business-kpis-heading" className="space-y-3" data-tour="dashboard-kpis">
         <h2
           id="business-kpis-heading"
           className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500"

@@ -40,6 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Deep Forest Green Sidebar Panel */}
       <aside
+        data-tour="sidebar"
         className={cn(
           'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[#103B28] bg-[#173F2B] text-white transition-all duration-200 ease-in-out md:static md:z-0 md:translate-x-0',
           collapsed ? 'md:w-16' : 'md:w-60',

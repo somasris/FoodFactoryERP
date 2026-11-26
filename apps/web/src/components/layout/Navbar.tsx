@@ -117,6 +117,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {user && onOpenCommandCenter && (
           <button
             type="button"
+            data-tour="command-center"
             onClick={onOpenCommandCenter}
             aria-label="Open Command Center"
             className="flex items-center gap-2 rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
@@ -132,6 +133,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {user && onOpenShortcuts && (
           <button
             type="button"
+            data-tour="shortcuts-trigger"
             onClick={onOpenShortcuts}
             aria-label={t('shortcuts.title', 'Keyboard Shortcuts')}
             title={t('shortcuts.title', 'Keyboard Shortcuts')}
@@ -142,6 +144,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
 
         <div
+          data-tour="theme-switcher"
           className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
           role="group"
           aria-label="Theme switcher"
@@ -188,6 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         <div
+          data-tour="language-switcher"
           className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
           role="group"
           aria-label="Language switcher"
@@ -243,6 +247,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="relative" ref={menuRef}>
             <button
               type="button"
+              data-tour="user-profile"
               onClick={() => setMenuOpen(prev => !prev)}
               aria-expanded={menuOpen}
               aria-haspopup="menu"

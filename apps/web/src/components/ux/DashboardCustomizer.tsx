@@ -32,6 +32,7 @@ export const DashboardCustomizer: React.FC<DashboardCustomizerProps> = ({
     <div className="relative">
       <button
         type="button"
+        data-tour="dashboard-customizer"
         onClick={() => setOpen(v => !v)}
         aria-expanded={open}
         className="inline-flex h-8 items-center gap-1.5 rounded-md border border-[#E1E7DD] bg-white px-2.5 text-xs font-medium text-[#17452C] hover:bg-[#EAF1E8] transition-colors"

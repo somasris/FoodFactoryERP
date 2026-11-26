@@ -89,7 +89,10 @@ export const SavedViewsBar: React.FC<SavedViewsBarProps> = ({
   });
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-2 text-xs">
+    <div
+      data-tour="saved-views"
+      className="flex flex-wrap items-center gap-2 rounded-lg border border-[#E1E7DD] bg-[#FAFBF8] px-3 py-2 text-xs"
+    >
       <span className="inline-flex items-center gap-1 font-semibold text-[#17452C]">
         <Bookmark className="h-3.5 w-3.5" />
         <span>{t('savedViews.title', 'Views')}:</span>

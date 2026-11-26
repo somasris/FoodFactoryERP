@@ -163,6 +163,7 @@ export const NotificationBell: React.FC = () => {
     <div className="relative" ref={containerRef}>
       <button
         type="button"
+        data-tour="notifications"
         onClick={() => setOpen(prev => !prev)}
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
         aria-expanded={open}

@@ -50,7 +50,10 @@ export const ActivityTimelinePage: React.FC = () => {
         )}
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E1E7DD] bg-white p-3">
+      <div
+        data-tour="activity-timeline"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#E1E7DD] bg-white p-3"
+      >
         <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Activity categories">
           {CATEGORIES.map(cat => (
             <button
