@@ -394,6 +394,13 @@ model Warehouse {
   batchReturns         ProductionBatchReturn[]
   qualityInspections   QualityInspection[]
   stockAudits          StockAudit[]
+  zones                WarehouseZone[]
+  racks                WarehouseRack[]
+  shelves              WarehouseShelf[]
+  bins                 WarehouseBin[]
+  binAllocations       BinStockAllocation[]
+  binMovements         BinMovement[]
+  cycleCountPlans      CycleCountPlan[]
 
   @@map("warehouses")
 }
@@ -450,6 +457,9 @@ model User {
   complianceDocsVerified      ComplianceDocument[]          @relation("ComplianceDocVerifier")
   userNotifications           UserNotification[]
   notificationPreferences     NotificationPreference[]
+  binMovementsPerformed       BinMovement[]
+  cycleCountPlansCreated      CycleCountPlan[]              @relation("CycleCountCreator")
+  cycleCountPlansAssigned     CycleCountPlan[]              @relation("CycleCountAssignee")
 
   @@map("users")
 }
@@ -810,6 +820,8 @@ model InventoryItem {
   batchConsumptions         ProductionBatchConsumption[]
   batchReturns              ProductionBatchReturn[]
   varianceApprovals         ProductionBatchVarianceApproval[]
+  binAllocations            BinStockAllocation[]
+  binMovements              BinMovement[]
 
   @@map("inventory_items")
 }
@@ -1010,6 +1022,8 @@ model InventoryBatch {
   consumedInBatches    ProductionBatchConsumption[]
   returnedFromBatches  ProductionBatchReturn[]
   qualityInspections   QualityInspection[]
+  binAllocations       BinStockAllocation[]
+  binMovements         BinMovement[]
 
   @@unique([inventoryItemId, batchNumber])
   @@index([inventoryItemId])
@@ -2197,6 +2211,11 @@ model StockAudit {
   notes                 String?          @db.Text
   idempotencyKey        String?          @unique @map("idempotency_key") @db.VarChar(100)
   inventoryAdjustmentId String?          @map("inventory_adjustment_id")
+  cycleCountPlanId      String?          @map("cycle_count_plan_id")
+  binId                 String?          @map("bin_id")
+  isBlindCount          Boolean          @default(false) @map("is_blind_count")
+  assignedToId          String?          @map("assigned_to_id")
+  recountRequired       Boolean          @default(false) @map("recount_required")
   createdById           String           @map("created_by_id")
   submittedById         String?          @map("submitted_by_id")
   submittedAt           DateTime?        @map("submitted_at")
@@ -2231,6 +2250,12 @@ model StockAuditLine {
   unitCost             Decimal           @default(0) @map("unit_cost") @db.Decimal(18, 4)
   varianceValue        Decimal           @default(0) @map("variance_value") @db.Decimal(14, 2)
   varianceReason       AdjustmentReason? @map("variance_reason")
+  binId                String?           @map("bin_id")
+  firstCountQuantity   Decimal?          @map("first_count_quantity") @db.Decimal(18, 4)
+  recountQuantity      Decimal?          @map("recount_quantity") @db.Decimal(18, 4)
+  recountById          String?           @map("recount_by_id")
+  recountedAt          DateTime?         @map("recounted_at")
+  investigationNotes   String?           @map("investigation_notes") @db.Text
   remarks              String?           @db.Text
 
   stockAudit StockAudit @relation(fields: [stockAuditId], references: [id], onDelete: Cascade)
@@ -2437,4 +2462,254 @@ model NotificationAlertState {
   resolvedAt      DateTime? @map("resolved_at")
 
   @@map("notification_alert_states")
+}
+
+// ------------------------------------------------------------------------------
+// 15. SMART WAREHOUSE, BIN LOCATIONS & BARCODE OPERATIONS (PHASE 9)
+// ------------------------------------------------------------------------------
+
+enum WarehouseLocationType {
+  ZONE
+  RACK
+  SHELF
+  BIN
+  STAGING
+  QUARANTINE
+  COLD_STORAGE
+  DISPATCH
+}
+
+enum StorageCondition {
+  AMBIENT
+  CHILLED
+  FROZEN
+  DRY
+  HAZMAT
+  QUARANTINE
+}
+
+enum BinMovementType {
+  PUT_AWAY
+  BIN_TRANSFER
+  PICK
+  CYCLE_COUNT_ADJUST
+}
+
+enum BarcodeEntityType {
+  RAW_MATERIAL
+  PACKAGING_MATERIAL
+  FINISHED_PRODUCT
+  INVENTORY_BATCH
+  WAREHOUSE_BIN
+  PURCHASE_RECEIPT
+  WORK_ORDER
+}
+
+enum AbcClass {
+  A
+  B
+  C
+}
+
+enum CycleCountFrequency {
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum CycleCountPlanStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model WarehouseZone {
+  id                      String                @id @default(uuid())
+  warehouseId             String                @map("warehouse_id")
+  code                    String                @db.VarChar(30)
+  name                    String                @db.VarChar(100)
+  zoneType                WarehouseLocationType @default(ZONE) @map("zone_type")
+  storageCondition        StorageCondition      @default(AMBIENT) @map("storage_condition")
+  isTemperatureControlled Boolean               @default(false) @map("is_temperature_controlled")
+  temperatureMinC         Decimal?              @map("temperature_min_c") @db.Decimal(6, 2)
+  temperatureMaxC         Decimal?              @map("temperature_max_c") @db.Decimal(6, 2)
+  allergenProfile         String?               @map("allergen_profile") @db.VarChar(200)
+  isActive                Boolean               @default(true) @map("is_active")
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+
+  warehouse Warehouse       @relation(fields: [warehouseId], references: [id])
+  racks     WarehouseRack[]
+
+  @@unique([warehouseId, code])
+  @@index([warehouseId, isActive])
+  @@map("warehouse_zones")
+}
+
+model WarehouseRack {
+  id          String   @id @default(uuid())
+  warehouseId String   @map("warehouse_id")
+  zoneId      String   @map("zone_id")
+  code        String   @db.VarChar(30)
+  name        String   @db.VarChar(100)
+  aisle       String?  @db.VarChar(30)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  zone      WarehouseZone    @relation(fields: [zoneId], references: [id])
+  shelves   WarehouseShelf[]
+
+  @@unique([zoneId, code])
+  @@index([warehouseId, zoneId])
+  @@map("warehouse_racks")
+}
+
+model WarehouseShelf {
+  id          String   @id @default(uuid())
+  warehouseId String   @map("warehouse_id")
+  rackId      String   @map("rack_id")
+  code        String   @db.VarChar(30)
+  name        String   @db.VarChar(100)
+  levelNumber Int      @default(1) @map("level_number")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
+  rack      WarehouseRack  @relation(fields: [rackId], references: [id])
+  bins      WarehouseBin[]
+
+  @@unique([rackId, code])
+  @@index([warehouseId, rackId])
+  @@map("warehouse_shelves")
+}
+
+model WarehouseBin {
+  id                      String                @id @default(uuid())
+  warehouseId             String                @map("warehouse_id")
+  shelfId                 String                @map("shelf_id")
+  code                    String                @db.VarChar(40)
+  name                    String                @db.VarChar(100)
+  locationType            WarehouseLocationType @default(BIN) @map("location_type")
+  storageCondition        StorageCondition      @default(AMBIENT) @map("storage_condition")
+  capacityQuantity        Decimal               @default(0) @map("capacity_quantity") @db.Decimal(18, 4)
+  capacityUomId           String?               @map("capacity_uom_id")
+  isTemperatureControlled Boolean               @default(false) @map("is_temperature_controlled")
+  allergenRestriction     String?               @map("allergen_restriction") @db.VarChar(200)
+  allowMixedItems         Boolean               @default(true) @map("allow_mixed_items")
+  allowMixedBatches       Boolean               @default(true) @map("allow_mixed_batches")
+  isActive                Boolean               @default(true) @map("is_active")
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+
+  warehouse     Warehouse            @relation(fields: [warehouseId], references: [id])
+  shelf         WarehouseShelf       @relation(fields: [shelfId], references: [id])
+  allocations   BinStockAllocation[]
+  movementsFrom BinMovement[]        @relation("BinMovementFrom")
+  movementsTo   BinMovement[]        @relation("BinMovementTo")
+
+  @@unique([warehouseId, code])
+  @@index([shelfId])
+  @@index([warehouseId, isActive])
+  @@map("warehouse_bins")
+}
+
+model BinStockAllocation {
+  id               String   @id @default(uuid())
+  warehouseId      String   @map("warehouse_id")
+  binId            String   @map("bin_id")
+  inventoryItemId  String   @map("inventory_item_id")
+  batchId          String?  @map("batch_id")
+  quantity         Decimal  @default(0) @db.Decimal(18, 4)
+  reservedQuantity Decimal  @default(0) @map("reserved_quantity") @db.Decimal(18, 4)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  warehouse     Warehouse       @relation(fields: [warehouseId], references: [id])
+  bin           WarehouseBin    @relation(fields: [binId], references: [id])
+  inventoryItem InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  batch         InventoryBatch? @relation(fields: [batchId], references: [id])
+
+  @@unique([binId, inventoryItemId, batchId])
+  @@index([warehouseId, inventoryItemId, batchId])
+  @@index([binId])
+  @@map("bin_stock_allocations")
+}
+
+model BinMovement {
+  id              String          @id @default(uuid())
+  movementNumber  String          @unique @map("movement_number") @db.VarChar(40)
+  warehouseId     String          @map("warehouse_id")
+  movementType    BinMovementType @map("movement_type")
+  inventoryItemId String          @map("inventory_item_id")
+  batchId         String?         @map("batch_id")
+  fromBinId       String?         @map("from_bin_id")
+  toBinId         String?         @map("to_bin_id")
+  quantity        Decimal         @db.Decimal(18, 4)
+  referenceType   String?         @map("reference_type") @db.VarChar(40)
+  referenceId     String?         @map("reference_id") @db.VarChar(60)
+  idempotencyKey  String?         @unique @map("idempotency_key") @db.VarChar(100)
+  performedById   String          @map("performed_by_id")
+  notes           String?         @db.Text
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  warehouse     Warehouse       @relation(fields: [warehouseId], references: [id])
+  inventoryItem InventoryItem   @relation(fields: [inventoryItemId], references: [id])
+  batch         InventoryBatch? @relation(fields: [batchId], references: [id])
+  fromBin       WarehouseBin?   @relation("BinMovementFrom", fields: [fromBinId], references: [id])
+  toBin         WarehouseBin?   @relation("BinMovementTo", fields: [toBinId], references: [id])
+  performedBy   User            @relation(fields: [performedById], references: [id])
+
+  @@index([warehouseId, createdAt])
+  @@index([inventoryItemId])
+  @@index([fromBinId])
+  @@index([toBinId])
+  @@map("bin_movements")
+}
+
+model BarcodeLabel {
+  id           String            @id @default(uuid())
+  barcodeValue String            @unique @map("barcode_value") @db.VarChar(120)
+  qrPayload    String?           @map("qr_payload") @db.Text
+  entityType   BarcodeEntityType @map("entity_type")
+  entityId     String            @map("entity_id") @db.VarChar(80)
+  warehouseId  String?           @map("warehouse_id")
+  labelFormat  String            @default("CODE128") @map("label_format") @db.VarChar(20)
+  isActive     Boolean           @default(true) @map("is_active")
+  createdById  String?           @map("created_by_id")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+
+  @@unique([entityType, entityId])
+  @@index([barcodeValue])
+  @@index([warehouseId])
+  @@map("barcode_labels")
+}
+
+model CycleCountPlan {
+  id           String               @id @default(uuid())
+  planNumber   String               @unique @map("plan_number") @db.VarChar(40)
+  name         String               @db.VarChar(120)
+  warehouseId  String               @map("warehouse_id")
+  abcClass     AbcClass?            @map("abc_class")
+  frequency    CycleCountFrequency
+  isBlindCount Boolean              @default(false) @map("is_blind_count")
+  binId        String?              @map("bin_id")
+  assignedToId String?              @map("assigned_to_id")
+  nextRunDate  DateTime             @map("next_run_date")
+  lastRunDate  DateTime?            @map("last_run_date")
+  status       CycleCountPlanStatus @default(ACTIVE)
+  createdById  String               @map("created_by_id")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+
+  warehouse  Warehouse @relation(fields: [warehouseId], references: [id])
+  createdBy  User      @relation("CycleCountCreator", fields: [createdById], references: [id])
+  assignedTo User?     @relation("CycleCountAssignee", fields: [assignedToId], references: [id])
+
+  @@index([warehouseId, status, nextRunDate])
+  @@map("cycle_count_plans")
 }
