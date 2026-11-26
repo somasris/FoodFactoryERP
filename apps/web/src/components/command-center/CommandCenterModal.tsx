@@ -14,6 +14,7 @@ import {
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from '../../i18n/I18nContext';
 import { NAV_GROUPS } from '../../config/navigation';
+import { SHORTCUT_DEFINITIONS } from '../../config/shortcuts';
 import { searchService, SearchResultItem } from '../../services/search.service';
 
 interface CommandCenterModalProps {
@@ -27,6 +28,7 @@ interface PaletteEntry {
   title: string;
   subtitle: string;
   status?: string | null;
+  shortcut?: string;
   path: string;
 }
 
@@ -123,64 +125,61 @@ export const CommandCenterModal: React.FC<CommandCenterModalProps> = ({ isOpen, 
   }, [debouncedQuery, isOpen]);
 
   const permittedNavItems = useMemo<PaletteEntry[]>(() => {
+    const shortcutByPath = new Map<string, string>();
+    for (const s of SHORTCUT_DEFINITIONS) {
+      if (s.path) shortcutByPath.set(s.path, s.displayKeys);
+    }
+
+    const seenPaths = new Set<string>();
     const items: PaletteEntry[] = [];
+
+    if (hasPermission('production.batches.read')) {
+      seenPaths.add('/production/factory-pulse');
+      items.push({
+        id: 'nav:/production/factory-pulse',
+        group: 'Navigation',
+        title: 'Live Factory Pulse',
+        subtitle: 'Real-Time Manufacturing Overview',
+        shortcut: shortcutByPath.get('/production/factory-pulse'),
+        path: '/production/factory-pulse',
+      });
+    }
+
     for (const group of NAV_GROUPS) {
       for (const item of group.items) {
+        if (seenPaths.has(item.path)) continue;
         const hasAll = !item.requiredPermissions?.length || item.requiredPermissions.every(p => hasPermission(p));
         const hasAny = !item.anyPermission?.length || item.anyPermission.some(p => hasPermission(p));
         if (hasAll && hasAny) {
+          seenPaths.add(item.path);
           items.push({
             id: `nav:${item.path}`,
             group: 'Navigation',
             title: item.label,
             subtitle: group.label,
+            shortcut: shortcutByPath.get(item.path),
             path: item.path,
           });
         }
       }
     }
 
-    if (hasPermission('production.batches.read')) {
-      items.unshift({
-        id: 'nav:/production/factory-pulse',
-        group: 'Navigation',
-        title: 'Live Factory Pulse',
-        subtitle: 'Real-Time Manufacturing Overview',
-        path: '/production/factory-pulse',
-      });
-    }
-
-    const quickActions: PaletteEntry[] = [];
-    if (hasPermission('sales.orders.create')) {
-      quickActions.push({
-        id: 'act:new-so',
-        group: 'Quick Actions',
-        title: 'Create Sales Order',
-        subtitle: 'Open new sales order draft form',
-        path: '/sales/orders/new',
-      });
-    }
-    if (hasPermission('production.plans.create')) {
-      quickActions.push({
-        id: 'act:new-plan',
-        group: 'Quick Actions',
-        title: 'Create Production Plan',
-        subtitle: 'Open production planning workspace',
-        path: '/production/plans',
-      });
-    }
-    if (hasPermission('inventory.receipt.create')) {
-      quickActions.push({
-        id: 'act:new-rcp',
-        group: 'Quick Actions',
-        title: 'Record Inventory Receipt',
-        subtitle: 'Open inventory receipts',
-        path: '/inventory/receipts',
-      });
-    }
+    const quickActions: PaletteEntry[] = SHORTCUT_DEFINITIONS.filter(
+      s =>
+        s.quickAction &&
+        s.path &&
+        (!s.requiredPermissions?.length || s.requiredPermissions.every(p => hasPermission(p))),
+    ).map(s => ({
+      id: s.id,
+      group: 'Quick Actions',
+      title: t(s.titleKey, s.defaultTitle),
+      subtitle: s.defaultSubtitle || '',
+      shortcut: s.displayKeys,
+      path: s.path!,
+    }));
 
     return [...quickActions, ...items];
-  }, [hasPermission]);
+  }, [hasPermission, t]);
 
   const entries = useMemo<PaletteEntry[]>(() => {
     if (!debouncedQuery) {
@@ -373,6 +372,11 @@ export const CommandCenterModal: React.FC<CommandCenterModalProps> = ({ isOpen, 
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      {entry.shortcut && (
+                        <kbd className="hidden sm:inline rounded border border-[#E1E7DD] bg-[#FAFBF8] px-1.5 py-0.5 font-mono text-[10px] text-[#66756A]">
+                          {entry.shortcut}
+                        </kbd>
+                      )}
                       {entry.status && (
                         <span className="rounded bg-[#F4F0E4] px-1.5 py-0.5 text-[10px] font-semibold text-[#17452C]">
                           {entry.status}
