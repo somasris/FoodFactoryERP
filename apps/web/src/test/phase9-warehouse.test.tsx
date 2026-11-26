@@ -60,10 +60,12 @@ describe('Phase 9 Smart Warehouse Frontend Suite', () => {
             updatedAt: new Date().toISOString(),
           },
         ],
-        total: 1,
-        page: 1,
-        limit: 100,
-        totalPages: 1,
+        pagination: {
+          total: 1,
+          page: 1,
+          limit: 100,
+          totalPages: 1,
+        },
       },
       timestamp: new Date().toISOString(),
     });
