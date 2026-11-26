@@ -471,6 +471,11 @@ Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 - **Scope:** Persistent PostgreSQL models (`Notification`, `UserNotification`, `NotificationPreference`, `NotificationOutbox`, `NotificationAlertState`), `/api/v1/notifications` REST + authenticated SSE stream, ERP business event integrations (Sales, Invoicing, Inventory/Low-Stock, Production, Quality, Administration, Operations), header `NotificationBell`, `/notifications` center, and `/notifications/preferences`.
 - **Verification:** `23` API test files (`132` tests) and `22` Web test files (`90` tests) passing; `MANUAL_UI_VERIFIED` pending live browser walkthrough (see `NOTIFICATION_SYSTEM_VERIFICATION_REPORT.md`).
 
+### Phase 9 – Smart Warehouse, Bin Locations & Barcode Operations
+- **Status:** `TESTED` (2026-11-26)
+- **Scope:** `Factory -> Warehouse -> Zone -> Rack -> Shelf -> Bin` hierarchy, `BinStockAllocation` & `BinMovement` sub-ledger preserving authoritative `InventoryBalance`, `BarcodeLabel` + camera/keyboard-wedge/manual scan operations, FEFO/FIFO & storage-condition picking/put-away suggestions, `StockAudit`-backed cycle counting (`CycleCountPlan`, blind counts, recount & variance investigation), warehouse analytics, and 10 React pages under `/inventory/*`.
+- **Verification:** `24` API test files (`137` tests) and `23` Web test files (`94` tests) passing; `MANUAL_UI_VERIFIED` pending live browser walkthrough (see `PHASE_9_VERIFICATION_REPORT.md`).
+
 ---
 
 ## 8. Roadmap Governance Rules
