@@ -13,6 +13,7 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
   let testCreatedUserId: string;
   let primaryOwnerId: string;
   let secondaryOwnerId: string;
+  let preservedOwnerUserIds: string[] = [];
 
   beforeAll(async () => {
     const pw = await hashPassword('AdminPass2026!');
@@ -39,6 +40,26 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
         },
       },
     });
+
+    // Snapshot existing non-test OWNER userIds before temporarily isolating last-owner tests
+    const existingOwners = await prisma.userRole.findMany({
+      where: {
+        role: { code: 'OWNER' },
+        user: {
+          username: {
+            notIn: [
+              'primary_test_owner',
+              'secondary_test_owner',
+              'usermgmt_admin',
+              'created_employee_test',
+              'attempted_owner_target',
+            ],
+          },
+        },
+      },
+      select: { userId: true },
+    });
+    preservedOwnerUserIds = Array.from(new Set(existingOwners.map(ur => ur.userId)));
 
     // Demote or deactivate any external active owners during this test to ensure exact isolation
     await prisma.userRole.deleteMany({
@@ -102,16 +123,27 @@ describe('Phase 1.3 User Management & Privilege Hardening Suite', () => {
       },
     });
 
-    // Ensure initial seeded owner retains OWNER role
-    const seedOwner = await prisma.user.findFirst({ where: { username: 'owner' } });
+    // Restore OWNER role assignments for all non-test OWNER accounts preserved before the suite
     const ownerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
-    if (seedOwner && ownerRole) {
-      await prisma.user.update({ where: { id: seedOwner.id }, data: { isActive: true } });
-      await prisma.userRole.upsert({
-        where: { userId_roleId: { userId: seedOwner.id, roleId: ownerRole.id } },
-        update: {},
-        create: { userId: seedOwner.id, roleId: ownerRole.id },
-      });
+    if (ownerRole) {
+      for (const userId of preservedOwnerUserIds) {
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId, roleId: ownerRole.id } },
+          update: {},
+          create: { userId, roleId: ownerRole.id },
+        });
+      }
+
+      // Also ensure initial seeded owner (username: 'owner') retains OWNER role if present
+      const seedOwner = await prisma.user.findFirst({ where: { username: 'owner' } });
+      if (seedOwner) {
+        await prisma.user.update({ where: { id: seedOwner.id }, data: { isActive: true } });
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId: seedOwner.id, roleId: ownerRole.id } },
+          update: {},
+          create: { userId: seedOwner.id, roleId: ownerRole.id },
+        });
+      }
     }
 
     await prisma.$disconnect();

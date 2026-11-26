@@ -17,6 +17,7 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
   let warehouseFGId: string;
   let testSalesmanUserId: string;
   let ownerUserId: string;
+  let preservedOwnerUserIds: string[] = [];
 
   beforeAll(async () => {
     // Look up warehouse facilities
@@ -152,16 +153,26 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
       },
     });
 
-    // Ensure initial seeded owner retains OWNER role
-    const seedOwner = await prisma.user.findFirst({ where: { username: 'owner' } });
+    // Restore OWNER role assignments for all preserved non-test OWNER accounts
     const ownerRole = await prisma.role.findUnique({ where: { code: 'OWNER' } });
-    if (seedOwner && ownerRole) {
-      await prisma.user.update({ where: { id: seedOwner.id }, data: { isActive: true } });
-      await prisma.userRole.upsert({
-        where: { userId_roleId: { userId: seedOwner.id, roleId: ownerRole.id } },
-        update: {},
-        create: { userId: seedOwner.id, roleId: ownerRole.id },
-      });
+    if (ownerRole) {
+      for (const userId of preservedOwnerUserIds) {
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId, roleId: ownerRole.id } },
+          update: {},
+          create: { userId, roleId: ownerRole.id },
+        });
+      }
+
+      const seedOwner = await prisma.user.findFirst({ where: { username: 'owner' } });
+      if (seedOwner) {
+        await prisma.user.update({ where: { id: seedOwner.id }, data: { isActive: true } });
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId: seedOwner.id, roleId: ownerRole.id } },
+          update: {},
+          create: { userId: seedOwner.id, roleId: ownerRole.id },
+        });
+      }
     }
 
     await prisma.$disconnect();
@@ -246,7 +257,16 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
     expect(adminAttemptRes.body.message).toContain('ADMIN cannot deactivate an OWNER');
 
     // 2. OWNER attempt on the last active OWNER is rejected with 400 (last owner invariant)
-    // First, temporarily remove any other active owners so that rbac_owner is the sole active owner
+    // Snapshot and temporarily remove other active owners so rbac_owner is the sole active owner
+    const existingOtherOwners = await prisma.userRole.findMany({
+      where: {
+        role: { code: 'OWNER' },
+        userId: { not: ownerUserId },
+      },
+      select: { userId: true, roleId: true },
+    });
+    preservedOwnerUserIds = Array.from(new Set(existingOtherOwners.map(ur => ur.userId)));
+
     await prisma.userRole.deleteMany({
       where: {
         role: { code: 'OWNER' },
@@ -254,13 +274,23 @@ describe('Phase 1.3 Role-Based Access Control (RBAC) Suite', () => {
       },
     });
 
-    const ownerAttemptRes = await request(app)
-      .patch(`/api/v1/users/${ownerUserId}/status`)
-      .set('Authorization', `Bearer ${ownerToken}`)
-      .send({ isActive: false });
+    try {
+      const ownerAttemptRes = await request(app)
+        .patch(`/api/v1/users/${ownerUserId}/status`)
+        .set('Authorization', `Bearer ${ownerToken}`)
+        .send({ isActive: false });
 
-    expect(ownerAttemptRes.status).toBe(400);
-    expect(ownerAttemptRes.body.message).toContain('Cannot deactivate the last active Owner account');
+      expect(ownerAttemptRes.status).toBe(400);
+      expect(ownerAttemptRes.body.message).toContain('Cannot deactivate the last active Owner account');
+    } finally {
+      for (const ur of existingOtherOwners) {
+        await prisma.userRole.upsert({
+          where: { userId_roleId: { userId: ur.userId, roleId: ur.roleId } },
+          update: {},
+          create: { userId: ur.userId, roleId: ur.roleId },
+        });
+      }
+    }
   });
 
   it('8. OWNER authorized operation is accepted globally', async () => {
