@@ -476,6 +476,11 @@ Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 - **Scope:** `Factory -> Warehouse -> Zone -> Rack -> Shelf -> Bin` hierarchy, `BinStockAllocation` & `BinMovement` sub-ledger preserving authoritative `InventoryBalance`, `BarcodeLabel` + camera/keyboard-wedge/manual scan operations, FEFO/FIFO & storage-condition picking/put-away suggestions, `StockAudit`-backed cycle counting (`CycleCountPlan`, blind counts, recount & variance investigation), warehouse analytics, and 10 React pages under `/inventory/*`.
 - **Verification:** `24` API test files (`137` tests) and `23` Web test files (`94` tests) passing; `MANUAL_UI_VERIFIED` pending live browser walkthrough (see `PHASE_9_VERIFICATION_REPORT.md`).
 
+### Offline-Capable PWA (Level 3)
+- **Status:** `TESTED` (2026-11-26)
+- **Scope:** Installable `vite-plugin-pwa` app shell & `/offline.html` fallback (`NetworkOnly` for `/api/*`), `Dexie` user-partitioned IndexedDB persistence (`FoodFactoryOfflineDB`), `OfflineContext` 5-state connectivity manager, durable `OfflineOperationQueue` with dependency ordering & multi-tab `withSyncLock`, authenticated `/api/v1/sync/*` push/pull APIs with `SyncIdempotencyRecord` & `SyncConflict` models, read-only offline caching, allowlisted offline draft queuing across Inventory/Sales/Production/Quality, and `/sync` Synchronization Center.
+- **Verification:** `OFFLINE_ERP_ARCHITECTURE_AUDIT.md`, `OFFLINE_ERP_IMPLEMENTATION_REPORT.md`, `OFFLINE_ERP_USER_GUIDE.md`; automated API (`test/sync.test.ts`) and Web (`pwa-foundation`, `offline-storage`, `sync-queue`, `offline-cache`, `offline-operations`, `sync-center`) test suites passing; `MANUAL_UI_VERIFIED` pending live multi-device walkthrough.
+
 ---
 
 ## 8. Roadmap Governance Rules
