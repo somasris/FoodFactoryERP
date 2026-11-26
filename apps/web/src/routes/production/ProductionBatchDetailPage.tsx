@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Lock, PackageCheck, PauseCircle, PlayCircle, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Lock, PackageCheck, PauseCircle, PlayCircle, QrCode, XCircle } from 'lucide-react';
+import { BatchQrLabelModal } from '../../components/production/BatchQrLabelModal';
 import { productionService } from '../../services/production.service';
 import { masterDataService } from '../../services/master-data.service';
 import { useAuth } from '../../hooks/useAuth';
@@ -42,6 +43,7 @@ export const ProductionBatchDetailPage: React.FC = () => {
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const [completeMfgDate, setCompleteMfgDate] = useState('');
   const [completeExpDate, setCompleteExpDate] = useState('');
+  const [qrModalOpen, setQrModalOpen] = useState(false);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['production', 'batches', id],
@@ -205,6 +207,9 @@ export const ProductionBatchDetailPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <Button size="sm" variant="outline" onClick={() => setQrModalOpen(true)}>
+            <QrCode className="mr-1 h-3.5 w-3.5" /> QR Label
+          </Button>
           {batch.status === 'CREATED' && canExecute && (
             <Button size="sm" variant="teal" disabled={statusMut.isPending} onClick={() => statusMut.mutate('start')}>
               <PlayCircle className="mr-1 h-3.5 w-3.5" /> Start Production
@@ -691,6 +696,11 @@ export const ProductionBatchDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+      <BatchQrLabelModal
+        batchId={id}
+        isOpen={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+      />
     </div>
   );
 };

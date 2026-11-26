@@ -1892,6 +1892,7 @@ model ProductionBatch {
   overheadAllocations ProductionOverheadAllocation[]
   statusHistory      ProductionBatchStatusHistory[]
   executionEntries   ProductionExecutionEntry[]
+  qrReferences       BatchQrReference[]
 
   @@index([workOrderId])
   @@index([productVariantId])
@@ -2775,4 +2776,25 @@ model SyncConflict {
   @@index([userId, resolvedAt])
   @@index([operationId])
   @@map("sync_conflicts")
+}
+
+// ------------------------------------------------------------------------------
+// 11. SCAN-TO-TRACE QR REFERENCES
+// ------------------------------------------------------------------------------
+
+model BatchQrReference {
+  id                String    @id @default(uuid())
+  productionBatchId String    @map("production_batch_id")
+  referenceToken    String    @unique @map("reference_token") @db.VarChar(64)
+  isActive          Boolean   @default(true) @map("is_active")
+  createdById       String    @map("created_by_id")
+  revokedById       String?   @map("revoked_by_id")
+  revokedAt         DateTime? @map("revoked_at")
+  revocationReason  String?   @map("revocation_reason") @db.VarChar(255)
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  productionBatch ProductionBatch @relation(fields: [productionBatchId], references: [id], onDelete: Cascade)
+
+  @@index([productionBatchId, isActive])
+  @@map("batch_qr_references")
 }

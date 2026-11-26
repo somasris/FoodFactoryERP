@@ -1,15 +1,26 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { GitBranch, Search } from 'lucide-react';
 import { productionService } from '../../services/production.service';
+import { ScannerInput } from '../../components/warehouse/ScannerInput';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/common/Card';
 import { Badge } from '../../components/common/Badge';
 import { Button } from '../../components/common/Button';
 
 export const BatchTraceabilityPage: React.FC = () => {
+  const navigate = useNavigate();
   const [inputBatch, setInputBatch] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [qrInput, setQrInput] = useState('');
+
+  const handleQrNavigate = (rawValue: string) => {
+    const trimmed = rawValue.trim();
+    if (!trimmed) return;
+    const match = trimmed.match(/\/trace\/batch\/([^/?#]+)/);
+    const token = match ? match[1] : trimmed;
+    navigate(`/trace/batch/${encodeURIComponent(token)}`);
+  };
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['production', 'traceability', searchTerm],
@@ -50,6 +61,15 @@ export const BatchTraceabilityPage: React.FC = () => {
               Trace Batch
             </Button>
           </form>
+          <div className="mt-4 border-t border-[#E1E7DD] pt-3">
+            <ScannerInput
+              label="Scan-to-Trace Batch QR (Camera or Manual Token)"
+              value={qrInput}
+              onChange={setQrInput}
+              onScanSubmit={handleQrNavigate}
+              placeholder="Scan QR code or enter QR reference token..."
+            />
+          </div>
         </CardContent>
       </Card>
 

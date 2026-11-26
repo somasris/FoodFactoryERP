@@ -54,6 +54,7 @@ import { ProductionBatchDetailPage } from './production/ProductionBatchDetailPag
 import { MaterialReconciliationPage } from './production/MaterialReconciliationPage';
 import { QualityInspectionsPage } from './production/QualityInspectionsPage';
 import { BatchTraceabilityPage } from './production/BatchTraceabilityPage';
+import { QrTraceabilityPage } from './production/QrTraceabilityPage';
 import { ProductionCostingDashboardPage } from './production/ProductionCostingDashboardPage';
 import { BatchCostingDetailPage } from './production/BatchCostingDetailPage';
 import { CostVarianceReportPage } from './production/CostVarianceReportPage';
@@ -877,6 +878,14 @@ export const router = createBrowserRouter([
       {
         path: 'sync',
         element: <SyncCenterPage />,
+      },
+      {
+        path: 'trace/batch/:reference',
+        element: (
+          <ProtectedRoute requiredPermissions={['production.batches.read']}>
+            <QrTraceabilityPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: '*',

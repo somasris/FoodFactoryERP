@@ -8,6 +8,7 @@ import { MaterialFgController } from './material-fg.controller';
 import { ProductionCostingController } from './production-costing.controller';
 import { ProductionReportsController } from './production-reports.controller';
 import { FactoryPulseController } from './factory-pulse.controller';
+import { BatchQrController } from './batch-qr.controller';
 
 export const productionRouter: Router = Router();
 
@@ -21,6 +22,23 @@ productionRouter.get(
   '/factory-pulse',
   requirePermissions('production.batches.read'),
   FactoryPulseController.getPulse,
+);
+
+// Scan-to-Trace QR System
+productionRouter.post(
+  '/batches/:batchId/qr',
+  requirePermissions('production.batches.read'),
+  BatchQrController.generateOrGet,
+);
+productionRouter.post(
+  '/batches/:batchId/qr/revoke',
+  requirePermissions('production.batches.execute'),
+  BatchQrController.revokeAndRegenerate,
+);
+productionRouter.get(
+  '/traceability/qr/:reference',
+  requirePermissions('production.batches.read'),
+  BatchQrController.resolveTraceability,
 );
 
 // Phase 3.2: Production Planning & Demand
