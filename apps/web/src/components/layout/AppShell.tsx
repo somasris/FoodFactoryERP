@@ -159,6 +159,7 @@ export const AppShell: React.FC = () => {
         isOpen={tourOpen}
         onComplete={handleFinishTour}
         onSkip={handleFinishTour}
+        onEnsureSidebarOpen={setSidebarOpen}
       />
       {swUpdateAvailable && (
         <div
