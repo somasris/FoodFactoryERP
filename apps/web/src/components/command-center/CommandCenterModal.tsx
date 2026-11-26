@@ -12,6 +12,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useTranslation } from '../../i18n/I18nContext';
 import { NAV_GROUPS } from '../../config/navigation';
 import { searchService, SearchResultItem } from '../../services/search.service';
 
@@ -47,6 +48,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
 
 export const CommandCenterModal: React.FC<CommandCenterModalProps> = ({ isOpen, onClose }) => {
   const { user, hasPermission } = useAuth();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -280,7 +282,7 @@ export const CommandCenterModal: React.FC<CommandCenterModalProps> = ({ isOpen, 
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Search orders, batches, materials, work orders, or jump to page..."
+            placeholder={t('commandCenter.placeholder')}
             aria-label="Command Center search"
             className="flex-1 bg-transparent text-sm text-[#24352A] placeholder:text-[#8A958C] focus:outline-none"
           />
@@ -387,7 +389,7 @@ export const CommandCenterModal: React.FC<CommandCenterModalProps> = ({ isOpen, 
 
         {/* Footer Hints */}
         <div className="flex items-center justify-between border-t border-[#E1E7DD] bg-[#FAFBF8] px-4 py-2 text-[11px] text-[#66756A]">
-          <span>↑↓ Navigate • ↵ Open • Esc Close</span>
+          <span>{t('commandCenter.hints')}</span>
           <span className="font-mono text-[10px]">Ctrl + K / Cmd + K</span>
         </div>
       </div>

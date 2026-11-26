@@ -15,6 +15,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getDefaultDashboardPath, NAV_GROUPS } from '../../config/navigation';
 import { NotificationBell } from './NotificationBell';
 import { OfflineStatusBadge } from './OfflineStatusBadge';
+import { useTranslation } from '../../i18n/I18nContext';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -25,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
   const { data: apiHealth, isError: apiError } = useApiHealth();
   const { data: dbHealth, isError: dbError } = useDatabaseHealth();
   const { user, logout } = useAuth();
+  const { language, setLanguage, t } = useTranslation();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -103,12 +105,37 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, onOpenCommandCe
             className="flex items-center gap-2 rounded-md border border-[#E1E7DD] bg-[#FAFBF8] px-2.5 py-1 text-xs text-[#66756A] hover:bg-[#EAF1E8] hover:text-[#17452C] transition-colors"
           >
             <Search className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">Search</span>
+            <span className="hidden md:inline">{t('common.search')}</span>
             <kbd className="hidden md:inline rounded border border-[#E1E7DD] bg-white px-1 py-0.5 font-mono text-[10px] text-[#8A958C]">
               Ctrl+K
             </kbd>
           </button>
         )}
+
+        <div
+          className="inline-flex items-center rounded-md border border-[#E1E7DD] bg-[#FAFBF8] p-0.5 text-[11px]"
+          role="group"
+          aria-label="Language switcher"
+        >
+          <button
+            type="button"
+            onClick={() => setLanguage('en')}
+            className={`rounded px-1.5 py-0.5 font-semibold transition-colors ${
+              language === 'en' ? 'bg-[#245C3A] text-white' : 'text-[#66756A] hover:text-[#17452C]'
+            }`}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => setLanguage('ta')}
+            className={`rounded px-1.5 py-0.5 font-semibold transition-colors ${
+              language === 'ta' ? 'bg-[#245C3A] text-white' : 'text-[#66756A] hover:text-[#17452C]'
+            }`}
+          >
+            தமிழ்
+          </button>
+        </div>
 
         <OfflineStatusBadge />
 

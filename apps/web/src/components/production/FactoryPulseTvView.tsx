@@ -9,6 +9,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { FactoryPulseData } from '../../services/factory-pulse.service';
+import { useTranslation } from '../../i18n/I18nContext';
 
 const TV_SECTIONS = [
   'Overview',
@@ -29,6 +30,7 @@ export const FactoryPulseTvView: React.FC<FactoryPulseTvViewProps> = ({
   connectionLabel,
   onExit,
 }) => {
+  const { t } = useTranslation();
   const [sectionIndex, setSectionIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [intervalSec, setIntervalSec] = useState(15);
@@ -130,7 +132,7 @@ export const FactoryPulseTvView: React.FC<FactoryPulseTvViewProps> = ({
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#E8D7AA] px-3.5 py-1.5 text-xs font-bold text-[#103B28] hover:bg-white"
           >
             <Minimize2 className="h-3.5 w-3.5" />
-            <span>Exit TV Mode</span>
+            <span>{t('tvMode.exitTvMode')}</span>
           </button>
         </div>
       </div>

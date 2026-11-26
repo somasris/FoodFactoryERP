@@ -12,8 +12,10 @@ import {
 } from 'lucide-react';
 import { factoryPulseService } from '../../services/factory-pulse.service';
 import { FactoryPulseTvView } from '../../components/production/FactoryPulseTvView';
+import { useTranslation } from '../../i18n/I18nContext';
 
 export const FactoryPulsePage: React.FC = () => {
+  const { t } = useTranslation();
   const [factoryId, setFactoryId] = useState('');
   const [warehouseId, setWarehouseId] = useState('');
   const [status, setStatus] = useState('');
@@ -80,7 +82,7 @@ export const FactoryPulsePage: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-[#17452C]">Live Factory Pulse</h1>
+              <h1 className="text-lg font-bold text-[#17452C]">{t('factoryPulse.title')}</h1>
               <span
                 className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
                   connectionLabel === 'Live'
@@ -165,7 +167,7 @@ export const FactoryPulsePage: React.FC = () => {
             className="inline-flex items-center gap-1.5 rounded-lg bg-[#245C3A] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#17452C] disabled:opacity-50"
           >
             <Maximize2 className="h-3.5 w-3.5" />
-            <span>TV Mode</span>
+            <span>{t('tvMode.enterTvMode')}</span>
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import { Link } from 'react-router-dom';
 import { Printer, RefreshCw, X, ExternalLink, QrCode } from 'lucide-react';
 import { batchQrService, BatchQrResponse } from '../../services/batch-qr.service';
+import { useTranslation } from '../../i18n/I18nContext';
 
 interface BatchQrLabelModalProps {
   batchId: string;
@@ -15,6 +16,7 @@ export const BatchQrLabelModal: React.FC<BatchQrLabelModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const { t } = useTranslation();
   const [qrData, setQrData] = useState<BatchQrResponse | null>(null);
   const [qrImageUrl, setQrImageUrl] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -64,7 +66,7 @@ export const BatchQrLabelModal: React.FC<BatchQrLabelModalProps> = ({
         <div className="mb-4 flex items-center justify-between print:hidden">
           <div className="flex items-center gap-2 text-sm font-bold text-[#17452C]">
             <QrCode className="h-4 w-4 text-[#245C3A]" />
-            <span>Batch QR Label Preview</span>
+            <span>{t('traceability.batchQrLabelPreview')}</span>
           </div>
           <button
             type="button"

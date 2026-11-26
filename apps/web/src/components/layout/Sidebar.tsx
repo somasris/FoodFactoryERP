@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
+import { useTranslation } from '../../i18n/I18nContext';
 import { canAccessNavItem, NAV_GROUPS } from '../../config/navigation';
 
 interface SidebarProps {
@@ -19,6 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
 }) => {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const visibleGroups = NAV_GROUPS.map(group => ({
     ...group,
@@ -96,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {!collapsed ? (
                   <div className="mb-1 flex items-center gap-2 px-2.5 text-[11px] font-semibold uppercase tracking-wider text-[#E8D7AA]/85">
                     <GroupIcon className="h-3.5 w-3.5 text-[#C39A45] shrink-0" />
-                    <span className="truncate">{group.label}</span>
+                    <span className="truncate">{t(`navigation.${group.label}`, group.label)}</span>
                   </div>
                 ) : (
                   <div
@@ -134,7 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             .join('')}
                         </span>
                       ) : (
-                        <span className="truncate">{item.label}</span>
+                        <span className="truncate">{t(`navigation.${item.label}`, item.label)}</span>
                       )}
                     </NavLink>
                   ))}

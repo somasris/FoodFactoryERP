@@ -3,8 +3,10 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { GitBranch, Package, ShieldCheck, Truck, Clock, ArrowLeft } from 'lucide-react';
 import { batchQrService } from '../../services/batch-qr.service';
+import { useTranslation } from '../../i18n/I18nContext';
 
 export const QrTraceabilityPage: React.FC = () => {
+  const { t } = useTranslation();
   const { reference } = useParams<{ reference: string }>();
 
   const { data, isLoading, error } = useQuery({
@@ -51,7 +53,7 @@ export const QrTraceabilityPage: React.FC = () => {
           <div>
             <div className="flex items-center gap-2 text-xs font-semibold text-[#245C3A]">
               <GitBranch className="h-4 w-4" />
-              <span>Scan-to-Trace Batch Genealogy</span>
+              <span>{t('traceability.scanToTraceTitle')}</span>
             </div>
             <h1 className="mt-1 text-xl font-bold text-[#17452C]">
               {batchIdentity.batchNumber} — {batchIdentity.productName}
