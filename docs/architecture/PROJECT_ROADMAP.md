@@ -40,6 +40,7 @@ No module may be marked `VERIFIED` based solely on successful compilation (`tsc`
 | **Phase 3** | BOM, Production & Costing | `TESTED` | Phase 1, Phase 2 | All 7 subphases (3.1–3.7) implemented, audited, and passing API E2E + Web tests (`PHASE_3_INTEGRATION_AUDIT_REPORT.md`); manual browser UI verification pending |
 | **Phase 4** | System Administration, Reporting & Compliance | `TESTED` | All Core Modules | All 5 subphases (4.1–4.5) implemented, migrated, and passing API + Web test suites (`PHASE_4_INTEGRATION_VERIFICATION_REPORT.md`); manual browser UI verification pending |
 | **Phase 5** | Smart User Experience (Command Center, Personalized Dashboard, Activity Timeline, Saved Views, Shortcuts, Product Tour) | `TESTED` | Phase 1–4 | `UserPreference` & `SavedView` migrated; `/api/v1/preferences`, `/api/v1/saved-views`, `/api/v1/activity-timeline` + frontend UX passing API (30 files / 159 tests) & Web (35 files / 127 tests); manual browser UI verification pending |
+| **Phase 6** | Manufacturing Intelligence (Batch Journey Timeline, Allergen Alert System, Shelf-Life Risk Radar, Efficiency Scorecard) | `TESTED` | Phase 1, Phase 3 | `RawMaterial` allergen fields & `ProductionBatch.allergenSnapshot` migrated; `/api/v1/manufacturing-intelligence/*` + frontend UI passing API (31 files / 164 tests) & Web (36 files / 131 tests); manual browser UI verification pending |
 
 ---
 
