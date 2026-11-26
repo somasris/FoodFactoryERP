@@ -17,11 +17,34 @@ export interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const SESSION_HINT_KEY = 'ff_has_session';
+
+function hasSessionHint(): boolean {
+  try {
+    return window.localStorage.getItem(SESSION_HINT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function setSessionHint(active: boolean): void {
+  try {
+    if (active) {
+      window.localStorage.setItem(SESSION_HINT_KEY, '1');
+    } else {
+      window.localStorage.removeItem(SESSION_HINT_KEY);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const handleAuthFailure = useCallback(() => {
+    setSessionHint(false);
     setActiveOfflineUserId(null);
     setUser(null);
   }, []);
@@ -31,13 +54,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setOnAuthFailure(handleAuthFailure);
   }, [handleAuthFailure]);
 
-  // Initial silent authentication check via HTTP-only refresh cookie
+  // Initial silent authentication check via HTTP-only refresh cookie (only when a session hint exists)
   useEffect(() => {
     let isMounted = true;
 
     const initAuth = async () => {
+      if (!hasSessionHint()) {
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+        if (isOffline) {
+          const snapshot = await offlineRepo.getLastActiveUserSnapshot().catch(() => null);
+          if (snapshot && isMounted) {
+            setActiveOfflineUserId(snapshot.userProfileSnapshot.id);
+            setUser(snapshot.userProfileSnapshot);
+            setIsLoading(false);
+            return;
+          }
+        }
+        if (isMounted) {
+          setActiveOfflineUserId(null);
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
       try {
         const userProfile = await authService.refresh();
+        setSessionHint(true);
         setActiveOfflineUserId(userProfile.id);
         await offlineRepo.saveUserSessionSnapshot(userProfile).catch(() => undefined);
         if (isMounted) {
@@ -55,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return;
           }
         }
+        setSessionHint(false);
         if (isMounted) {
           setActiveOfflineUserId(null);
           setUser(null);
@@ -75,6 +119,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (usernameOrEmail: string, password: string): Promise<UserProfile> => {
     const userProfile = await authService.login(usernameOrEmail, password);
+    setSessionHint(true);
     setActiveOfflineUserId(userProfile.id);
     await offlineRepo.saveUserSessionSnapshot(userProfile).catch(() => undefined);
     setUser(userProfile);
@@ -88,6 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Allow safe offline logout even when the server is unreachable
     } finally {
+      setSessionHint(false);
       setActiveOfflineUserId(null);
       if (currentUserId) {
         await offlineRepo.clearUserDataOnLogout(currentUserId, false).catch(() => undefined);
