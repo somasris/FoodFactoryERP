@@ -123,4 +123,58 @@ describe('OWNER Demo Role Assignment & Login Regression Suite', () => {
       expect(res.body.data.user.roles).not.toContain('OWNER');
     }
   });
+
+  it('6. Environment-configured OWNER logs in, resolves OWNER role & /auth/me, and accesses admin routes', async () => {
+    const initialEmail = process.env.INITIAL_OWNER_EMAIL?.trim().toLowerCase();
+    const initialPassword = process.env.INITIAL_OWNER_PASSWORD;
+    if (!initialEmail || !initialPassword) {
+      return;
+    }
+
+    const loginRes = await request(app)
+      .post('/api/v1/auth/login')
+      .set(CSRF)
+      .send({ usernameOrEmail: initialEmail, password: initialPassword });
+
+    expect(loginRes.status).toBe(200);
+    expect(loginRes.body.data.user.roles).toContain('OWNER');
+    expect(loginRes.body.data.user.permissions.length).toBeGreaterThan(0);
+
+    const token = loginRes.body.data.accessToken as string;
+    const meRes = await request(app)
+      .get('/api/v1/auth/me')
+      .set('Authorization', `Bearer ${token}`);
+    expect(meRes.status).toBe(200);
+    expect(meRes.body.data.roles).toContain('OWNER');
+
+    const adminUsersRes = await request(app)
+      .get('/api/v1/admin/users')
+      .set('Authorization', `Bearer ${token}`);
+    expect(adminUsersRes.status).toBe(200);
+  });
+
+  it('7. OWNER login rejects incorrect password and unknown email with 401, and public signup rejects OWNER role', async () => {
+    const badPassRes = await request(app)
+      .post('/api/v1/auth/login')
+      .set(CSRF)
+      .send({ usernameOrEmail: demoEmail, password: 'WrongPassword!2026' });
+    expect(badPassRes.status).toBe(401);
+
+    const unknownRes = await request(app)
+      .post('/api/v1/auth/login')
+      .set(CSRF)
+      .send({ usernameOrEmail: 'nonexistent.owner@foodfactory.local', password: demoPassword });
+    expect(unknownRes.status).toBe(401);
+
+    const signupRes = await request(app)
+      .post('/api/v1/auth/register')
+      .set(CSRF)
+      .send({
+        name: 'Rogue Owner',
+        email: `rogue_owner_${Date.now()}@test.local`,
+        password: 'StrongPassword!2026',
+        requestedRole: 'OWNER',
+      });
+    expect(signupRes.status).toBe(400);
+  });
 });

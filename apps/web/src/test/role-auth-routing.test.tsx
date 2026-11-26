@@ -6,7 +6,7 @@ import { LoginPage } from '../routes/LoginPage';
 import { Sidebar } from '../components/layout/Sidebar';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { getDefaultDashboardPath, canAccessPath } from '../config/navigation';
-import { UserProfile } from '../services/auth.service';
+import { authService, UserProfile } from '../services/auth.service';
 
 const makeUser = (roles: string[], permissions: string[]): UserProfile => ({
   id: `user-${roles[0] || 'none'}`,
@@ -134,5 +134,86 @@ describe('Role-Based Authentication, Redirects & Dynamic Navigation', () => {
     );
 
     expect(screen.getByText('Unauthorized Page')).toBeTruthy();
+  });
+
+  it('7. OWNER demo button autofills configured credentials with masked password and redirects to /reports/executive', async () => {
+    const owner = makeUser(['OWNER'], []);
+    const loginMock = vi.fn().mockResolvedValue(owner);
+    vi.spyOn(authService, 'getDemoAccounts').mockResolvedValue({
+      enabled: true,
+      accounts: [
+        {
+          role: 'OWNER',
+          label: 'OWNER Demo',
+          description: 'Executive oversight',
+          email: 'demo.owner@foodfactory.local',
+          password: 'DemoFactory2026!',
+        },
+      ],
+    });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/reports/executive" element={<div>Executive Dashboard Target</div>} />
+      </Routes>,
+      { user: null, isAuthenticated: false, login: loginMock },
+      ['/login'],
+    );
+
+    const ownerDemoBtn = await screen.findByRole('button', { name: /^OWNER$/i });
+    fireEvent.click(ownerDemoBtn);
+
+    const usernameInput = screen.getByLabelText(/Username or Email/i) as HTMLInputElement;
+    const passwordInput = screen.getByLabelText(/^Password/i) as HTMLInputElement;
+    expect(usernameInput.value).toBe('demo.owner@foodfactory.local');
+    expect(passwordInput.value).toBe('DemoFactory2026!');
+    expect(passwordInput.type).toBe('password');
+
+    const signInButtons = screen.getAllByRole('button', { name: /Sign In/i });
+    fireEvent.click(signInButtons[signInButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(loginMock).toHaveBeenCalledWith('demo.owner@foodfactory.local', 'DemoFactory2026!');
+      expect(screen.getByText('Executive Dashboard Target')).toBeTruthy();
+    });
+  });
+
+  it('8. Failed OWNER login displays backend error message and renders full Sidebar when authenticated', async () => {
+    const loginMock = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('Your account does not have an active role assigned. Please contact an administrator.'),
+      );
+    vi.spyOn(authService, 'getDemoAccounts').mockResolvedValue({ enabled: false, accounts: [] });
+
+    renderWithAuth(
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>,
+      { user: null, isAuthenticated: false, login: loginMock },
+      ['/login'],
+    );
+
+    fireEvent.change(screen.getByLabelText(/Username or Email/i), {
+      target: { value: 'owner@foodfactory.com' },
+    });
+    fireEvent.change(screen.getByLabelText(/^Password/i), {
+      target: { value: 'ValidPass2026!' },
+    });
+    const signInButtons = screen.getAllByRole('button', { name: /Sign In/i });
+    fireEvent.click(signInButtons[signInButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'Your account does not have an active role assigned',
+      );
+    });
+
+    // Verify OWNER Sidebar renders Executive & System Administration links
+    const owner = makeUser(['OWNER'], []);
+    renderWithAuth(<Sidebar isOpen={true} onClose={vi.fn()} />, { user: owner });
+    expect(screen.getByText('Executive Dashboard')).toBeTruthy();
+    expect(screen.getByText('Users')).toBeTruthy();
   });
 });
