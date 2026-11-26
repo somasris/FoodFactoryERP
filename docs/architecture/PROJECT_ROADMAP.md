@@ -488,6 +488,11 @@ Updated following the Production Readiness UI & Routing Audit (2026-11-25):
 - **Scope:** `GET /api/v1/search` + `Ctrl+K`/`Cmd+K` Command Center (`CommandCenterModal.tsx`), `GET /api/v1/production/factory-pulse` + `/production/factory-pulse` (`FactoryPulsePage.tsx`) with full-screen 16:9 TV Mode (`FactoryPulseTvView.tsx`), opaque `BatchQrReference` + printable QR labels (`BatchQrLabelModal.tsx`) + `/trace/batch/:reference` (`QrTraceabilityPage.tsx`) + `ScannerInput` camera/manual scan, and English/Tamil bilingual localization (`I18nContext.tsx`, `en.ts`, `ta.ts`, `EN | தமிழ்` switcher).
 - **Verification:** `FEATURES_IMPLEMENTATION_AUDIT.md`, `COMMAND_CENTER_VERIFICATION_REPORT.md`, `FACTORY_PULSE_VERIFICATION_REPORT.md`, `TV_MODE_VERIFICATION_REPORT.md`, `QR_TRACEABILITY_VERIFICATION_REPORT.md`, `LOCALIZATION_VERIFICATION_REPORT.md`, `FEATURES_PRODUCTION_READINESS_REPORT.md`; automated API + Web suites passing; `MANUAL_UI_VERIFIED` pending live browser/device walkthrough.
 
+### Phase 7 – Factory Collaboration & Decision Support
+- **Status:** `TESTED` (2026-11-26)
+- **Scope:** Factory/warehouse-scoped Digital Shift Handover (`ShiftHandover`, `ShiftHandoverHistory`, `/api/v1/collaboration/handovers/*`, `/production/handovers`) with `DRAFT -> SUBMITTED -> ACKNOWLEDGED -> CLOSED` (`RETURNED`) lifecycle and deduplicated notifications; Read-only Material Substitution Compatibility Checker (`MaterialSubstitutionRequest`, `/api/v1/collaboration/substitutions/*`, `/production/substitutions`) checking category/type, UOM conversion, usable accepted stock, and allergen introduction with controlled approve/reject/apply workflow.
+- **Verification:** `32` API test files (`168` tests) and `37` Web test files (`133` tests) passing (`pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm build` all green); `MANUAL_UI_VERIFIED` pending live browser walkthrough (see `PHASE_7_VERIFICATION_REPORT.md`).
+
 ---
 
 ## 8. Roadmap Governance Rules
