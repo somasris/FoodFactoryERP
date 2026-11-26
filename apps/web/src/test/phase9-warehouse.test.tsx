@@ -56,6 +56,8 @@ describe('Phase 9 Smart Warehouse Frontend Suite', () => {
             name: 'Raw Material Store',
             warehouseType: 'RAW_MATERIAL',
             isActive: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           },
         ],
         total: 1,
