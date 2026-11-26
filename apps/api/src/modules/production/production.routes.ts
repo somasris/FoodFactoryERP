@@ -7,6 +7,7 @@ import { ProductionBatchController } from './production-batch.controller';
 import { MaterialFgController } from './material-fg.controller';
 import { ProductionCostingController } from './production-costing.controller';
 import { ProductionReportsController } from './production-reports.controller';
+import { FactoryPulseController } from './factory-pulse.controller';
 
 export const productionRouter: Router = Router();
 
@@ -14,6 +15,13 @@ productionRouter.use(authenticate);
 
 // Phase 3.1: BOM & Recipes
 productionRouter.use('/boms', bomsRouter);
+
+// Live Factory Pulse Operational Overview
+productionRouter.get(
+  '/factory-pulse',
+  requirePermissions('production.batches.read'),
+  FactoryPulseController.getPulse,
+);
 
 // Phase 3.2: Production Planning & Demand
 productionRouter.get(

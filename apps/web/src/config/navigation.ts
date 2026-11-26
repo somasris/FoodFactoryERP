@@ -95,6 +95,11 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         requiredPermissions: ['production.batches.read'],
       },
       {
+        label: 'Live Factory Pulse',
+        path: '/production/factory-pulse',
+        requiredPermissions: ['production.batches.read'],
+      },
+      {
         label: 'Production Planning',
         path: '/production/planning',
         requiredPermissions: ['production.plans.read'],

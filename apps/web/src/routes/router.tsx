@@ -48,6 +48,7 @@ import { WorkOrdersPage } from './production/WorkOrdersPage';
 import { WorkOrderFormPage } from './production/WorkOrderFormPage';
 import { WorkOrderDetailPage } from './production/WorkOrderDetailPage';
 import { ProductionExecutionDashboardPage } from './production/ProductionExecutionDashboardPage';
+import { FactoryPulsePage } from './production/FactoryPulsePage';
 import { ProductionBatchesPage } from './production/ProductionBatchesPage';
 import { ProductionBatchDetailPage } from './production/ProductionBatchDetailPage';
 import { MaterialReconciliationPage } from './production/MaterialReconciliationPage';
@@ -576,6 +577,14 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute requiredPermissions={['production.batches.read']}>
                 <ProductionExecutionDashboardPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'factory-pulse',
+            element: (
+              <ProtectedRoute requiredPermissions={['production.batches.read']}>
+                <FactoryPulsePage />
               </ProtectedRoute>
             ),
           },
