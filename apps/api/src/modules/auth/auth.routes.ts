@@ -55,3 +55,7 @@ authRouter.post('/refresh', refreshLimiter, validateCsrfProtection, AuthControll
 authRouter.post('/logout', validateCsrfProtection, AuthController.logout);
 authRouter.post('/logout-all', authenticate, AuthController.logoutAll);
 authRouter.get('/me', authenticate, AuthController.me);
+authRouter.get('/session', authenticate, AuthController.getSessionStatus);
+authRouter.post('/session/extend', authenticate, validateCsrfProtection, AuthController.extendSession);
+authRouter.get('/sessions', authenticate, AuthController.listMySessions);
+authRouter.post('/sessions/:sessionId/revoke', authenticate, validateCsrfProtection, AuthController.revokeMySession);

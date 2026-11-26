@@ -56,6 +56,16 @@ adminRouter.get(
   requirePermissions('administration.users.read'),
   AdminController.listUsers,
 );
+adminRouter.get(
+  '/users/:id/sessions',
+  requirePermissions('administration.users.read'),
+  AdminController.listUserSessions,
+);
+adminRouter.post(
+  '/sessions/:sessionId/revoke',
+  requirePermissions('administration.users.manage'),
+  AdminController.revokeUserSession,
+);
 adminRouter.post(
   '/users/:id/reset-password',
   requirePermissions('administration.users.manage'),

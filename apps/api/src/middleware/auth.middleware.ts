@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken, TokenPayload } from '../utils/token';
 import { AppError } from './error.middleware';
 import { prisma } from '../services/prisma.service';
+import { SessionService } from '../modules/auth/session.service';
 
 // Augment Express Request to hold the authenticated user
 declare global {
@@ -169,6 +170,10 @@ export const authenticate = async (
       return;
     }
 
+    if (payload.sessionId) {
+      await SessionService.validateSession(payload.sessionId);
+    }
+
     const permissions = Array.from(
       new Set(activeUserRoles.flatMap(ur => ur.role.permissions.map(rp => rp.permission.code))),
     );
@@ -179,6 +184,7 @@ export const authenticate = async (
       email: user.email,
       roles,
       permissions,
+      ...(payload.sessionId ? { sessionId: payload.sessionId } : {}),
     };
 
     next();

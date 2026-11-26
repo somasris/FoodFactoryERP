@@ -8,6 +8,7 @@ export interface TokenPayload {
   email: string;
   roles: string[];
   permissions: string[];
+  sessionId?: string;
 }
 
 export const TOKEN_ISSUER = 'foodfactory-erp';

@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from './auth.service';
+import { SessionService } from './session.service';
 import { loginSchema, refreshSchema, registerSchema } from './auth.types';
 import { sendSuccess } from '../../utils/response';
 import { env } from '../../config/env';
@@ -124,7 +125,13 @@ export class AuthController {
       const ipAddress = req.ip || req.socket.remoteAddress;
       const userAgent = req.headers['user-agent'];
 
-      await AuthService.logout(rawRefreshToken, req.user?.userId, ipAddress, userAgent);
+      await AuthService.logout(
+        rawRefreshToken,
+        req.user?.userId,
+        ipAddress,
+        userAgent,
+        req.user?.sessionId,
+      );
 
       res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions());
       sendSuccess(res, 'Logged out successfully', null, 200);
@@ -150,6 +157,87 @@ export class AuthController {
 
       res.clearCookie(REFRESH_COOKIE_NAME, getClearCookieOptions());
       sendSuccess(res, 'All active sessions have been terminated', null, 200);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/auth/session
+   */
+  static async getSessionStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user?.sessionId) {
+        const policy = await SessionService.getPolicy();
+        const now = new Date();
+        sendSuccess(res, 'Session policy retrieved', {
+          sessionId: null,
+          lastActivityAt: now.toISOString(),
+          inactivityExpiresAt: new Date(now.getTime() + policy.timeoutMinutes * 60_000).toISOString(),
+          absoluteExpiresAt: new Date(now.getTime() + policy.absoluteMaxHours * 3_600_000).toISOString(),
+          timeoutMinutes: policy.timeoutMinutes,
+          warningMinutes: policy.warningMinutes,
+          serverTime: now.toISOString(),
+        });
+        return;
+      }
+
+      const data = await SessionService.getSessionStatus(req.user.sessionId);
+      sendSuccess(res, 'Session status retrieved', data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/session/extend
+   */
+  static async extendSession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      if (!req.user?.sessionId) {
+        res.status(401).json({ success: false, message: 'No active session to extend' });
+        return;
+      }
+
+      const data = await SessionService.extendSession(
+        req.user.sessionId,
+        req.user,
+        req.ip || req.socket.remoteAddress,
+        req.headers['user-agent'],
+      );
+      sendSuccess(res, 'Session extended successfully', data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * GET /api/v1/auth/sessions
+   */
+  static async listMySessions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await SessionService.listUserSessions(req.user!.userId);
+      sendSuccess(res, 'Active sessions retrieved', data);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/sessions/:sessionId/revoke
+   */
+  static async revokeMySession(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const data = await SessionService.revokeSession(
+        String(req.params.sessionId),
+        req.user!.userId,
+        {
+          isAdmin: false,
+          ipAddress: req.ip || req.socket.remoteAddress,
+          userAgent: req.headers['user-agent'],
+        },
+      );
+      sendSuccess(res, 'Session revoked successfully', data);
     } catch (error) {
       next(error);
     }

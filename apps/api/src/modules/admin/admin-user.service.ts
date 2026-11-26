@@ -291,10 +291,19 @@ export class AdminUserService {
         data: { passwordHash: newHash },
       });
 
-      // Revoke all active refresh tokens to force re-login
+      // Revoke all active refresh tokens and user sessions to force re-login
       await tx.refreshToken.updateMany({
         where: { userId: targetUserId, isRevoked: false },
         data: { isRevoked: true },
+      });
+      await tx.userSession.updateMany({
+        where: { userId: targetUserId, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revokedById: actor.userId,
+          revocationReason: 'ADMIN_PASSWORD_RESET',
+        },
       });
 
       await tx.auditLog.create({

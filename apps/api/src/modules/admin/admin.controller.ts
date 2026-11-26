@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { sendSuccess } from '../../utils/response';
 import { AppError } from '../../middleware/error.middleware';
+import { SessionService } from '../auth/session.service';
 import {
   adminListUsersQuerySchema,
   assignUserWarehouseAccessSchema,
@@ -161,6 +162,34 @@ export class AdminController {
         getActor(req),
       );
       sendSuccess(res, 'User password reset successfully and active sessions revoked', result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async listUserSessions(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await SessionService.listUserSessions(String(req.params.id));
+      sendSuccess(res, 'User sessions retrieved', data);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async revokeUserSession(req: Request, res: Response, next: NextFunction) {
+    try {
+      const actor = getActor(req);
+      const data = await SessionService.revokeSession(
+        String(req.params.sessionId),
+        actor.userId,
+        {
+          isAdmin: true,
+          reason: typeof req.body?.reason === 'string' ? req.body.reason : undefined,
+          ipAddress: actor.ipAddress,
+          userAgent: actor.userAgent,
+        },
+      );
+      sendSuccess(res, 'User session revoked successfully', data);
     } catch (err) {
       next(err);
     }

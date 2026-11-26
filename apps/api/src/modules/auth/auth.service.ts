@@ -10,6 +10,7 @@ import {
   TokenPayload,
 } from '../../utils/token';
 import { AuditService } from '../../services/audit.service';
+import { SessionService } from './session.service';
 import { NotificationEventsService } from '../notifications/notification-events.service';
 import { AuthResult, AuthUserData, LoginInput, RegisterInput } from './auth.types';
 
@@ -281,15 +282,6 @@ export class AuthService {
     // Collect active roles and deduplicated permissions
     const { roles, permissions } = AuthService.resolveActiveRolesAndPermissions(user.userRoles);
 
-    const tokenPayload: TokenPayload = {
-      userId: user.id,
-      username: user.username,
-      email: user.email,
-      roles,
-      permissions,
-    };
-
-    const accessToken = generateAccessToken(tokenPayload);
     const rawRefreshToken = generateRefreshToken();
     const tokenHash = hashRefreshToken(rawRefreshToken);
     const family = crypto.randomUUID();
@@ -297,11 +289,18 @@ export class AuthService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + env.JWT_REFRESH_EXPIRY_DAYS);
 
-    // Save refresh token securely hashed within an atomic transaction
-    await prisma.$transaction(async tx => {
+    // Save refresh token and authoritative UserSession within an atomic transaction
+    const session = await prisma.$transaction(async tx => {
       await tx.user.update({
         where: { id: user.id },
         data: { lastLoginAt: new Date() },
+      });
+
+      const createdSession = await SessionService.createSessionInTx(tx, {
+        userId: user.id,
+        family,
+        ipAddress,
+        userAgent,
       });
 
       await tx.refreshToken.create({
@@ -319,14 +318,27 @@ export class AuthService {
         data: {
           userId: user.id,
           action: 'LOGIN',
-          entityType: 'User',
-          entityId: user.id,
-          remarks: 'User logged in successfully',
+          entityType: 'UserSession',
+          entityId: createdSession.id,
+          remarks: 'SESSION_CREATED: User logged in successfully',
           ipAddress: ipAddress || null,
           userAgent: userAgent || null,
         },
       });
+
+      return createdSession;
     });
+
+    const tokenPayload: TokenPayload = {
+      userId: user.id,
+      username: user.username,
+      email: user.email,
+      roles,
+      permissions,
+      sessionId: session.id,
+    };
+
+    const accessToken = generateAccessToken(tokenPayload);
 
     const authUser: AuthUserData = {
       id: user.id,
@@ -512,6 +524,50 @@ export class AuthService {
         },
       });
 
+      // Enforce authoritative UserSession validity for this token family
+      const existingSession = await tx.userSession.findUnique({
+        where: { family: storedToken.family },
+      });
+      const now = new Date();
+      if (existingSession) {
+        if (existingSession.isRevoked) {
+          throw new AppError('Your session has been terminated. Please sign in again.', 401, {
+            code: 'SESSION_REVOKED',
+          });
+        }
+        if (existingSession.inactivityExpiresAt <= now || existingSession.absoluteExpiresAt <= now) {
+          await tx.userSession.updateMany({
+            where: { id: existingSession.id, isRevoked: false },
+            data: {
+              isRevoked: true,
+              revokedAt: now,
+              revocationReason:
+                existingSession.absoluteExpiresAt <= now
+                  ? 'ABSOLUTE_LIFETIME_EXPIRED'
+                  : 'INACTIVITY_TIMEOUT',
+            },
+          });
+          await tx.refreshToken.updateMany({
+            where: { family: storedToken.family, isRevoked: false },
+            data: { isRevoked: true },
+          });
+          throw new AppError('Your session expired due to inactivity. Please sign in again.', 401, {
+            code: 'SESSION_EXPIRED',
+          });
+        }
+
+        const policy = await SessionService.getPolicy(tx);
+        const candidateExpiry = new Date(now.getTime() + policy.timeoutMinutes * 60_000);
+        const nextExpiry =
+          candidateExpiry > existingSession.absoluteExpiresAt
+            ? existingSession.absoluteExpiresAt
+            : candidateExpiry;
+        await tx.userSession.update({
+          where: { id: existingSession.id },
+          data: { lastActivityAt: now, inactivityExpiresAt: nextExpiry },
+        });
+      }
+
       // 7. Generate fresh access token
       const tokenPayload: TokenPayload = {
         userId: user.id,
@@ -519,6 +575,7 @@ export class AuthService {
         email: user.email,
         roles,
         permissions,
+        ...(existingSession ? { sessionId: existingSession.id } : {}),
       };
 
       const accessToken = generateAccessToken(tokenPayload);
@@ -557,13 +614,42 @@ export class AuthService {
     userId?: string,
     ipAddress?: string,
     userAgent?: string,
+    sessionId?: string,
   ): Promise<void> {
+    const now = new Date();
     if (rawRefreshToken) {
       const tokenHash = hashRefreshToken(rawRefreshToken);
+      const tokenRow = await prisma.refreshToken.findUnique({
+        where: { tokenHash },
+        select: { family: true },
+      });
       await prisma.refreshToken.updateMany({
         where: { tokenHash, isRevoked: false },
         data: { isRevoked: true },
       });
+      if (tokenRow?.family) {
+        await prisma.userSession.updateMany({
+          where: { family: tokenRow.family, isRevoked: false },
+          data: { isRevoked: true, revokedAt: now, revocationReason: 'USER_LOGOUT' },
+        });
+      }
+    }
+
+    if (sessionId) {
+      const sess = await prisma.userSession.findUnique({
+        where: { id: sessionId },
+        select: { family: true },
+      });
+      await prisma.userSession.updateMany({
+        where: { id: sessionId, isRevoked: false },
+        data: { isRevoked: true, revokedAt: now, revocationReason: 'USER_LOGOUT' },
+      });
+      if (sess?.family) {
+        await prisma.refreshToken.updateMany({
+          where: { family: sess.family, isRevoked: false },
+          data: { isRevoked: true },
+        });
+      }
     }
 
     if (userId) {
@@ -571,8 +657,8 @@ export class AuthService {
         userId,
         action: 'LOGOUT',
         entityType: 'UserSession',
-        entityId: userId,
-        remarks: 'User logged out',
+        entityId: sessionId || userId,
+        remarks: 'USER_LOGOUT: User logged out',
         ipAddress,
         userAgent,
       });
@@ -591,6 +677,14 @@ export class AuthService {
       await tx.refreshToken.updateMany({
         where: { userId, isRevoked: false },
         data: { isRevoked: true },
+      });
+      await tx.userSession.updateMany({
+        where: { userId, isRevoked: false },
+        data: {
+          isRevoked: true,
+          revokedAt: new Date(),
+          revocationReason: 'LOGOUT_ALL_DEVICES',
+        },
       });
 
       await tx.auditLog.create({
