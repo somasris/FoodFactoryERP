@@ -140,16 +140,18 @@ export const AppShell: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand-bg font-sans text-brand-text">
-      <Navbar
-        onToggleSidebar={() => setSidebarOpen(prev => !prev)}
-        onOpenCommandCenter={() => {
-          lastFocusedRef.current = document.activeElement as HTMLElement | null;
-          setCommandOpen(true);
-        }}
-        onOpenShortcuts={() => setShortcutsOpen(true)}
-        onStartTour={() => setTourOpen(true)}
-      />
+    <div className="flex h-screen supports-[height:100dvh]:h-dvh flex-col overflow-hidden bg-brand-bg font-sans text-brand-text">
+      <div className="shrink-0">
+        <Navbar
+          onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+          onOpenCommandCenter={() => {
+            lastFocusedRef.current = document.activeElement as HTMLElement | null;
+            setCommandOpen(true);
+          }}
+          onOpenShortcuts={() => setShortcutsOpen(true)}
+          onStartTour={() => setTourOpen(true)}
+        />
+      </div>
       <CommandCenterModal isOpen={commandOpen} onClose={handleCloseCommand} />
       <KeyboardShortcutsModal
         isOpen={shortcutsOpen}
@@ -188,21 +190,27 @@ export const AppShell: React.FC = () => {
           <span>Offline storage warning: {storageQuotaError}</span>
         </div>
       )}
-      <div className="flex flex-1 min-w-0">
+      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
         <Sidebar
           isOpen={sidebarOpen}
           collapsed={sidebarCollapsed}
           onToggleCollapse={handleToggleCollapse}
           onClose={() => setSidebarOpen(false)}
         />
-        <main className="flex-1 min-w-0 overflow-x-hidden px-4 py-5 sm:px-6 md:px-9 md:py-7">
-          <div className="mx-auto max-w-[1440px] space-y-6">
-            <OfflineDataBanner pendingCount={counts.pending} />
-            <Outlet />
+        <main
+          className={`flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col justify-between ${
+            sidebarOpen ? 'overflow-hidden md:overflow-y-auto' : 'overflow-y-auto'
+          }`}
+        >
+          <div className="w-full px-4 py-5 sm:px-6 md:px-9 md:py-7">
+            <div className="mx-auto max-w-[1440px] space-y-6">
+              <OfflineDataBanner pendingCount={counts.pending} />
+              <Outlet />
+            </div>
           </div>
+          <Footer />
         </main>
       </div>
-      <Footer />
     </div>
   );
 };

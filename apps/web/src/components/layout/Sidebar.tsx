@@ -104,14 +104,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         data-tour="sidebar"
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex flex-col border-r border-[#103B28] bg-[#173F2B] text-white transition-all duration-200 ease-in-out md:static md:z-0 md:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex h-full min-h-0 flex-col overflow-hidden border-r border-[#103B28] bg-[#173F2B] text-white transition-all duration-200 ease-in-out md:static md:z-0 md:shrink-0 md:translate-x-0',
           collapsed ? 'md:w-16' : 'md:w-64',
           'w-64',
           isOpen ? 'translate-x-0 shadow-xl md:shadow-none' : '-translate-x-full',
         )}
       >
         {/* Mobile Header */}
-        <div className="flex h-14 items-center justify-between border-b border-white/10 px-4 md:hidden">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-4 md:hidden">
           <span className="text-sm font-semibold text-[#F4F0E4]">
             {t('common.navigation', 'Navigation')}
           </span>
@@ -129,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {onToggleCollapse && (
           <div
             className={cn(
-              'hidden md:flex items-center px-3 pt-3 pb-1',
+              'hidden md:flex shrink-0 items-center px-3 pt-3 pb-1',
               collapsed ? 'justify-center' : 'justify-end',
             )}
           >
@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Permission-Driven Collapsible Navigation List */}
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1.5">
+        <div className="ff-sidebar-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 py-3 space-y-1.5">
           {visibleGroups.map(group => {
             const GroupIcon = group.icon;
             const isExpanded = Boolean(expandedGroups[group.id]);
@@ -229,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Authenticated Role Footer */}
         {user && !collapsed && (
-          <div className="border-t border-white/10 bg-[#103B28]/70 px-4 py-3 text-xs">
+          <div className="shrink-0 border-t border-white/10 bg-[#103B28]/70 px-4 py-3 text-xs">
             <div className="font-medium text-white truncate">{user.fullName}</div>
             <div className="mt-1 flex flex-wrap gap-1">
               {user.roles.map(role => (

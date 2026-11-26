@@ -87,4 +87,27 @@ describe('UI Simplification & Spacious Enterprise Redesign', () => {
     expect(screen.getByRole('menuitem', { name: /Keyboard Shortcuts/i })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /Restart Product Tour/i })).toBeTruthy();
   });
+
+  it('3. Sidebar keeps header/footer fixed and scrolls only its navigation list independently', () => {
+    render(
+      <AuthContext.Provider value={salesmanAuth}>
+        <I18nProvider>
+          <MemoryRouter initialEntries={['/sales/orders']}>
+            <Sidebar isOpen={false} onToggleCollapse={vi.fn()} onClose={vi.fn()} />
+          </MemoryRouter>
+        </I18nProvider>
+      </AuthContext.Provider>,
+    );
+
+    const aside = document.querySelector('aside[data-tour="sidebar"]')!;
+    expect(aside.className).toContain('h-full');
+    expect(aside.className).toContain('min-h-0');
+    expect(aside.className).toContain('overflow-hidden');
+
+    const navScroll = aside.querySelector('.ff-sidebar-scroll')!;
+    expect(navScroll.className).toContain('flex-1');
+    expect(navScroll.className).toContain('min-h-0');
+    expect(navScroll.className).toContain('overflow-y-auto');
+    expect(navScroll.className).toContain('overflow-x-hidden');
+  });
 });

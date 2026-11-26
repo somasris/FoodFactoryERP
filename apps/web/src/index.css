@@ -171,3 +171,21 @@ table {
   outline: 2px solid var(--ff-primary);
   outline-offset: 1px;
 }
+
+.ff-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.ff-sidebar-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.ff-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ff-sidebar-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22);
+  border-radius: 9999px;
+}
