@@ -1,15 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { RefreshCw, AlertTriangle } from 'lucide-react';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { Footer } from './Footer';
 import { OfflineDataBanner } from '../common/OfflineDataBanner';
+import { CommandCenterModal } from '../command-center/CommandCenterModal';
 import { useOffline } from '../../context/OfflineContext';
 
 export const AppShell: React.FC = () => {
   const { swUpdateAvailable, applySwUpdate, storageQuotaError, counts } = useOffline();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const lastFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandOpen(prev => {
+          if (!prev) {
+            lastFocusedRef.current = document.activeElement as HTMLElement | null;
+          }
+          return !prev;
+        });
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
+
+  const handleCloseCommand = () => {
+    setCommandOpen(false);
+    lastFocusedRef.current?.focus?.();
+  };
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('ff_sidebar_collapsed') === 'true';
@@ -32,7 +56,14 @@ export const AppShell: React.FC = () => {
 
   return (
     <div className="flex min-h-screen flex-col bg-brand-bg font-sans text-brand-text">
-      <Navbar onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
+      <Navbar
+        onToggleSidebar={() => setSidebarOpen(prev => !prev)}
+        onOpenCommandCenter={() => {
+          lastFocusedRef.current = document.activeElement as HTMLElement | null;
+          setCommandOpen(true);
+        }}
+      />
+      <CommandCenterModal isOpen={commandOpen} onClose={handleCloseCommand} />
       {swUpdateAvailable && (
         <div
           role="status"

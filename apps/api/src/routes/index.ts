@@ -14,6 +14,7 @@ import { operationsRouter } from '../modules/operations/operations.routes';
 import { notificationRouter } from '../modules/notifications/notification.routes';
 import { warehouseRouter } from '../modules/warehouse/warehouse.routes';
 import { syncRouter } from '../modules/sync/sync.routes';
+import { searchRouter } from '../modules/search/search.routes';
 
 export const apiRouter: Router = Router();
 
@@ -61,3 +62,6 @@ apiRouter.use('/warehouse', warehouseRouter);
 
 // Mount Offline PWA Synchronization API under /api/v1/sync
 apiRouter.use('/sync', syncRouter);
+
+// Mount Global Command Center Search API under /api/v1/search
+apiRouter.use('/search', searchRouter);
