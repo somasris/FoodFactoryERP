@@ -109,6 +109,7 @@ describe('Role-Based Authentication, Redirects & Dynamic Navigation', () => {
 
     expect(screen.getByText('Sales Dashboard')).toBeTruthy();
     expect(screen.getByText('Sales Orders')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Master Data/i }));
     expect(screen.getByText('Customers')).toBeTruthy();
     expect(screen.queryByText('Production Planning')).toBeNull();
     expect(screen.queryByText('Maintenance Mode')).toBeNull();
@@ -214,6 +215,7 @@ describe('Role-Based Authentication, Redirects & Dynamic Navigation', () => {
     const owner = makeUser(['OWNER'], []);
     renderWithAuth(<Sidebar isOpen={true} onClose={vi.fn()} />, { user: owner });
     expect(screen.getByText('Executive Dashboard')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Administration$/i }));
     expect(screen.getByText('Users')).toBeTruthy();
   });
 });
