@@ -14,8 +14,13 @@ import {
 import { Card } from '../../components/common/Card';
 import { useAuth } from '../../hooks/useAuth';
 import { productionService } from '../../services/production.service';
+import {
+  EfficiencyScorecardData,
+  manufacturingIntelligenceService,
+} from '../../services/manufacturing-intelligence.service';
 import { ReportFilterBar } from '../../components/production/ReportFilterBar';
 import { ProductionTrendChart } from '../../components/production/ProductionTrendChart';
+import { EfficiencyScorecardSection } from '../../components/production/EfficiencyScorecardSection';
 import {
   ProductionAnalyticsDashboard,
   ProductionReportQuery,
@@ -31,6 +36,7 @@ export const ProductionAnalyticsDashboardPage: React.FC = () => {
   });
   const [dashboard, setDashboard] = useState<ProductionAnalyticsDashboard | null>(null);
   const [trends, setTrends] = useState<ProductionTrendsResponse | null>(null);
+  const [scorecard, setScorecard] = useState<EfficiencyScorecardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,12 +46,20 @@ export const ProductionAnalyticsDashboardPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [dashRes, trendRes] = await Promise.all([
+      const [dashRes, trendRes, scRes] = await Promise.all([
         productionService.reports.dashboard(query),
         productionService.reports.trends(query),
+        manufacturingIntelligenceService
+          .getEfficiencyScorecard({
+            period: query.period,
+            fromDate: query.fromDate,
+            toDate: query.toDate,
+          })
+          .catch(() => null),
       ]);
       setDashboard(dashRes.data ?? null);
       setTrends(trendRes.data ?? null);
+      setScorecard(scRes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load production analytics');
     } finally {
@@ -277,6 +291,8 @@ export const ProductionAnalyticsDashboardPage: React.FC = () => {
           </Link>
         )}
       </div>
+
+      <EfficiencyScorecardSection scorecard={scorecard} isLoading={loading} />
     </div>
   );
 };

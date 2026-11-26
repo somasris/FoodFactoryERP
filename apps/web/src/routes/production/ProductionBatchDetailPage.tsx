@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Lock, PackageCheck, PauseCircle, PlayCircle, QrCode, XCircle } from 'lucide-react';
 import { BatchQrLabelModal } from '../../components/production/BatchQrLabelModal';
+import { AllergenAlertBanner } from '../../components/production/AllergenAlertBanner';
+import { BatchJourneyTimeline } from '../../components/production/BatchJourneyTimeline';
 import { productionService } from '../../services/production.service';
+import { manufacturingIntelligenceService } from '../../services/manufacturing-intelligence.service';
 import { masterDataService } from '../../services/master-data.service';
 import { useAuth } from '../../hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/common/Card';
@@ -55,6 +58,20 @@ export const ProductionBatchDetailPage: React.FC = () => {
     queryKey: ['master-data', 'warehouses', 'all'],
     queryFn: () => masterDataService.warehouses.list({ limit: 100 }),
     enabled: consumeModalOpen,
+  });
+
+  const { data: allergenProfile, isLoading: allergensLoading } = useQuery({
+    queryKey: ['mi', 'batch-allergens', id],
+    queryFn: () => manufacturingIntelligenceService.getBatchAllergens(id),
+    enabled: Boolean(id),
+    retry: false,
+  });
+
+  const { data: batchJourney, isLoading: journeyLoading } = useQuery({
+    queryKey: ['mi', 'batch-journey', id],
+    queryFn: () => manufacturingIntelligenceService.getBatchJourney(id),
+    enabled: Boolean(id),
+    retry: false,
   });
 
   const batch = data?.data;
@@ -279,6 +296,9 @@ export const ProductionBatchDetailPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      <AllergenAlertBanner profile={allergenProfile} isLoading={allergensLoading} />
+      <BatchJourneyTimeline journey={batchJourney} isLoading={journeyLoading} />
 
       {actionError && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">{actionError}</div>
