@@ -37,7 +37,7 @@ export async function seedMurukkuBenchmarkProfile(prisma: PrismaClient) {
     create: {
       fromUomId: uomKg.id,
       toUomId: uomG.id,
-      conversionFactor: new Prisma.Decimal('1000.000000'),
+      multiplier: new Prisma.Decimal('1000.000000'),
     },
   });
 
@@ -173,14 +173,13 @@ export async function seedMurukkuBenchmarkProfile(prisma: PrismaClient) {
             expectedWastagePercent: new Prisma.Decimal('6.00'),
             outputUomId: uomPcs.id,
             status: 'ACTIVE',
-            isActive: true,
             items: {
               create: [
-                { lineNumber: 1, inventoryItemId: flr.id, itemType: 'RAW_MATERIAL', standardQuantity: new Prisma.Decimal('40'), uomId: flr.uomId },
-                { lineNumber: 2, inventoryItemId: oil.id, itemType: 'RAW_MATERIAL', standardQuantity: new Prisma.Decimal('10'), uomId: oil.uomId },
-                { lineNumber: 3, inventoryItemId: spc.id, itemType: 'RAW_MATERIAL', standardQuantity: new Prisma.Decimal('1.2'), uomId: spc.uomId },
-                { lineNumber: 4, inventoryItemId: pch.id, itemType: 'PACKAGING', standardQuantity: new Prisma.Decimal('194'), uomId: pch.uomId },
-                { lineNumber: 5, inventoryItemId: ctn.id, itemType: 'PACKAGING', standardQuantity: new Prisma.Decimal('9'), uomId: ctn.uomId },
+                { inventoryItemId: flr.id, itemType: 'RAW_MATERIAL', standardQuantity: new Prisma.Decimal('40'), uomId: flr.uomId },
+                { inventoryItemId: oil.id, itemType: 'RAW_MATERIAL', standardQuantity: new Prisma.Decimal('10'), uomId: oil.uomId },
+                { inventoryItemId: spc.id, itemType: 'RAW_MATERIAL', standardQuantity: new Prisma.Decimal('1.2'), uomId: spc.uomId },
+                { inventoryItemId: pch.id, itemType: 'PACKAGING', standardQuantity: new Prisma.Decimal('194'), uomId: pch.uomId },
+                { inventoryItemId: ctn.id, itemType: 'PACKAGING', standardQuantity: new Prisma.Decimal('9'), uomId: ctn.uomId },
               ],
             },
           },
