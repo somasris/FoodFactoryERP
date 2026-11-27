@@ -8,7 +8,7 @@ import {
   SyncConflictRecord,
   UserOfflinePreferenceRecord,
 } from './db';
-import { OfflineOperationStatus, OfflineQueueCounts } from './types';
+import { OfflineEntityType, OfflineOperationStatus, OfflineQueueCounts } from './types';
 import { UserProfile } from '../services/auth.service';
 
 const FORBIDDEN_SECRET_KEYS = new Set([
@@ -200,6 +200,22 @@ export class OfflineRepository {
         .sortBy('localSequence');
     }
     return this.db.pendingOperations.where('userId').equals(userId).sortBy('localSequence');
+  }
+
+  async findOperationByEntityId(
+    userId: string,
+    entityType: OfflineEntityType,
+    entityId: string,
+  ): Promise<PendingOperationRecord | undefined> {
+    if (!userId || !entityId) return undefined;
+    const ops = await this.listOperationsByUser(userId);
+    const matches = ops.filter(
+      op =>
+        op.entityType === entityType &&
+        (op.entityId === entityId || op.serverResultEntityId === entityId),
+    );
+    if (matches.length === 0) return undefined;
+    return matches[matches.length - 1];
   }
 
   async getQueueCounts(userId: string): Promise<OfflineQueueCounts> {

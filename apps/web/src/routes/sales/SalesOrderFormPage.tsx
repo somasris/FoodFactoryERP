@@ -90,7 +90,14 @@ export const SalesOrderFormPage: React.FC = () => {
       isEdit ? salesService.orders.update(id!, payload) : salesService.orders.create(payload),
     onSuccess: res => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
-      navigate(`/sales/orders/${res.data!.id}`);
+      const isOfflineQueued = Boolean(
+        (res.data as { isOfflineQueued?: boolean } | undefined)?.isOfflineQueued,
+      );
+      navigate(`/sales/orders/${res.data!.id}`, {
+        state: isOfflineQueued
+          ? { offlineQueuedMessage: 'Order saved offline – waiting for sync' }
+          : undefined,
+      });
     },
     onError: err => {
       setFormError(err instanceof Error ? err.message : 'Failed to save sales order');

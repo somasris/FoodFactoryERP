@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Edit } from 'lucide-react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, CloudOff, Edit, RefreshCw } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { useAuth } from '../../hooks/useAuth';
+import { offlineRepo } from '../../offline/offline-repository';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
 import { Button } from '../../components/common/Button';
 import { ConfirmDialog, Modal } from '../../components/master-data/Modal';
@@ -11,8 +12,11 @@ import { ConfirmDialog, Modal } from '../../components/master-data/Modal';
 export const SalesOrderDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
+  const location = useLocation();
+  const { user, hasPermission } = useAuth();
   const queryClient = useQueryClient();
+  const offlineQueuedMessage = (location.state as { offlineQueuedMessage?: string } | null)
+    ?.offlineQueuedMessage;
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -22,10 +26,35 @@ export const SalesOrderDetailPage: React.FC = () => {
   const [reason, setReason] = useState('');
   const [fulfillNotes, setFulfillNotes] = useState('');
 
+  const localOpQuery = useQuery({
+    queryKey: ['offline', 'sales-order-op', user?.id, id],
+    queryFn: () => offlineRepo.findOperationByEntityId(user!.id, 'SALES_ORDER', id!),
+    enabled: Boolean(user?.id && id),
+  });
+
+  const localOp = localOpQuery.data;
+  const reconciledServerId =
+    localOp?.status === 'SYNCED' &&
+    localOp.serverResultEntityId &&
+    localOp.serverResultEntityId !== id
+      ? localOp.serverResultEntityId
+      : null;
+
+  useEffect(() => {
+    if (reconciledServerId) {
+      navigate(`/sales/orders/${reconciledServerId}`, { replace: true });
+    }
+  }, [reconciledServerId, navigate]);
+
+  const isLocalOnlyPending = Boolean(
+    localOp && localOp.status !== 'SYNCED' && localOp.operationType === 'SALES_ORDER_DRAFT_CREATE',
+  );
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['sales', 'order', id],
     queryFn: () => salesService.orders.getById(id!),
-    enabled: Boolean(id),
+    enabled: Boolean(id) && !isLocalOnlyPending && !reconciledServerId,
+    retry: false,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -100,10 +129,121 @@ export const SalesOrderDetailPage: React.FC = () => {
     },
   });
 
-  if (isLoading) {
+  if (isLoading || localOpQuery.isLoading || reconciledServerId) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-xs text-slate-500">
         Loading sales order...
+      </div>
+    );
+  }
+
+  if (localOp && localOp.status !== 'SYNCED' && !data?.data) {
+    const payload = localOp.payload as {
+      customerId?: string;
+      warehouseId?: string;
+      expectedDeliveryDate?: string;
+      notes?: string;
+      deliveryInstructions?: string;
+      lines?: Array<{
+        productVariantId: string;
+        uomId: string;
+        orderedQuantity: string;
+        discountPercent?: string;
+      }>;
+    };
+    const isFailedOrConflict = localOp.status === 'FAILED' || localOp.status === 'CONFLICT';
+    return (
+      <div className="space-y-4">
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-xs ${
+            isFailedOrConflict
+              ? 'border-red-200 bg-red-50 text-red-800'
+              : 'border-amber-200 bg-amber-50 text-amber-900'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CloudOff className="h-4 w-4 shrink-0" />
+            <div>
+              <div className="font-semibold">
+                {localOp.status === 'CONFLICT'
+                  ? 'Sync Conflict — Action Required'
+                  : localOp.status === 'FAILED'
+                    ? 'Sync Failed — Local Draft Preserved'
+                    : offlineQueuedMessage || 'Order saved offline – waiting for sync (Pending Sync)'}
+              </div>
+              {localOp.lastErrorMessage && (
+                <div className="mt-0.5 text-[11px]">{localOp.lastErrorMessage}</div>
+              )}
+            </div>
+          </div>
+          <Link to="/sync-center">
+            <Button size="sm" variant="outline">
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+              Open Sync Center
+            </Button>
+          </Link>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-3">
+              <Link
+                to="/sales/orders"
+                className="rounded-md border border-slate-200 p-1.5 text-slate-600 hover:bg-slate-100"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-mono text-base font-bold text-brand-navy">
+                    LOCAL-DRAFT ({localOp.entityId.slice(0, 8)})
+                  </h2>
+                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                    Pending Sync ({localOp.status})
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Saved locally at {new Date(localOp.clientCreatedAt).toLocaleString('en-IN')} ·
+                  Customer ID: {payload.customerId || '-'} · Warehouse ID: {payload.warehouseId || '-'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-xs">
+              <thead className="bg-slate-50 text-left font-semibold text-slate-600">
+                <tr>
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">Product Variant ID</th>
+                  <th className="px-3 py-2">UOM ID</th>
+                  <th className="px-3 py-2 text-right">Ordered Qty</th>
+                  <th className="px-3 py-2 text-right">Discount %</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(payload.lines || []).map((l, idx) => (
+                  <tr key={`${l.productVariantId}-${idx}`}>
+                    <td className="px-3 py-2">{idx + 1}</td>
+                    <td className="px-3 py-2 font-mono">{l.productVariantId}</td>
+                    <td className="px-3 py-2 font-mono">{l.uomId}</td>
+                    <td className="px-3 py-2 text-right font-medium">{l.orderedQuantity}</td>
+                    <td className="px-3 py-2 text-right">{l.discountPercent || '0'}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {(payload.notes || payload.deliveryInstructions) && (
+            <div className="mt-3 space-y-1 border-t border-slate-100 pt-3 text-xs text-slate-600">
+              {payload.notes && <div>Notes: {payload.notes}</div>}
+              {payload.deliveryInstructions && (
+                <div>Delivery Instructions: {payload.deliveryInstructions}</div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     );
   }
