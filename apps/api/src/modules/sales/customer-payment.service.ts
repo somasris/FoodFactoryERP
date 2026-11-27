@@ -843,4 +843,193 @@ export class CustomerPaymentService {
       invoices,
     };
   }
+
+  /**
+   * P1.1 Dedicated Collection Summary Report.
+   * Uses paymentDate (not invoiceDate) and Prisma.Decimal for all monetary totals.
+   * Reversed payments are tracked in totalReversedPayments and excluded from netCollections.
+   */
+  static async getCollectionReport(filters: {
+    fromDate?: string;
+    toDate?: string;
+    paymentMode?: string;
+    customerId?: string;
+    groupBy?: 'daily' | 'monthly';
+  }) {
+    const groupBy = filters.groupBy === 'daily' ? 'daily' : 'monthly';
+    const where: Prisma.CustomerPaymentWhereInput = {};
+    if (filters.customerId) where.customerId = filters.customerId;
+    if (filters.paymentMode) where.paymentMode = filters.paymentMode as PaymentMode;
+    const dateFilter = buildDateRangeFilter(filters.fromDate, filters.toDate);
+    if (dateFilter) where.paymentDate = dateFilter;
+
+    const payments = await prisma.customerPayment.findMany({
+      where,
+      orderBy: { paymentDate: 'asc' },
+      include: {
+        customer: { select: { id: true, code: true, legalName: true } },
+        allocations: { where: { isReversed: false } },
+      },
+    });
+
+    let totalGrossPaymentsReceived = new Prisma.Decimal(0);
+    let totalReversedPayments = new Prisma.Decimal(0);
+    let netCollections = new Prisma.Decimal(0);
+    let totalAllocatedAmount = new Prisma.Decimal(0);
+    let totalUnallocatedAdvances = new Prisma.Decimal(0);
+    let recordedCount = 0;
+    let reversedCount = 0;
+
+    const modeMap = new Map<
+      string,
+      {
+        paymentMode: string;
+        transactionCount: number;
+        netCollected: Prisma.Decimal;
+        allocatedAmount: Prisma.Decimal;
+        unallocatedAdvances: Prisma.Decimal;
+      }
+    >();
+
+    const customerMap = new Map<
+      string,
+      {
+        customerId: string;
+        customerCode: string;
+        customerLegalName: string;
+        transactionCount: number;
+        netCollected: Prisma.Decimal;
+        allocatedAmount: Prisma.Decimal;
+        unallocatedAdvances: Prisma.Decimal;
+      }
+    >();
+
+    const periodMap = new Map<
+      string,
+      {
+        period: string;
+        transactionCount: number;
+        grossReceived: Prisma.Decimal;
+        reversedAmount: Prisma.Decimal;
+        netCollected: Prisma.Decimal;
+        unallocatedAdvances: Prisma.Decimal;
+      }
+    >();
+
+    for (const p of payments) {
+      const amt = new Prisma.Decimal(p.amount).toDecimalPlaces(2);
+      totalGrossPaymentsReceived = totalGrossPaymentsReceived.add(amt);
+
+      const periodKey =
+        groupBy === 'daily'
+          ? p.paymentDate.toISOString().slice(0, 10)
+          : p.paymentDate.toISOString().slice(0, 7);
+
+      const pEntry = periodMap.get(periodKey) ?? {
+        period: periodKey,
+        transactionCount: 0,
+        grossReceived: new Prisma.Decimal(0),
+        reversedAmount: new Prisma.Decimal(0),
+        netCollected: new Prisma.Decimal(0),
+        unallocatedAdvances: new Prisma.Decimal(0),
+      };
+      pEntry.transactionCount += 1;
+      pEntry.grossReceived = pEntry.grossReceived.add(amt);
+
+      if (p.status === CustomerPaymentStatus.REVERSED) {
+        reversedCount += 1;
+        totalReversedPayments = totalReversedPayments.add(amt);
+        pEntry.reversedAmount = pEntry.reversedAmount.add(amt);
+        periodMap.set(periodKey, pEntry);
+        continue;
+      }
+
+      recordedCount += 1;
+      netCollections = netCollections.add(amt);
+
+      const allocSum = p.allocations.reduce(
+        (sum, a) => sum.add(new Prisma.Decimal(a.allocatedAmount)),
+        new Prisma.Decimal(0),
+      );
+      const allocated = Prisma.Decimal.min(amt, allocSum).toDecimalPlaces(2);
+      const unallocated = Prisma.Decimal.max(ZERO, amt.sub(allocated)).toDecimalPlaces(2);
+
+      totalAllocatedAmount = totalAllocatedAmount.add(allocated);
+      totalUnallocatedAdvances = totalUnallocatedAdvances.add(unallocated);
+
+      pEntry.netCollected = pEntry.netCollected.add(amt);
+      pEntry.unallocatedAdvances = pEntry.unallocatedAdvances.add(unallocated);
+      periodMap.set(periodKey, pEntry);
+
+      const mEntry = modeMap.get(p.paymentMode) ?? {
+        paymentMode: p.paymentMode,
+        transactionCount: 0,
+        netCollected: new Prisma.Decimal(0),
+        allocatedAmount: new Prisma.Decimal(0),
+        unallocatedAdvances: new Prisma.Decimal(0),
+      };
+      mEntry.transactionCount += 1;
+      mEntry.netCollected = mEntry.netCollected.add(amt);
+      mEntry.allocatedAmount = mEntry.allocatedAmount.add(allocated);
+      mEntry.unallocatedAdvances = mEntry.unallocatedAdvances.add(unallocated);
+      modeMap.set(p.paymentMode, mEntry);
+
+      const cEntry = customerMap.get(p.customerId) ?? {
+        customerId: p.customerId,
+        customerCode: p.customer.code,
+        customerLegalName: p.customer.legalName,
+        transactionCount: 0,
+        netCollected: new Prisma.Decimal(0),
+        allocatedAmount: new Prisma.Decimal(0),
+        unallocatedAdvances: new Prisma.Decimal(0),
+      };
+      cEntry.transactionCount += 1;
+      cEntry.netCollected = cEntry.netCollected.add(amt);
+      cEntry.allocatedAmount = cEntry.allocatedAmount.add(allocated);
+      cEntry.unallocatedAdvances = cEntry.unallocatedAdvances.add(unallocated);
+      customerMap.set(p.customerId, cEntry);
+    }
+
+    return {
+      groupBy,
+      accountingPolicy:
+        'Reversed payments are excluded from netCollections and breakdowns, and reported separately in totalReversedPayments. Multi-invoice allocations are summed once per payment without double-counting.',
+      summary: {
+        transactionCount: payments.length,
+        recordedCount,
+        reversedCount,
+        totalGrossPaymentsReceived: totalGrossPaymentsReceived.toFixed(2),
+        totalReversedPayments: totalReversedPayments.toFixed(2),
+        netCollections: netCollections.toFixed(2),
+        totalAllocatedAmount: totalAllocatedAmount.toFixed(2),
+        totalUnallocatedAdvances: totalUnallocatedAdvances.toFixed(2),
+      },
+      byPaymentMode: Array.from(modeMap.values()).map(m => ({
+        paymentMode: m.paymentMode,
+        transactionCount: m.transactionCount,
+        netCollected: m.netCollected.toFixed(2),
+        allocatedAmount: m.allocatedAmount.toFixed(2),
+        unallocatedAdvances: m.unallocatedAdvances.toFixed(2),
+      })),
+      byCustomer: Array.from(customerMap.values())
+        .sort((a, b) => b.netCollected.cmp(a.netCollected))
+        .map(c => ({
+          customerId: c.customerId,
+          customerCode: c.customerCode,
+          customerLegalName: c.customerLegalName,
+          transactionCount: c.transactionCount,
+          netCollected: c.netCollected.toFixed(2),
+          allocatedAmount: c.allocatedAmount.toFixed(2),
+          unallocatedAdvances: c.unallocatedAdvances.toFixed(2),
+        })),
+      byPeriod: Array.from(periodMap.values()).map(p => ({
+        period: p.period,
+        transactionCount: p.transactionCount,
+        grossReceived: p.grossReceived.toFixed(2),
+        reversedAmount: p.reversedAmount.toFixed(2),
+        netCollected: p.netCollected.toFixed(2),
+        unallocatedAdvances: p.unallocatedAdvances.toFixed(2),
+      })),
+    };
+  }
 }

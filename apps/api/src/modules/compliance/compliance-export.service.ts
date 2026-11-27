@@ -335,4 +335,32 @@ export class ComplianceExportService {
       format,
     );
   }
+
+  static async generateCollectionReportExport(
+    format: ExportFormat,
+    filters: {
+      fromDate?: string;
+      toDate?: string;
+      paymentMode?: string;
+      customerId?: string;
+      groupBy?: 'daily' | 'monthly';
+    },
+  ) {
+    const report = await CustomerPaymentService.getCollectionReport(filters);
+    const columns = [
+      { key: 'period', label: 'Period' },
+      { key: 'transactionCount', label: 'Transactions' },
+      { key: 'grossReceived', label: 'Gross Received' },
+      { key: 'reversedAmount', label: 'Reversed' },
+      { key: 'netCollected', label: 'Net Collected' },
+      { key: 'unallocatedAdvances', label: 'Unallocated Advances' },
+    ];
+    return this.renderTabularExport(
+      'Customer Collection Summary Report',
+      'collection-summary',
+      columns,
+      report.byPeriod,
+      format,
+    );
+  }
 }

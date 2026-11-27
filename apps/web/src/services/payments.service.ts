@@ -117,6 +117,45 @@ export interface AgeingReport {
   }>;
 }
 
+export interface CollectionReport {
+  groupBy: 'daily' | 'monthly';
+  accountingPolicy: string;
+  summary: {
+    transactionCount: number;
+    recordedCount: number;
+    reversedCount: number;
+    totalGrossPaymentsReceived: string;
+    totalReversedPayments: string;
+    netCollections: string;
+    totalAllocatedAmount: string;
+    totalUnallocatedAdvances: string;
+  };
+  byPaymentMode: Array<{
+    paymentMode: string;
+    transactionCount: number;
+    netCollected: string;
+    allocatedAmount: string;
+    unallocatedAdvances: string;
+  }>;
+  byCustomer: Array<{
+    customerId: string;
+    customerCode: string;
+    customerLegalName: string;
+    transactionCount: number;
+    netCollected: string;
+    allocatedAmount: string;
+    unallocatedAdvances: string;
+  }>;
+  byPeriod: Array<{
+    period: string;
+    transactionCount: number;
+    grossReceived: string;
+    reversedAmount: string;
+    netCollected: string;
+    unallocatedAdvances: string;
+  }>;
+}
+
 function buildQs(params: Record<string, string | number | undefined>) {
   const sp = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -223,6 +262,34 @@ export const paymentsService = {
       credentials: 'include',
     });
     if (!res.ok) throw new Error('Failed to export receivables ageing');
+    return res.blob();
+  },
+
+  getCollections: (params: {
+    fromDate?: string;
+    toDate?: string;
+    paymentMode?: string;
+    customerId?: string;
+    groupBy?: 'daily' | 'monthly';
+  } = {}) => apiClient<CollectionReport>(`/sales/collections${buildQs(params)}`),
+
+  async downloadCollectionsExport(
+    format: 'csv' | 'excel' | 'pdf',
+    params: {
+      fromDate?: string;
+      toDate?: string;
+      paymentMode?: string;
+      customerId?: string;
+      groupBy?: 'daily' | 'monthly';
+    } = {},
+  ) {
+    const qs = buildQs({ ...params, format });
+    const token = getAccessToken();
+    const res = await fetch(`${config.apiBaseUrl}/sales/collections${qs}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      credentials: 'include',
+    });
+    if (!res.ok) throw new Error('Failed to export collection summary');
     return res.blob();
   },
 };

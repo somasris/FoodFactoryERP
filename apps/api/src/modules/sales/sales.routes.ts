@@ -162,6 +162,11 @@ salesRouter.get(
   requirePermissions('sales.payments.read'),
   CustomerPaymentController.getAgeingReport,
 );
+salesRouter.get(
+  '/collections',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getCollectionReport,
+);
 
 // P0.2: GST Credit Notes
 salesRouter.get(

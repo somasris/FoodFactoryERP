@@ -177,4 +177,33 @@ export class CustomerPaymentController {
       next(err);
     }
   }
+
+  static async getCollectionReport(req: Request, res: Response, next: NextFunction) {
+    try {
+      const filters = {
+        fromDate: req.query.fromDate ? String(req.query.fromDate) : undefined,
+        toDate: req.query.toDate ? String(req.query.toDate) : undefined,
+        paymentMode: req.query.paymentMode ? String(req.query.paymentMode) : undefined,
+        customerId: req.query.customerId ? String(req.query.customerId) : undefined,
+        groupBy: (req.query.groupBy === 'daily' ? 'daily' : 'monthly') as 'daily' | 'monthly',
+      };
+
+      const format = req.query.format ? String(req.query.format).toLowerCase() : undefined;
+      if (format === 'csv' || format === 'excel' || format === 'pdf') {
+        const exported = await ComplianceExportService.generateCollectionReportExport(
+          format as ExportFormat,
+          filters,
+        );
+        res.setHeader('Content-Type', exported.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${exported.filename}"`);
+        res.send(exported.buffer);
+        return;
+      }
+
+      const data = await CustomerPaymentService.getCollectionReport(filters);
+      sendSuccess(res, 'Collection summary report retrieved successfully', data);
+    } catch (err) {
+      next(err);
+    }
+  }
 }
