@@ -22,7 +22,11 @@ export interface SalesOrderLineStockAvailability {
   sku: string;
   productName: string;
   uomSymbol: string;
+  orderedQuantity?: string;
+  fulfilledQuantity?: string;
   requestedQuantity: string;
+  onHandQuantity?: string;
+  reservedByOthersQuantity?: string;
   availableQuantity: string;
   shortageQuantity: string;
   isSufficient: boolean;

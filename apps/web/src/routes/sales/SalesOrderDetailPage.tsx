@@ -391,18 +391,41 @@ export const SalesOrderDetailPage: React.FC = () => {
         </div>
       )}
 
-      {order.stockAvailability &&
-        (order.stockAvailability.status === 'INSUFFICIENT' ||
-          order.stockAvailability.status === 'PARTIAL') && (
-          <div className="rounded-lg border border-[#C74440]/30 bg-red-50/60 p-3 text-xs">
-            <div className="mb-2 font-semibold text-[#C74440]">
-              {order.stockAvailability.status === 'PARTIAL'
-                ? 'Partial Stock Availability'
-                : 'Insufficient Stock for Order'}
+      {!['FULFILLED', 'CANCELLED', 'REJECTED'].includes(order.status) &&
+        (order.stockAvailability && order.stockAvailability.status !== 'NOT_APPLICABLE' ? (
+          <div
+            className={`rounded-lg border p-3 text-xs ${
+              order.stockAvailability.status === 'SUFFICIENT'
+                ? 'border-emerald-200 bg-emerald-50/50'
+                : order.stockAvailability.status === 'PARTIAL'
+                  ? 'border-amber-200 bg-amber-50/50'
+                  : 'border-[#C74440]/30 bg-red-50/60'
+            }`}
+          >
+            <div
+              className={`mb-2 font-semibold ${
+                order.stockAvailability.status === 'SUFFICIENT'
+                  ? 'text-emerald-800'
+                  : order.stockAvailability.status === 'PARTIAL'
+                    ? 'text-amber-800'
+                    : 'text-[#C74440]'
+              }`}
+            >
+              {order.stockAvailability.status === 'SUFFICIENT'
+                ? 'All items available for fulfillment'
+                : order.stockAvailability.status === 'PARTIAL'
+                  ? 'Some items unavailable — Partial Stock Availability'
+                  : 'Insufficient Stock for Order'}
             </div>
-            <StockShortageTable stock={order.stockAvailability} />
+            {order.stockAvailability.lines.length > 0 && (
+              <StockShortageTable stock={order.stockAvailability} detailed />
+            )}
           </div>
-        )}
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            Stock availability not verified.
+          </div>
+        ))}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
