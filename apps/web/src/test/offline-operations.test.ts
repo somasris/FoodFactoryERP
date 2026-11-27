@@ -1,10 +1,12 @@
 import 'fake-indexeddb/auto';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { inventoryService } from '../services/inventory.service';
 import { salesService } from '../services/sales.service';
 import { productionService } from '../services/production.service';
 import { setActiveOfflineUserId } from '../offline/offline-cache';
 import { offlineRepo } from '../offline/offline-repository';
+import { executeOrQueueOffline } from '../offline/offline-mutation';
+import { ApiError } from '../services/api-client';
 
 describe('Sprint 5: Offline Business Operations Queueing', () => {
   const userId = 'ops-user-1';
@@ -29,7 +31,7 @@ describe('Sprint 5: Offline Business Operations Queueing', () => {
       lines: [],
     });
 
-    expect(rcp.message).toContain('Queued offline');
+    expect(rcp.message).toContain('Saved on this device');
     expect((rcp.data as { status: string }).status).toBe('DRAFT');
     expect((iss.data as { isOfflineQueued?: boolean }).isOfflineQueued).toBe(true);
     expect((adj.data as { isOfflineQueued?: boolean }).isOfflineQueued).toBe(true);
@@ -61,5 +63,23 @@ describe('Sprint 5: Offline Business Operations Queueing', () => {
       'BATCH_MATERIAL_RETURN_DRAFT',
       'QUALITY_OBSERVATION_DRAFT',
     ]);
+  });
+
+  it('queues locally when browser is online but backend returns 502/503/504 gateway error', async () => {
+    Object.defineProperty(window.navigator, 'onLine', { value: true, configurable: true });
+    const onlineCall = vi.fn().mockRejectedValue(new ApiError('Bad Gateway', 502));
+
+    const res = await executeOrQueueOffline({
+      entityType: 'SALES_ORDER',
+      operationType: 'SALES_ORDER_DRAFT_CREATE',
+      payload: { customerId: 'c1', warehouseId: 'wh-1', lines: [] },
+      onlineCall,
+    });
+
+    expect(onlineCall).toHaveBeenCalledTimes(1);
+    expect(res.message).toContain('Saved on this device');
+    const ops = await offlineRepo.listOperationsByUser(userId, 'PENDING');
+    expect(ops).toHaveLength(1);
+    expect(ops[0].operationType).toBe('SALES_ORDER_DRAFT_CREATE');
   });
 });

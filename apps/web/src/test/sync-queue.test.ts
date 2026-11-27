@@ -6,6 +6,7 @@ import { OfflineOperationQueue } from '../offline/operation-queue';
 import { SyncEngine } from '../offline/sync-engine';
 import { withSyncLock } from '../offline/sync-lock';
 import { syncApiService } from '../services/sync.service';
+import { ApiError } from '../services/api-client';
 import * as connectionState from '../offline/connection-state';
 
 describe('Sprint 3: Offline Operation Queue, Dependencies, Lock & Sync Engine', () => {
@@ -149,5 +150,110 @@ describe('Sprint 3: Offline Operation Queue, Dependencies, Lock & Sync Engine', 
     const res = await withSyncLock('user-1', async () => 'done');
     expect(res.acquired).toBe(false);
     window.localStorage.removeItem('ff_offline_sync_lock_user-1');
+  });
+
+  it('coalesces offline draft updates into pending create and chains submit dependencies across batches', async () => {
+    vi.spyOn(connectionState, 'probeApiServer').mockResolvedValue({
+      reachable: true,
+      checkedAt: new Date().toISOString(),
+      latencyMs: 10,
+    });
+
+    const createOp = await queue.enqueue({
+      userId: 'user-1',
+      entityType: 'SALES_ORDER',
+      operationType: 'SALES_ORDER_DRAFT_CREATE',
+      payload: { customerId: 'c1', warehouseId: 'w1', notes: 'initial' },
+    });
+
+    const updatedOp = await queue.enqueue({
+      userId: 'user-1',
+      entityType: 'SALES_ORDER',
+      entityId: createOp.entityId,
+      operationType: 'SALES_ORDER_DRAFT_UPDATE',
+      payload: { customerId: 'c1', warehouseId: 'w1', notes: 'updated offline' },
+    });
+
+    expect(updatedOp.operationId).toBe(createOp.operationId);
+    expect(updatedOp.idempotencyKey).toBe(createOp.idempotencyKey);
+    expect(updatedOp.payload.notes).toBe('updated offline');
+
+    const submitOp = await queue.enqueue({
+      userId: 'user-1',
+      entityType: 'SALES_ORDER',
+      entityId: createOp.entityId,
+      operationType: 'SALES_ORDER_SUBMIT',
+      payload: {},
+    });
+
+    expect(submitOp.dependencyOperationIds).toContain(createOp.operationId);
+
+    const pushSpy = vi
+      .spyOn(syncApiService, 'pushBatch')
+      .mockResolvedValueOnce({
+        serverTimestamp: new Date().toISOString(),
+        results: [
+          {
+            operationId: createOp.operationId,
+            idempotencyKey: createOp.idempotencyKey,
+            status: 'SYNCED',
+            serverEntityId: 'srv-so-100',
+            serverVersion: '2026-11-27T10:00:00.000Z',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({
+        serverTimestamp: new Date().toISOString(),
+        results: [
+          {
+            operationId: submitOp.operationId,
+            idempotencyKey: submitOp.idempotencyKey,
+            status: 'SYNCED',
+            serverEntityId: 'srv-so-100',
+          },
+        ],
+      });
+
+    vi.spyOn(syncApiService, 'pullChanges').mockResolvedValue({
+      nextCursor: new Date().toISOString(),
+      hasMore: false,
+      serverTimestamp: new Date().toISOString(),
+      changes: {},
+    });
+
+    const summary = await engine.runSync('user-1');
+    expect(summary.syncedCount).toBe(2);
+    expect(pushSpy).toHaveBeenCalledTimes(2);
+    expect(pushSpy.mock.calls[1][0][0].entityId).toBe('srv-so-100');
+
+    const state = await repo.getLocalSalesOrderState('user-1', createOp.entityId);
+    expect(state.resolvedServerId).toBe('srv-so-100');
+  });
+
+  it('pauses sync on 401 session expiry without failing pending operations', async () => {
+    vi.spyOn(connectionState, 'probeApiServer').mockResolvedValue({
+      reachable: true,
+      checkedAt: new Date().toISOString(),
+      latencyMs: 8,
+    });
+
+    const op = await queue.enqueue({
+      userId: 'user-1',
+      entityType: 'SALES_ORDER',
+      operationType: 'SALES_ORDER_DRAFT_CREATE',
+      payload: { customerId: 'c1', warehouseId: 'w1', lines: [] },
+    });
+
+    vi.spyOn(syncApiService, 'pushBatch').mockRejectedValue(
+      new ApiError('Access token expired', 401),
+    );
+
+    const summary = await engine.runSync('user-1');
+    expect(summary.skippedReason).toBe('SESSION_EXPIRED');
+    expect(summary.failedCount).toBe(0);
+
+    const persisted = await repo.getPendingOperation('user-1', op.operationId);
+    expect(persisted?.status).toBe('PENDING');
+    expect(persisted?.lastErrorCode).toBe('SESSION_EXPIRED');
   });
 });
