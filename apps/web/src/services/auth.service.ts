@@ -59,6 +59,8 @@ export interface DemoAccountsConfig {
   configError?: boolean;
 }
 
+let inFlightRefresh: Promise<UserProfile> | null = null;
+
 export const authService = {
   async register(payload: RegisterPayload): Promise<RegisterResponseData> {
     const response = await apiClient<RegisterResponseData>('/auth/register', {
@@ -85,20 +87,32 @@ export const authService = {
   },
 
   async refresh(): Promise<UserProfile> {
-    const response = await apiClient<AuthResponseData>('/auth/refresh', {
-      method: 'POST',
-      body: JSON.stringify({}),
-    });
-
-    if (response.data?.accessToken) {
-      setAccessToken(response.data.accessToken);
+    if (inFlightRefresh) {
+      return inFlightRefresh;
     }
 
-    if (!response.data?.user) {
-      throw new Error('Failed to refresh session');
-    }
+    inFlightRefresh = (async () => {
+      try {
+        const response = await apiClient<AuthResponseData>('/auth/refresh', {
+          method: 'POST',
+          body: JSON.stringify({}),
+        });
 
-    return response.data.user;
+        if (response.data?.accessToken) {
+          setAccessToken(response.data.accessToken);
+        }
+
+        if (!response.data?.user) {
+          throw new Error('Failed to refresh session');
+        }
+
+        return response.data.user;
+      } finally {
+        inFlightRefresh = null;
+      }
+    })();
+
+    return inFlightRefresh;
   },
 
   async logout(): Promise<void> {

@@ -54,7 +54,13 @@ async function refreshAccessToken(): Promise<string | null> {
       });
 
       if (!response.ok) {
-        throw new Error('Refresh failed');
+        if (response.status === 401 || response.status === 403) {
+          setAccessToken(null);
+          if (onAuthFailureCallback) {
+            onAuthFailureCallback();
+          }
+        }
+        return null;
       }
 
       const json = await response.json();
@@ -65,10 +71,7 @@ async function refreshAccessToken(): Promise<string | null> {
       }
       return null;
     } catch {
-      setAccessToken(null);
-      if (onAuthFailureCallback) {
-        onAuthFailureCallback();
-      }
+      // Network/offline error during refresh must NOT clear the user's offline session
       return null;
     } finally {
       isRefreshing = false;

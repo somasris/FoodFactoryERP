@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useEffect, useState, useCallback } from 'react';
 import { authService, UserProfile } from '../services/auth.service';
-import { setOnAuthFailure } from '../services/api-client';
+import { ApiError, setOnAuthFailure } from '../services/api-client';
 import { offlineRepo } from '../offline/offline-repository';
 import { setActiveOfflineUserId } from '../offline/offline-cache';
 import {
@@ -108,10 +108,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (isMounted) {
           setUser(userProfile);
         }
-      } catch {
-        // Only fall back to a previously authenticated, non-expired offline session when offline
+      } catch (err) {
+        // Fall back to a previously authenticated, non-expired offline session when offline or backend unreachable
         const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-        if (isOffline) {
+        const isBackendUnreachable =
+          err instanceof TypeError ||
+          (err instanceof ApiError && err.statusCode >= 502 && err.statusCode <= 504) ||
+          (err instanceof Error && /network|fetch|offline|aborted/i.test(err.message));
+
+        if (isOffline || isBackendUnreachable) {
           const snapshot = await offlineRepo.getLastActiveUserSnapshot().catch(() => null);
           if (snapshot && isMounted) {
             setActiveOfflineUserId(snapshot.userProfileSnapshot.id);

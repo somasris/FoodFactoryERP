@@ -10,9 +10,13 @@ import { AppRoutes } from './routes';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      networkMode: 'always',
       staleTime: 1000 * 10,
       retry: 1,
       refetchOnWindowFocus: false,
+    },
+    mutations: {
+      networkMode: 'always',
     },
   },
 });
