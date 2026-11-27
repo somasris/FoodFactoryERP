@@ -686,11 +686,32 @@ export class SalesService {
   }
 
   static async createOrder(input: CreateSalesOrderInput, user: UserContext, meta: AuditMeta) {
-    await assertWarehouseAccess(user, input.warehouseId, 'READ_WRITE');
+    let resolvedWarehouseId = input.warehouseId;
+    if (!resolvedWarehouseId) {
+      const authorizedIds = await getAuthorizedWarehouseIds(user, 'READ_WRITE');
+      const whereClause: Prisma.WarehouseWhereInput = {
+        isActive: true,
+        warehouseType: 'FINISHED_GOODS',
+        factory: { isActive: true },
+        ...(authorizedIds !== null ? { id: { in: authorizedIds } } : {}),
+      };
+      const defaultWh =
+        (await prisma.warehouse.findFirst({ where: { ...whereClause, code: 'WH-FG-01' } })) ??
+        (await prisma.warehouse.findFirst({ where: whereClause, orderBy: { createdAt: 'asc' } }));
+      if (!defaultWh) {
+        throw new AppError(
+          'No active finished-goods fulfillment warehouse is configured or authorized for your account.',
+          400,
+        );
+      }
+      resolvedWarehouseId = defaultWh.id;
+    }
+
+    await assertWarehouseAccess(user, resolvedWarehouseId, 'READ_WRITE');
 
     const [customer, warehouse] = await Promise.all([
       prisma.customer.findUnique({ where: { id: input.customerId } }),
-      prisma.warehouse.findUnique({ where: { id: input.warehouseId } }),
+      prisma.warehouse.findUnique({ where: { id: resolvedWarehouseId } }),
     ]);
     if (!customer || !customer.isActive) throw new AppError('Active customer not found.', 404);
     if (!warehouse || !warehouse.isActive) throw new AppError('Active warehouse not found.', 404);

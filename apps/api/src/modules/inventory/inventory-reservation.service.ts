@@ -67,10 +67,14 @@ function formatShortageMessage(
   requested: Prisma.Decimal,
   available: Prisma.Decimal,
   uomSymbol: string,
+  warehouseLabel?: string,
+  reserved?: Prisma.Decimal,
 ): string {
   const shortage = Prisma.Decimal.max(ZERO, requested.sub(available));
   const unit = uomSymbol ? ` ${uomSymbol}` : '';
-  return `Insufficient available stock for ${itemName}. Requested: ${requested.toString()}${unit}, Available: ${available.toString()}${unit}, Shortage: ${shortage.toString()}${unit} (Short by ${shortage.toString()}).`;
+  const whPart = warehouseLabel ? ` in ${warehouseLabel}` : '';
+  const resPart = reserved && reserved.gt(ZERO) ? `, Reserved: ${reserved.toString()}${unit}` : '';
+  return `Insufficient available stock for ${itemName}${whPart}. Requested: ${requested.toString()}${unit}, Available: ${available.toString()}${unit}${resPart}, Shortage: ${shortage.toString()}${unit} (Short by ${shortage.toString()}).`;
 }
 
 export class InventoryReservationService {
@@ -159,10 +163,12 @@ export class InventoryReservationService {
     if (items.length === 0) return;
 
     const itemIds = items.map(i => i.inventoryItemId);
-    const [lockedItems, uomSymbols] = await Promise.all([
+    const [lockedItems, uomSymbols, warehouse] = await Promise.all([
       lockInventoryItems(tx, itemIds),
       getUomSymbolsByItem(tx, itemIds),
+      tx.warehouse.findUnique({ where: { id: warehouseId }, select: { code: true, name: true } }),
     ]);
+    const warehouseLabel = warehouse ? `${warehouse.code} (${warehouse.name})` : warehouseId;
 
     const refDate = new Date();
     const shortageErrors: string[] = [];
@@ -194,6 +200,10 @@ export class InventoryReservationService {
           ),
         ZERO,
       );
+      const totalReserved = valid.reduce(
+        (acc, c) => acc.add(Prisma.Decimal.max(ZERO, new Prisma.Decimal(c.quantity_reserved))),
+        ZERO,
+      );
 
       if (totalAvailable.lt(req.baseQuantity)) {
         shortageErrors.push(
@@ -202,6 +212,8 @@ export class InventoryReservationService {
             req.baseQuantity,
             totalAvailable,
             uomSymbols.get(item.id) || '',
+            warehouseLabel,
+            totalReserved,
           ),
         );
         continue;

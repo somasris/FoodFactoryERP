@@ -33,7 +33,7 @@ export const salesOrderLineInputSchema = z.object({
 export const createSalesOrderSchema = z.object({
   customerId: z.string().uuid(),
   shippingAddressId: z.string().uuid().optional(),
-  warehouseId: z.string().uuid(),
+  warehouseId: z.string().uuid().optional(),
   orderDate: dateStringSchema,
   expectedDeliveryDate: dateStringSchema,
   notes: z.string().trim().max(1000).optional(),
