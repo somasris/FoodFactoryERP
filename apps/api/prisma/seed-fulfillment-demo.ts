@@ -39,7 +39,7 @@ export const FULFILLMENT_DEMO_TARGETS: FulfillmentDemoTarget[] = [
     netWeightGrams: '200.00',
     sellingPrice: '65.00',
     unitCost: '35.0000',
-    targetAvailable: 800,
+    targetAvailable: 1000,
   },
   {
     code: 'BAN-200',
@@ -50,7 +50,7 @@ export const FULFILLMENT_DEMO_TARGETS: FulfillmentDemoTarget[] = [
     netWeightGrams: '200.00',
     sellingPrice: '75.00',
     unitCost: '42.0000',
-    targetAvailable: 600,
+    targetAvailable: 1000,
   },
   {
     code: 'RIB-200',
@@ -61,7 +61,7 @@ export const FULFILLMENT_DEMO_TARGETS: FulfillmentDemoTarget[] = [
     netWeightGrams: '200.00',
     sellingPrice: '55.00',
     unitCost: '30.0000',
-    targetAvailable: 600,
+    targetAvailable: 1000,
   },
   {
     code: 'GRN-200',
@@ -72,7 +72,7 @@ export const FULFILLMENT_DEMO_TARGETS: FulfillmentDemoTarget[] = [
     netWeightGrams: '200.00',
     sellingPrice: '52.00',
     unitCost: '28.0000',
-    targetAvailable: 500,
+    targetAvailable: 1000,
   },
 ];
 
@@ -319,7 +319,7 @@ export async function seedFulfillmentDemoProfile(client: PrismaClient = prisma):
     const neededTotal = new Prisma.Decimal(spec.targetAvailable + (pendingOrderDemand.get(spec.sku) ?? 0));
     const deficit = neededTotal.sub(currentAvail);
 
-    const batchNum = `DEMO-FUL-${spec.sku}-B01`;
+    let batchNum = `DEMO-FUL-${spec.sku}-B01`;
     const existingBatch = await client.inventoryBatch.findUnique({
       where: {
         inventoryItemId_batchNumber: {
@@ -329,7 +329,22 @@ export async function seedFulfillmentDemoProfile(client: PrismaClient = prisma):
       },
     });
 
-    if (deficit.gt(ZERO) && !existingBatch) {
+    if (deficit.gt(ZERO)) {
+      if (existingBatch) {
+        batchNum = `DEMO-INV-${spec.sku}-1000`;
+        const existingReconcile = await client.inventoryBatch.findUnique({
+          where: {
+            inventoryItemId_batchNumber: {
+              inventoryItemId: info.inventoryItemId,
+              batchNumber: batchNum,
+            },
+          },
+        });
+        if (existingReconcile) {
+          report.stockReceipts.skipped.push(batchNum);
+          continue;
+        }
+      }
       receiptLines.push({
         inventoryItemId: info.inventoryItemId,
         uomId: info.uomId,
@@ -345,7 +360,7 @@ export async function seedFulfillmentDemoProfile(client: PrismaClient = prisma):
     }
   }
 
-  const receiptIdemKey = 'DEMO-FULFILLMENT-TOPUP-WH-FG-01-V1';
+  const receiptIdemKey = 'DEMO-INVENTORY-TARGET-1000-WH-FG-01';
   const existingReceipt = await client.inventoryReceipt.findFirst({
     where: { idempotencyKey: receiptIdemKey },
   });

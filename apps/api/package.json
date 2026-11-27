@@ -17,7 +17,8 @@
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
     "seed:fulfillment-demo": "tsx prisma/seed-fulfillment-demo.ts",
-    "seed:existing-orders-stock": "tsx prisma/seed-existing-orders-stock.ts"
+    "seed:existing-orders-stock": "tsx prisma/seed-existing-orders-stock.ts",
+    "seed:demo-inventory": "tsx prisma/seed-fulfillment-demo.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
