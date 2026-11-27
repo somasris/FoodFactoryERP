@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { z } from 'zod';
 import { setAccessToken, getAccessToken, apiClient } from '../services/api-client';
+import { authService } from '../services/auth.service';
 
 const loginFormSchema = z.object({
   usernameOrEmail: z.string().min(1, 'Username or email is required'),
@@ -95,5 +96,35 @@ describe('Phase 1.3 Frontend Authentication & Session Suite', () => {
     expect(result.success).toBe(true);
     expect(result.data?.secured).toBe('payload');
     expect(getAccessToken()).toBe('jwt.fresh.token_after_refresh');
+  });
+
+  it('5. Coalesces concurrent authService.refresh calls to prevent StrictMode token-reuse 401s', async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          data: {
+            accessToken: 'jwt.coalesced.token',
+            user: {
+              id: 'u-1',
+              username: 'demo',
+              email: 'demo@foodfactory.local',
+              fullName: 'Demo User',
+              isActive: true,
+              registrationStatus: 'APPROVED',
+              createdAt: new Date().toISOString(),
+            },
+          },
+        }),
+    });
+    globalThis.fetch = mockFetch;
+
+    const [u1, u2] = await Promise.all([authService.refresh(), authService.refresh()]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(u1.id).toBe('u-1');
+    expect(u2.id).toBe('u-1');
+    expect(getAccessToken()).toBe('jwt.coalesced.token');
   });
 });
