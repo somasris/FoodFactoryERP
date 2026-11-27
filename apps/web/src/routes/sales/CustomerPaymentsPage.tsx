@@ -22,6 +22,7 @@ export const CustomerPaymentsPage: React.FC = () => {
   const [reverseTarget, setReverseTarget] = useState<CustomerPayment | null>(null);
   const [reverseReason, setReverseReason] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Create form state
   const [customerId, setCustomerId] = useState('');
@@ -29,6 +30,8 @@ export const CustomerPaymentsPage: React.FC = () => {
   const [paymentMode, setPaymentMode] = useState('BANK_TRANSFER');
   const [txRef, setTxRef] = useState('');
   const [notes, setNotes] = useState('');
+  const [createInvoiceId, setCreateInvoiceId] = useState('');
+  const [createIdempotencyKey, setCreateIdempotencyKey] = useState('');
 
   // Allocation form state
   const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
@@ -57,25 +60,49 @@ export const CustomerPaymentsPage: React.FC = () => {
     enabled: Boolean(allocPayment?.customerId),
   });
 
+  const createReceivablesQuery = useQuery({
+    queryKey: ['sales', 'receivables', customerId],
+    queryFn: () => paymentsService.getReceivables({ customerId }),
+    enabled: createOpen && Boolean(customerId),
+  });
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ['sales'] });
 
   const createMut = useMutation({
-    mutationFn: () =>
-      paymentsService.create({
+    mutationFn: () => {
+      const amt = Number(amount);
+      const selectedInv = (createReceivablesQuery.data?.data?.invoices || []).find(
+        i => i.invoiceId === createInvoiceId,
+      );
+      const allocAmt = selectedInv ? Math.min(amt, Number(selectedInv.outstandingAmount)) : 0;
+      const allocations =
+        canAllocate && createInvoiceId && allocAmt > 0
+          ? [{ salesInvoiceId: createInvoiceId, allocatedAmount: allocAmt.toFixed(2) }]
+          : undefined;
+      return paymentsService.create({
         customerId,
         amount,
         paymentMode,
         transactionReference: txRef || undefined,
         notes: notes || undefined,
-      }),
-    onSuccess: () => {
+        idempotencyKey: createIdempotencyKey || undefined,
+        allocations,
+      });
+    },
+    onSuccess: res => {
       invalidate();
       setCreateOpen(false);
       setCustomerId('');
       setAmount('');
       setTxRef('');
       setNotes('');
+      setCreateInvoiceId('');
       setErrorMsg(null);
+      setSuccessMsg(
+        res.data
+          ? `Payment ${res.data.paymentNumber} recorded (Allocated: ₹${res.data.allocatedAmount}, Unallocated: ₹${res.data.unallocatedAmount}).`
+          : 'Payment recorded successfully.',
+      );
     },
     onError: err => setErrorMsg(err instanceof Error ? err.message : 'Failed to record payment'),
   });
@@ -144,7 +171,13 @@ export const CustomerPaymentsPage: React.FC = () => {
           </select>
         </div>
         {canCreate && (
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
+          <Button
+            size="sm"
+            onClick={() => {
+              setCreateIdempotencyKey(`PAY-${Date.now()}`);
+              setCreateOpen(true);
+            }}
+          >
             <Plus className="mr-1.5 h-3.5 w-3.5" />
             Record Payment
           </Button>
@@ -154,6 +187,12 @@ export const CustomerPaymentsPage: React.FC = () => {
       {errorMsg && (
         <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
           {errorMsg}
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+          {successMsg}
         </div>
       )}
 
@@ -282,7 +321,10 @@ export const CustomerPaymentsPage: React.FC = () => {
             <label className="mb-1 block font-medium text-slate-700">Customer</label>
             <select
               value={customerId}
-              onChange={e => setCustomerId(e.target.value)}
+              onChange={e => {
+                setCustomerId(e.target.value);
+                setCreateInvoiceId('');
+              }}
               className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
             >
               <option value="">Select customer...</option>
@@ -293,6 +335,36 @@ export const CustomerPaymentsPage: React.FC = () => {
               ))}
             </select>
           </div>
+          {canAllocate && customerId && (
+            <div>
+              <label className="mb-1 block font-medium text-slate-700">
+                Allocate to Invoice (Optional)
+              </label>
+              <select
+                value={createInvoiceId}
+                onChange={e => {
+                  const invId = e.target.value;
+                  setCreateInvoiceId(invId);
+                  const found = (createReceivablesQuery.data?.data?.invoices || []).find(
+                    i => i.invoiceId === invId,
+                  );
+                  if (found && !amount) {
+                    setAmount(found.outstandingAmount);
+                  }
+                }}
+                className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
+              >
+                <option value="">Leave as unallocated advance</option>
+                {(createReceivablesQuery.data?.data?.invoices || [])
+                  .filter(i => Number(i.outstandingAmount) > 0)
+                  .map(i => (
+                    <option key={i.invoiceId} value={i.invoiceId}>
+                      {i.invoiceNumber} — Outstanding ₹{i.outstandingAmount}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block font-medium text-slate-700">Amount (INR)</label>

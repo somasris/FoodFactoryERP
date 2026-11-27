@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, Download, Edit, Eye, XCircle } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, CreditCard, Download, Edit, Eye, XCircle } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { paymentsService } from '../../services/payments.service';
 import { useAuth } from '../../hooks/useAuth';
@@ -16,8 +16,18 @@ export const SalesInvoiceDetailPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [issueOpen, setIssueOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState('');
+  const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [payMode, setPayMode] = useState<
+    'BANK_TRANSFER' | 'UPI' | 'NEFT_RTGS' | 'CHEQUE' | 'CASH' | 'OTHER'
+  >('BANK_TRANSFER');
+  const [payRef, setPayRef] = useState('');
+  const [payNotes, setPayNotes] = useState('');
+  const [payIdempotencyKey, setPayIdempotencyKey] = useState('');
   const [reason, setReason] = useState('');
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
@@ -59,6 +69,51 @@ export const SalesInvoiceDetailPage: React.FC = () => {
     },
     onError: err => {
       setActionError(err instanceof Error ? err.message : 'Failed to cancel invoice');
+    },
+  });
+
+  const recordPaymentMut = useMutation({
+    mutationFn: async () => {
+      const invData = data?.data;
+      if (!invData) throw new Error('Invoice not loaded');
+      const outstanding = Number(
+        paymentHistoryQuery.data?.data?.outstandingAmount ?? invData.grandTotal,
+      );
+      const entered = Number(payAmount);
+      if (!Number.isFinite(entered) || entered <= 0) {
+        throw new Error('Payment amount must be greater than zero.');
+      }
+      const canAllocate = hasPermission('sales.payments.allocate');
+      const allocAmt = Math.min(entered, outstanding);
+      const allocations =
+        canAllocate && allocAmt > 0
+          ? [{ salesInvoiceId: invData.id, allocatedAmount: allocAmt.toFixed(2) }]
+          : undefined;
+
+      return paymentsService.create({
+        customerId: invData.customerId,
+        paymentDate: payDate,
+        amount: entered.toFixed(2),
+        paymentMode: payMode,
+        transactionReference: payRef.trim() || undefined,
+        notes: payNotes.trim() || undefined,
+        idempotencyKey: payIdempotencyKey || undefined,
+        allocations,
+      });
+    },
+    onSuccess: res => {
+      invalidate();
+      setPayOpen(false);
+      setActionError(null);
+      const payment = res.data;
+      setActionSuccess(
+        payment
+          ? `Payment ${payment.paymentNumber} recorded (Allocated: ₹${payment.allocatedAmount}, Unallocated: ₹${payment.unallocatedAmount}).`
+          : 'Payment recorded and allocated successfully.',
+      );
+    },
+    onError: err => {
+      setActionError(err instanceof Error ? err.message : 'Failed to record payment');
     },
   });
 
@@ -104,10 +159,18 @@ export const SalesInvoiceDetailPage: React.FC = () => {
   }
 
   const inv = data.data;
+  const paymentSummary = paymentHistoryQuery.data?.data;
+  const currentOutstanding = Number(
+    paymentSummary?.outstandingAmount ?? inv.grandTotal,
+  );
   const canEdit = hasPermission('sales.invoices.update') && inv.status === 'DRAFT';
   const canIssue = hasPermission('sales.invoices.issue') && inv.status === 'DRAFT';
   const canCancel = hasPermission('sales.invoices.cancel') && inv.status === 'DRAFT';
   const canDownload = hasPermission('sales.invoices.download');
+  const canRecordPayment =
+    hasPermission('sales.payments.create') &&
+    inv.status === 'ISSUED' &&
+    currentOutstanding > 0;
 
   return (
     <div className="space-y-4">
@@ -149,6 +212,24 @@ export const SalesInvoiceDetailPage: React.FC = () => {
               <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" /> Issue Invoice
             </Button>
           )}
+          {canRecordPayment && (
+            <Button
+              size="sm"
+              variant="teal"
+              onClick={() => {
+                setActionError(null);
+                setActionSuccess(null);
+                setPayAmount(currentOutstanding.toFixed(2));
+                setPayDate(new Date().toISOString().slice(0, 10));
+                setPayRef('');
+                setPayNotes('');
+                setPayIdempotencyKey(`INV-PAY-${inv.id}-${Date.now()}`);
+                setPayOpen(true);
+              }}
+            >
+              <CreditCard className="mr-1.5 h-3.5 w-3.5" /> Record Payment
+            </Button>
+          )}
           {canDownload && (
             <>
               <Button
@@ -185,6 +266,12 @@ export const SalesInvoiceDetailPage: React.FC = () => {
       {actionError && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
           {actionError}
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
+          {actionSuccess}
         </div>
       )}
 
@@ -340,6 +427,67 @@ export const SalesInvoiceDetailPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Payment & Allocation History */}
+      {inv.status === 'ISSUED' && paymentSummary && (
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-brand-navy">Payment &amp; Allocation History</h3>
+            <Link
+              to="/sales/payments"
+              className="text-[11px] font-medium text-brand-blue hover:underline"
+            >
+              Manage All Payments →
+            </Link>
+          </div>
+          {paymentSummary.allocations.length === 0 ? (
+            <p className="text-xs text-slate-500">
+              No payments allocated to this invoice yet.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-200 bg-slate-50 text-[11px] uppercase text-slate-500">
+                  <tr>
+                    <th className="px-2.5 py-2">Payment #</th>
+                    <th className="px-2.5 py-2">Date</th>
+                    <th className="px-2.5 py-2">Mode / Ref</th>
+                    <th className="px-2.5 py-2 text-right">Allocated</th>
+                    <th className="px-2.5 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paymentSummary.allocations.map(a => (
+                    <tr key={a.id} className={a.isReversed ? 'opacity-60' : ''}>
+                      <td className="px-2.5 py-2 font-mono font-medium">
+                        {a.payment.paymentNumber}
+                      </td>
+                      <td className="px-2.5 py-2 text-slate-600">
+                        {new Date(a.payment.paymentDate).toLocaleDateString('en-IN')}
+                      </td>
+                      <td className="px-2.5 py-2 text-slate-600">{a.payment.paymentMode}</td>
+                      <td className="px-2.5 py-2 text-right font-semibold text-emerald-700">
+                        ₹{Number(a.allocatedAmount).toFixed(2)}
+                      </td>
+                      <td className="px-2.5 py-2">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            a.isReversed || a.payment.status === 'REVERSED'
+                              ? 'bg-red-100 text-red-700'
+                              : 'bg-emerald-100 text-emerald-700'
+                          }`}
+                        >
+                          {a.isReversed ? 'REVERSED' : a.payment.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Status History */}
       {inv.statusHistory && inv.statusHistory.length > 0 && (
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -378,6 +526,117 @@ export const SalesInvoiceDetailPage: React.FC = () => {
           />
         </Modal>
       )}
+
+      <Modal
+        isOpen={payOpen}
+        onClose={() => setPayOpen(false)}
+        title={`Record Payment – ${inv.invoiceNumber}`}
+      >
+        <div className="space-y-3 text-xs">
+          <div className="rounded-md bg-slate-50 p-2.5 text-slate-700">
+            <div>
+              <strong>Customer:</strong> {inv.customerLegalName}
+            </div>
+            <div>
+              <strong>Outstanding Balance:</strong> ₹{currentOutstanding.toFixed(2)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block font-medium text-slate-700">Amount (INR)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={payAmount}
+                onChange={e => setPayAmount(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-slate-700">Payment Date</label>
+              <input
+                type="date"
+                value={payDate}
+                onChange={e => setPayDate(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block font-medium text-slate-700">Payment Mode</label>
+              <select
+                value={payMode}
+                onChange={e =>
+                  setPayMode(
+                    e.target.value as
+                      | 'BANK_TRANSFER'
+                      | 'UPI'
+                      | 'NEFT_RTGS'
+                      | 'CHEQUE'
+                      | 'CASH'
+                      | 'OTHER',
+                  )
+                }
+                className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
+              >
+                <option value="BANK_TRANSFER">Bank Transfer</option>
+                <option value="UPI">UPI</option>
+                <option value="NEFT_RTGS">NEFT / RTGS</option>
+                <option value="CHEQUE">Cheque</option>
+                <option value="CASH">Cash</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block font-medium text-slate-700">Reference #</label>
+              <input
+                type="text"
+                value={payRef}
+                onChange={e => setPayRef(e.target.value)}
+                placeholder="UTR / Cheque / Ref"
+                className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block font-medium text-slate-700">Notes</label>
+            <input
+              type="text"
+              value={payNotes}
+              onChange={e => setPayNotes(e.target.value)}
+              placeholder="Optional payment remarks"
+              className="w-full rounded-md border border-slate-300 px-2.5 py-1.5"
+            />
+          </div>
+
+          {Number(payAmount) > currentOutstanding && (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-2 text-[11px] text-amber-800">
+              Entered amount exceeds invoice outstanding (₹{currentOutstanding.toFixed(2)}). ₹
+              {currentOutstanding.toFixed(2)} will be allocated to this invoice and ₹
+              {(Number(payAmount) - currentOutstanding).toFixed(2)} will remain as unallocated customer advance.
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="outline" onClick={() => setPayOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              variant="teal"
+              disabled={!payAmount || Number(payAmount) <= 0 || recordPaymentMut.isPending}
+              onClick={() => recordPaymentMut.mutate()}
+            >
+              {recordPaymentMut.isPending ? 'Recording...' : 'Record & Allocate Payment'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <ConfirmDialog
         isOpen={issueOpen}

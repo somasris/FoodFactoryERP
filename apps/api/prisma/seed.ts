@@ -3,6 +3,7 @@ import { env } from '../src/config/env';
 import { getDemoAccounts, isDemoModeEnabled } from '../src/config/demo-accounts';
 import { hashPassword, validatePasswordPolicy } from '../src/utils/password';
 import { seedMurukkuBenchmarkProfile } from './seed-murukku-benchmark';
+import { seedDemoSalesProfile } from './seed-demo-sales';
 
 const prisma = new PrismaClient();
 
@@ -1727,6 +1728,16 @@ async function main() {
   ) {
     const bm = await seedMurukkuBenchmarkProfile(prisma);
     console.info(`✅ Optional Murukku 200 g benchmark master data seeded (${bm.bomCode}).`);
+  }
+
+  if (
+    process.env.SEED_DEMO_SALES === 'true' ||
+    process.argv.includes('--demo-sales')
+  ) {
+    const demo = await seedDemoSalesProfile(prisma);
+    console.info(
+      `✅ Optional demo sales products & finished goods seeded (${demo.productCount} products, receiptPosted=${demo.receiptPosted}, warehouse=${demo.warehouseCode}).`,
+    );
   }
 }
 

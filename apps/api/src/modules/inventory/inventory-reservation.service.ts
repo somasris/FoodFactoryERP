@@ -31,10 +31,44 @@ export interface FulfillmentLineRequest {
   baseQuantity: Prisma.Decimal;
 }
 
+function sortFefo(candidates: LockedCandidateBalance[]): LockedCandidateBalance[] {
+  return [...candidates].sort((a, b) => {
+    const expA = a.expiry_date ? a.expiry_date.getTime() : Number.MAX_SAFE_INTEGER;
+    const expB = b.expiry_date ? b.expiry_date.getTime() : Number.MAX_SAFE_INTEGER;
+    if (expA !== expB) return expA - expB;
+    const recA = a.received_date ? a.received_date.getTime() : a.created_at.getTime();
+    const recB = b.received_date ? b.received_date.getTime() : b.created_at.getTime();
+    return recA - recB;
+  });
+}
+
+async function getUomSymbolsByItem(
+  tx: Prisma.TransactionClient,
+  itemIds: string[],
+): Promise<Map<string, string>> {
+  if (itemIds.length === 0) return new Map();
+  const rows = await tx.inventoryItem.findMany({
+    where: { id: { in: itemIds } },
+    select: { id: true, uom: { select: { symbol: true } } },
+  });
+  return new Map(rows.map(r => [r.id, r.uom.symbol]));
+}
+
+function formatShortageMessage(
+  itemName: string,
+  requested: Prisma.Decimal,
+  available: Prisma.Decimal,
+  uomSymbol: string,
+): string {
+  const shortage = Prisma.Decimal.max(ZERO, requested.sub(available));
+  const unit = uomSymbol ? ` ${uomSymbol}` : '';
+  return `Insufficient available stock for ${itemName}. Requested: ${requested.toString()}${unit}, Available: ${available.toString()}${unit}, Shortage: ${shortage.toString()}${unit} (Short by ${shortage.toString()}).`;
+}
+
 export class InventoryReservationService {
   /**
    * Atomically reserve non-expired available stock in a warehouse inside an active DB transaction.
-   * Uses SELECT ... FOR UPDATE to prevent concurrent overselling.
+   * Uses SELECT ... FOR UPDATE to prevent concurrent overselling and reports all insufficient lines.
    */
   static async reserveStockInTx(
     tx: Prisma.TransactionClient,
@@ -43,12 +77,14 @@ export class InventoryReservationService {
   ): Promise<void> {
     if (items.length === 0) return;
 
-    const lockedItems = await lockInventoryItems(
-      tx,
-      items.map(i => i.inventoryItemId),
-    );
+    const itemIds = items.map(i => i.inventoryItemId);
+    const [lockedItems, uomSymbols] = await Promise.all([
+      lockInventoryItems(tx, itemIds),
+      getUomSymbolsByItem(tx, itemIds),
+    ]);
 
     const refDate = new Date();
+    const shortageErrors: string[] = [];
 
     for (const req of items) {
       const item = lockedItems.get(req.inventoryItemId);
@@ -66,18 +102,31 @@ export class InventoryReservationService {
         FOR UPDATE OF b
       `;
 
-      const valid = candidates.filter(c => !isBatchExpired(c.expiry_date, refDate));
-      valid.sort((a, b) => {
-        const expA = a.expiry_date ? a.expiry_date.getTime() : Number.MAX_SAFE_INTEGER;
-        const expB = b.expiry_date ? b.expiry_date.getTime() : Number.MAX_SAFE_INTEGER;
-        if (expA !== expB) return expA - expB;
-        const recA = a.received_date ? a.received_date.getTime() : a.created_at.getTime();
-        const recB = b.received_date ? b.received_date.getTime() : b.created_at.getTime();
-        return recA - recB;
-      });
+      const valid = sortFefo(candidates.filter(c => !isBatchExpired(c.expiry_date, refDate)));
+      const totalAvailable = valid.reduce(
+        (acc, c) =>
+          acc.add(
+            Prisma.Decimal.max(
+              ZERO,
+              new Prisma.Decimal(c.quantity_on_hand).sub(new Prisma.Decimal(c.quantity_reserved)),
+            ),
+          ),
+        ZERO,
+      );
+
+      if (totalAvailable.lt(req.baseQuantity)) {
+        shortageErrors.push(
+          formatShortageMessage(
+            item.name,
+            req.baseQuantity,
+            totalAvailable,
+            uomSymbols.get(item.id) || '',
+          ),
+        );
+        continue;
+      }
 
       let remaining = req.baseQuantity;
-
       for (const cand of valid) {
         if (remaining.lte(ZERO)) break;
         const onHand = new Prisma.Decimal(cand.quantity_on_hand);
@@ -86,27 +135,22 @@ export class InventoryReservationService {
         if (available.lte(ZERO)) continue;
 
         const take = available.gte(remaining) ? remaining : available;
-        const newReserved = reserved.add(take);
-
         await tx.inventoryBalance.update({
           where: { id: cand.id },
-          data: { quantityReserved: newReserved },
+          data: { quantityReserved: reserved.add(take) },
         });
-
         remaining = remaining.sub(take);
       }
+    }
 
-      if (remaining.gt(ZERO)) {
-        throw new AppError(
-          `Insufficient available non-expired stock for item ${item.code} (${item.name}). Short by ${remaining.toString()}.`,
-          400,
-        );
-      }
+    if (shortageErrors.length > 0) {
+      throw new AppError(shortageErrors.join(' '), 400);
     }
   }
 
   /**
    * Release previously reserved stock in a warehouse inside an active DB transaction.
+   * Releases in FEFO order (non-expired ACCEPTED batches first) to match reserveStockInTx.
    */
   static async releaseReservedStockInTx(
     tx: Prisma.TransactionClient,
@@ -120,6 +164,8 @@ export class InventoryReservationService {
       items.map(i => i.inventoryItemId),
     );
 
+    const refDate = new Date();
+
     for (const req of items) {
       if (req.baseQuantity.lte(ZERO)) continue;
 
@@ -131,12 +177,15 @@ export class InventoryReservationService {
         WHERE b.warehouse_id = ${warehouseId}
           AND b.inventory_item_id = ${req.inventoryItemId}
           AND b.quantity_reserved > 0
-        ORDER BY b.created_at DESC
         FOR UPDATE OF b
       `;
 
+      const nonExpired = sortFefo(reservedRows.filter(r => !isBatchExpired(r.expiry_date, refDate)));
+      const expiredOrOther = sortFefo(reservedRows.filter(r => isBatchExpired(r.expiry_date, refDate)));
+      const ordered = [...nonExpired, ...expiredOrOther];
+
       let remaining = req.baseQuantity;
-      for (const row of reservedRows) {
+      for (const row of ordered) {
         if (remaining.lte(ZERO)) break;
         const reserved = new Prisma.Decimal(row.quantity_reserved);
         const releaseQty = reserved.gte(remaining) ? remaining : reserved;
@@ -167,12 +216,13 @@ export class InventoryReservationService {
       lines: FulfillmentLineRequest[];
     },
   ) {
-    const lockedItems = await lockInventoryItems(
-      tx,
-      params.lines.map(l => l.inventoryItemId),
-    );
+    const itemIds = params.lines.map(l => l.inventoryItemId);
+    const [lockedItems, uomSymbols] = await Promise.all([
+      lockInventoryItems(tx, itemIds),
+      getUomSymbolsByItem(tx, itemIds),
+    ]);
 
-    // 1. Release the reserved quantities for the fulfilled items
+    // 1. Release the reserved quantities for the fulfilled items in FEFO order
     await this.releaseReservedStockInTx(
       tx,
       params.warehouseId,
@@ -220,6 +270,7 @@ export class InventoryReservationService {
 
     const refDate = new Date();
     let txLineCounter = 0;
+    const shortageErrors: string[] = [];
 
     for (let i = 0; i < params.lines.length; i++) {
       const line = params.lines[i];
@@ -238,15 +289,29 @@ export class InventoryReservationService {
         FOR UPDATE OF b
       `;
 
-      const valid = candidates.filter(c => !isBatchExpired(c.expiry_date, refDate));
-      valid.sort((a, b) => {
-        const expA = a.expiry_date ? a.expiry_date.getTime() : Number.MAX_SAFE_INTEGER;
-        const expB = b.expiry_date ? b.expiry_date.getTime() : Number.MAX_SAFE_INTEGER;
-        if (expA !== expB) return expA - expB;
-        const recA = a.received_date ? a.received_date.getTime() : a.created_at.getTime();
-        const recB = b.received_date ? b.received_date.getTime() : b.created_at.getTime();
-        return recA - recB;
-      });
+      const valid = sortFefo(candidates.filter(c => !isBatchExpired(c.expiry_date, refDate)));
+      const totalAvailable = valid.reduce(
+        (acc, c) =>
+          acc.add(
+            Prisma.Decimal.max(
+              ZERO,
+              new Prisma.Decimal(c.quantity_on_hand).sub(new Prisma.Decimal(c.quantity_reserved)),
+            ),
+          ),
+        ZERO,
+      );
+
+      if (totalAvailable.lt(line.baseQuantity)) {
+        shortageErrors.push(
+          formatShortageMessage(
+            item.name,
+            line.baseQuantity,
+            totalAvailable,
+            uomSymbols.get(item.id) || '',
+          ),
+        );
+        continue;
+      }
 
       let remaining = line.baseQuantity;
       let lineTotalCost = ZERO;
@@ -303,13 +368,6 @@ export class InventoryReservationService {
         remaining = remaining.sub(pickQty);
       }
 
-      if (remaining.gt(ZERO)) {
-        throw new AppError(
-          `Insufficient available non-expired stock for item ${item.code} during fulfillment. Short by ${remaining.toString()}.`,
-          400,
-        );
-      }
-
       const avgUnitCost = line.baseQuantity.gt(ZERO)
         ? lineTotalCost.div(line.baseQuantity).toDecimalPlaces(4)
         : ZERO;
@@ -326,6 +384,10 @@ export class InventoryReservationService {
           totalCost: lineTotalCost,
         },
       });
+    }
+
+    if (shortageErrors.length > 0) {
+      throw new AppError(shortageErrors.join(' '), 400);
     }
 
     return { inventoryIssue: issue, inventoryTransaction: invTx };
