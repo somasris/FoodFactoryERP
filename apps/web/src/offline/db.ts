@@ -62,6 +62,7 @@ export interface SyncAttemptRecord {
 
 export interface SyncConflictRecord {
   conflictId: string;
+  serverConflictId?: string | null;
   operationId: string;
   userId: string;
   entityType: OfflineEntityType;

@@ -5,7 +5,9 @@ import { offlineQueue } from './operation-queue';
 import { OfflineEntityType, OfflineOperationType } from './types';
 
 function isNetworkFailure(err: unknown): boolean {
-  if (err instanceof ApiError) return false;
+  if (err instanceof ApiError) {
+    return err.statusCode >= 502 && err.statusCode <= 504;
+  }
   if (err instanceof TypeError) return true;
   if (err instanceof Error && /network|fetch|offline|aborted/i.test(err.message)) return true;
   return false;
@@ -62,7 +64,7 @@ export async function executeOrQueueOffline<T>(params: {
 
   return {
     success: true,
-    message: 'Queued offline — will synchronize automatically when connectivity returns.',
+    message: 'Saved on this device. It will sync automatically when the connection is restored.',
     data: optimistic,
     timestamp: queuedOp.clientCreatedAt,
   };

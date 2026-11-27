@@ -1,5 +1,5 @@
 import { FoodFactoryOfflineDB, offlineDb, PendingOperationRecord } from './db';
-import { OfflineRepository, offlineRepo } from './offline-repository';
+import { isQuotaExceededError, OfflineRepository, offlineRepo } from './offline-repository';
 import { OfflineEntityType, OfflineOperationType } from './types';
 
 export const MAX_TRANSIENT_RETRIES = 5;
@@ -61,6 +61,52 @@ export class OfflineOperationQueue {
     }
 
     const now = new Date().toISOString();
+
+    // Coalesce offline draft updates into an existing still-PENDING local draft creation
+    if (params.entityId && params.operationType === 'SALES_ORDER_DRAFT_UPDATE') {
+      const existingOps = await this.repo.listOperationsByEntityId(
+        params.userId,
+        params.entityType,
+        params.entityId,
+      );
+      const pendingCreate = existingOps.find(
+        op => op.operationType === 'SALES_ORDER_DRAFT_CREATE' && op.status === 'PENDING',
+      );
+      if (pendingCreate) {
+        const coalesced: PendingOperationRecord = {
+          ...pendingCreate,
+          payload: { ...pendingCreate.payload, ...params.payload },
+          clientUpdatedAt: now,
+        };
+        try {
+          await this.repo.putPendingOperation(coalesced);
+        } catch (err) {
+          if (isQuotaExceededError(err)) {
+            throw new Error(
+              'Local browser storage quota exceeded. Free up space before saving offline.',
+            );
+          }
+          throw err;
+        }
+        return coalesced;
+      }
+    }
+
+    // Automatically chain dependencies on prior unresolved operations for the same entity
+    const depIds = new Set<string>(params.dependencyOperationIds ?? []);
+    if (params.entityId) {
+      const priorOps = await this.repo.listOperationsByEntityId(
+        params.userId,
+        params.entityType,
+        params.entityId,
+      );
+      for (const prior of priorOps) {
+        if (prior.status !== 'SYNCED' && prior.status !== 'CANCELLED') {
+          depIds.add(prior.operationId);
+        }
+      }
+    }
+
     const operationId = generateUuid();
     const localSequence = await this.repo.getNextSequence(params.userId);
 
@@ -78,7 +124,7 @@ export class OfflineOperationQueue {
       clientUpdatedAt: now,
       baseServerVersion: params.baseServerVersion ?? null,
       localSequence,
-      dependencyOperationIds: params.dependencyOperationIds ?? [],
+      dependencyOperationIds: Array.from(depIds),
       status: 'PENDING',
       retryCount: 0,
       nextRetryAt: null,
@@ -88,7 +134,16 @@ export class OfflineOperationQueue {
       serverResultEntityId: null,
     };
 
-    await this.repo.putPendingOperation(record);
+    try {
+      await this.repo.putPendingOperation(record);
+    } catch (err) {
+      if (isQuotaExceededError(err)) {
+        throw new Error(
+          'Local browser storage quota exceeded. Free up space before saving offline.',
+        );
+      }
+      throw err;
+    }
     return record;
   }
 

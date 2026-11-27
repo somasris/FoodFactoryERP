@@ -43,6 +43,25 @@ export function sanitizeForOfflineStorage<T>(value: T): T {
   return result as T;
 }
 
+const queueListeners = new Set<() => void>();
+
+export function subscribeOfflineQueueChanges(listener: () => void): () => void {
+  queueListeners.add(listener);
+  return () => {
+    queueListeners.delete(listener);
+  };
+}
+
+export function notifyOfflineQueueChanged(): void {
+  for (const listener of queueListeners) {
+    try {
+      listener();
+    } catch {
+      // Ignore listener errors
+    }
+  }
+}
+
 export function isQuotaExceededError(err: unknown): boolean {
   if (!err || typeof err !== 'object') return false;
   const e = err as { name?: string; code?: number };
@@ -165,10 +184,12 @@ export class OfflineRepository {
   }
 
   async getNextSequence(userId: string): Promise<number> {
-    const current = (await this.getMetadata<number>(userId, 'localSequence')) ?? 0;
-    const next = current + 1;
-    await this.setMetadata(userId, 'localSequence', next);
-    return next;
+    return this.db.transaction('rw', this.db.offlineMetadata, async () => {
+      const current = (await this.getMetadata<number>(userId, 'localSequence')) ?? 0;
+      const next = current + 1;
+      await this.setMetadata(userId, 'localSequence', next);
+      return next;
+    });
   }
 
   async putPendingOperation(op: PendingOperationRecord): Promise<void> {
@@ -177,6 +198,7 @@ export class OfflineRepository {
       payload: sanitizeForOfflineStorage(op.payload),
     };
     await this.db.pendingOperations.put(sanitized);
+    notifyOfflineQueueChanged();
   }
 
   async getPendingOperation(
@@ -202,20 +224,76 @@ export class OfflineRepository {
     return this.db.pendingOperations.where('userId').equals(userId).sortBy('localSequence');
   }
 
+  async listOperationsByEntityId(
+    userId: string,
+    entityType: OfflineEntityType,
+    entityId: string,
+  ): Promise<PendingOperationRecord[]> {
+    if (!userId || !entityId) return [];
+    const ops = await this.listOperationsByUser(userId);
+    return ops.filter(
+      op =>
+        op.entityType === entityType &&
+        op.status !== 'CANCELLED' &&
+        (op.entityId === entityId || op.serverResultEntityId === entityId),
+    );
+  }
+
   async findOperationByEntityId(
     userId: string,
     entityType: OfflineEntityType,
     entityId: string,
   ): Promise<PendingOperationRecord | undefined> {
-    if (!userId || !entityId) return undefined;
-    const ops = await this.listOperationsByUser(userId);
-    const matches = ops.filter(
-      op =>
-        op.entityType === entityType &&
-        (op.entityId === entityId || op.serverResultEntityId === entityId),
-    );
+    const matches = await this.listOperationsByEntityId(userId, entityType, entityId);
     if (matches.length === 0) return undefined;
     return matches[matches.length - 1];
+  }
+
+  async getLocalSalesOrderState(
+    userId: string,
+    entityId: string,
+  ): Promise<{
+    createOp: PendingOperationRecord | null;
+    latestOp: PendingOperationRecord | null;
+    mergedPayload: Record<string, unknown> | null;
+    resolvedServerId: string | null;
+  }> {
+    const matches = await this.listOperationsByEntityId(userId, 'SALES_ORDER', entityId);
+    const mappedServerId =
+      (await this.getMetadata<string>(userId, `localToServerId:${entityId}`)) ?? null;
+
+    if (matches.length === 0) {
+      return {
+        createOp: null,
+        latestOp: null,
+        mergedPayload: null,
+        resolvedServerId: mappedServerId,
+      };
+    }
+
+    const createOp = matches.find(m => m.operationType === 'SALES_ORDER_DRAFT_CREATE') ?? null;
+    const latestOp = matches[matches.length - 1] ?? null;
+
+    let mergedPayload: Record<string, unknown> | null = null;
+    for (const op of matches) {
+      if (
+        op.operationType === 'SALES_ORDER_DRAFT_CREATE' ||
+        op.operationType === 'SALES_ORDER_DRAFT_UPDATE'
+      ) {
+        mergedPayload = { ...(mergedPayload ?? {}), ...op.payload };
+      }
+    }
+
+    const serverIdFromOps =
+      matches.find(m => m.status === 'SYNCED' && m.serverResultEntityId)?.serverResultEntityId ??
+      mappedServerId;
+
+    return {
+      createOp,
+      latestOp,
+      mergedPayload,
+      resolvedServerId: serverIdFromOps && serverIdFromOps !== entityId ? serverIdFromOps : null,
+    };
   }
 
   async getQueueCounts(userId: string): Promise<OfflineQueueCounts> {
@@ -249,6 +327,7 @@ export class OfflineRepository {
         ? sanitizeForOfflineStorage(conflict.serverSnapshot)
         : null,
     });
+    notifyOfflineQueueChanged();
   }
 
   async listConflicts(userId: string, unresolvedOnly = true): Promise<SyncConflictRecord[]> {
