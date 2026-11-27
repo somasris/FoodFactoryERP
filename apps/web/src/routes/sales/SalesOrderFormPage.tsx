@@ -67,6 +67,30 @@ export const SalesOrderFormPage: React.FC = () => {
     queryFn: () => masterDataService.warehouses.list({ limit: 100, isActive: true }),
   });
 
+  const sortedWarehouses = React.useMemo(() => {
+    const list = warehousesData?.data?.items || [];
+    return [...list].sort((a, b) => {
+      if (a.code === 'WH-FG-01') return -1;
+      if (b.code === 'WH-FG-01') return 1;
+      const aFg = a.warehouseType === 'FINISHED_GOODS' ? 0 : 1;
+      const bFg = b.warehouseType === 'FINISHED_GOODS' ? 0 : 1;
+      if (aFg !== bFg) return aFg - bFg;
+      return a.code.localeCompare(b.code);
+    });
+  }, [warehousesData]);
+
+  useEffect(() => {
+    if (!isEdit && !warehouseId && sortedWarehouses.length > 0) {
+      const preferred =
+        sortedWarehouses.find(w => w.code === 'WH-FG-01') ??
+        sortedWarehouses.find(w => w.warehouseType === 'FINISHED_GOODS') ??
+        sortedWarehouses[0];
+      if (preferred) {
+        setWarehouseId(preferred.id);
+      }
+    }
+  }, [isEdit, warehouseId, sortedWarehouses]);
+
   const { data: variantsData } = useQuery({
     queryKey: ['master-data', 'product-variants', 'active'],
     queryFn: () => masterDataService.productVariants.list({ limit: 200, isActive: true }),
@@ -153,7 +177,25 @@ export const SalesOrderFormPage: React.FC = () => {
     },
   });
 
-  const variants = variantsData?.data?.items || [];
+  const variants = React.useMemo(() => {
+    const list = variantsData?.data?.items || [];
+    const demoOrder = new Map([
+      ['MUR-200', 1],
+      ['MIX-200', 2],
+      ['BAN-200', 3],
+      ['RIB-200', 4],
+      ['GRN-200', 5],
+      ['THA-200', 6],
+      ['COC-200', 7],
+      ['CAS-COOK', 8],
+    ]);
+    return [...list].sort((a, b) => {
+      const ra = demoOrder.get(a.sku) ?? 999;
+      const rb = demoOrder.get(b.sku) ?? 999;
+      if (ra !== rb) return ra - rb;
+      return a.sku.localeCompare(b.sku);
+    });
+  }, [variantsData]);
   const variantMap = new Map(variants.map(v => [v.id, v]));
 
   // Live UI estimate (backend remains authoritative)
@@ -258,9 +300,9 @@ export const SalesOrderFormPage: React.FC = () => {
             className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-xs"
           >
             <option value="">Select warehouse...</option>
-            {warehousesData?.data?.items.map(w => (
+            {sortedWarehouses.map(w => (
               <option key={w.id} value={w.id}>
-                {w.code} — {w.name}
+                {w.code} — {w.name} ({w.warehouseType})
               </option>
             ))}
           </select>
