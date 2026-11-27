@@ -533,13 +533,15 @@ describe('Phase 3.7: Production Reports & Analytics Suite', () => {
       .set('Authorization', `Bearer ${auditorToken}`);
     expect(csvRes.status).toBe(200);
     expect(csvRes.headers['content-type']).toContain('text/csv');
-    expect(csvRes.text).toContain('Production Plan vs Actual Report');
+    expect(csvRes.text).toContain('Plan #,Plan Status,Product');
 
     const xlsRes = await request(app)
       .get('/api/v1/production/reports/export/costing?format=excel&period=fy')
       .set('Authorization', `Bearer ${adminToken}`);
     expect(xlsRes.status).toBe(200);
-    expect(xlsRes.headers['content-type']).toContain('application/vnd.ms-excel');
+    expect(xlsRes.headers['content-type']).toContain(
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    );
 
     const pdfRes = await request(app)
       .get('/api/v1/production/reports/export/quality?format=pdf&period=fy')
