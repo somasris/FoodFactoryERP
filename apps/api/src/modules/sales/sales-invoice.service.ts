@@ -798,6 +798,12 @@ export class SalesInvoiceService {
       if (existing.status === 'CANCELLED') {
         throw new AppError('Sales invoice is already cancelled.', 400);
       }
+      if (existing.status === 'ISSUED') {
+        throw new AppError(
+          'Issued sales invoices cannot be directly cancelled. Please issue a GST Credit Note instead.',
+          400,
+        );
+      }
 
       await tx.$queryRaw`SELECT id FROM sales_orders WHERE id = ${existing.salesOrderId} FOR UPDATE`;
 

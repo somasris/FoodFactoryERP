@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { authenticate, requirePermissions } from '../../middleware/auth.middleware';
 import { SalesController } from './sales.controller';
 import { SalesInvoiceController } from './sales-invoice.controller';
+import { CustomerPaymentController } from './customer-payment.controller';
+import { CreditNoteController } from './credit-note.controller';
 
 export const salesRouter: Router = Router();
 
@@ -107,4 +109,98 @@ salesRouter.post(
   '/orders/:orderId/invoices',
   requirePermissions('sales.invoices.create'),
   SalesInvoiceController.createInvoiceFromOrder,
+);
+
+// P0.1: Customer Payments, Receivables & Ageing
+salesRouter.get(
+  '/payments',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.listPayments,
+);
+salesRouter.post(
+  '/payments',
+  requirePermissions('sales.payments.create'),
+  CustomerPaymentController.createPayment,
+);
+salesRouter.get(
+  '/payments/:id',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getPaymentById,
+);
+salesRouter.post(
+  '/payments/:id/allocate',
+  requirePermissions('sales.payments.allocate'),
+  CustomerPaymentController.allocatePayment,
+);
+salesRouter.post(
+  '/payments/:id/reverse',
+  requirePermissions('sales.payments.reverse'),
+  CustomerPaymentController.reversePayment,
+);
+salesRouter.get(
+  '/invoices/:id/payments',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getInvoicePaymentHistory,
+);
+salesRouter.get(
+  '/customers/:customerId/payments',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getCustomerPaymentHistory,
+);
+salesRouter.get(
+  '/customers/:customerId/outstanding',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getCustomerOutstanding,
+);
+salesRouter.get(
+  '/receivables',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getReceivablesReport,
+);
+salesRouter.get(
+  '/ageing',
+  requirePermissions('sales.payments.read'),
+  CustomerPaymentController.getAgeingReport,
+);
+
+// P0.2: GST Credit Notes
+salesRouter.get(
+  '/credit-notes',
+  requirePermissions('sales.credit_notes.read'),
+  CreditNoteController.listCreditNotes,
+);
+salesRouter.post(
+  '/credit-notes',
+  requirePermissions('sales.credit_notes.create'),
+  CreditNoteController.createDraft,
+);
+salesRouter.get(
+  '/credit-notes/:id',
+  requirePermissions('sales.credit_notes.read'),
+  CreditNoteController.getCreditNoteById,
+);
+salesRouter.get(
+  '/credit-notes/:id/pdf',
+  requirePermissions('sales.credit_notes.download'),
+  CreditNoteController.downloadCreditNotePdf,
+);
+salesRouter.post(
+  '/credit-notes/:id/issue',
+  requirePermissions('sales.credit_notes.issue'),
+  CreditNoteController.issueCreditNote,
+);
+salesRouter.post(
+  '/credit-notes/:id/cancel',
+  requirePermissions('sales.credit_notes.cancel'),
+  CreditNoteController.cancelCreditNote,
+);
+salesRouter.get(
+  '/invoices/:id/credit-notes',
+  requirePermissions('sales.credit_notes.read'),
+  CreditNoteController.listInvoiceCreditNotes,
+);
+salesRouter.get(
+  '/customers/:customerId/credit-balance',
+  requirePermissions('sales.credit_notes.read'),
+  CreditNoteController.getCustomerCreditBalance,
 );
