@@ -8,6 +8,37 @@ export type SalesOrderStatus =
   | 'FULFILLED'
   | 'CANCELLED';
 
+export type StockAvailabilityStatus =
+  | 'SUFFICIENT'
+  | 'PARTIAL'
+  | 'INSUFFICIENT'
+  | 'NOT_APPLICABLE';
+
+export interface SalesOrderLineStockAvailability {
+  salesOrderLineId: string;
+  lineNumber: number;
+  productVariantId: string;
+  inventoryItemId: string;
+  sku: string;
+  productName: string;
+  uomSymbol: string;
+  requestedQuantity: string;
+  availableQuantity: string;
+  shortageQuantity: string;
+  isSufficient: boolean;
+}
+
+export interface SalesOrderStockAvailability {
+  status: StockAvailabilityStatus;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  totalLines: number;
+  sufficientLines: number;
+  insufficientLines: number;
+  lines: SalesOrderLineStockAvailability[];
+}
+
 export interface SalesOrderLine {
   id: string;
   lineNumber: number;
@@ -99,6 +130,7 @@ export interface SalesOrder {
   statusHistory?: SalesOrderStatusHistoryItem[];
   fulfillments?: SalesOrderFulfillmentItem[];
   _count?: { lines: number };
+  stockAvailability?: SalesOrderStockAvailability | null;
 }
 
 export interface SalesInvoiceMetrics {

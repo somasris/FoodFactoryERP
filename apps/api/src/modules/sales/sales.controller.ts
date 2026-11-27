@@ -15,6 +15,7 @@ import { SalesService } from './sales.service';
 const getUserCtx = (req: Request): UserContext => ({
   userId: req.user!.userId,
   roles: req.user!.roles || [],
+  permissions: req.user!.permissions || [],
 });
 
 const getStr = (val: unknown): string | undefined =>
@@ -42,6 +43,9 @@ export class SalesController {
         warehouseId: getStr(req.query.warehouseId),
         fromDate: getStr(req.query.fromDate),
         toDate: getStr(req.query.toDate),
+        stockAvailability: getStr(req.query.stockAvailability),
+        sortBy: getStr(req.query.sortBy),
+        sortOrder: getStr(req.query.sortOrder),
       });
       sendSuccess(res, 'Sales orders retrieved successfully', data);
     } catch (error) {

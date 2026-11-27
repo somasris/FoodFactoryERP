@@ -6,6 +6,8 @@ import { salesService } from '../../services/sales.service';
 import { useAuth } from '../../hooks/useAuth';
 import { offlineRepo } from '../../offline/offline-repository';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
+import { StockAvailabilityBadge } from '../../components/sales/StockAvailabilityBadge';
+import { StockShortageTable } from '../../components/sales/StockShortageTable';
 import { Button } from '../../components/common/Button';
 import { ConfirmDialog, Modal } from '../../components/master-data/Modal';
 
@@ -55,6 +57,8 @@ export const SalesOrderDetailPage: React.FC = () => {
     queryFn: () => salesService.orders.getById(id!),
     enabled: Boolean(id) && !isLocalOnlyPending && !reconciledServerId,
     retry: false,
+    staleTime: 10_000,
+    refetchOnWindowFocus: true,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -290,6 +294,9 @@ export const SalesOrderDetailPage: React.FC = () => {
             <div className="flex items-center gap-2">
               <h2 className="font-mono text-lg font-bold text-brand-navy">{order.orderNumber}</h2>
               <SalesStatusBadge status={order.status} />
+              {order.stockAvailability && (
+                <StockAvailabilityBadge status={order.stockAvailability.status} />
+              )}
             </div>
             <p className="text-xs text-slate-500">
               Customer: {order.customer.legalName} ({order.customer.code}) · Warehouse:{' '}
@@ -370,6 +377,19 @@ export const SalesOrderDetailPage: React.FC = () => {
           {actionError}
         </div>
       )}
+
+      {order.stockAvailability &&
+        (order.stockAvailability.status === 'INSUFFICIENT' ||
+          order.stockAvailability.status === 'PARTIAL') && (
+          <div className="rounded-lg border border-[#C74440]/30 bg-red-50/60 p-3 text-xs">
+            <div className="mb-2 font-semibold text-[#C74440]">
+              {order.stockAvailability.status === 'PARTIAL'
+                ? 'Partial Stock Availability'
+                : 'Insufficient Stock for Order'}
+            </div>
+            <StockShortageTable stock={order.stockAvailability} />
+          </div>
+        )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">

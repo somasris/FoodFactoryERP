@@ -54,7 +54,10 @@ export const InventoryReceiptsPage: React.FC = () => {
     queryFn: () => masterDataService.uoms.list({ limit: 100, isActive: true }),
   });
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['inventory'] });
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['sales'] });
+  };
 
   const createMutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) => inventoryService.receipts.create(payload),

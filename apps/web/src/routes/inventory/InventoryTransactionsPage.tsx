@@ -33,6 +33,7 @@ export const InventoryTransactionsPage: React.FC = () => {
       inventoryService.reverseTransaction(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['sales'] });
       setReverseTargetId(null);
       setReverseReason('');
       setActionError(null);

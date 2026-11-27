@@ -5,6 +5,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { AppError } from '../../middleware/error.middleware';
+import { prisma } from '../../services/prisma.service';
 import { generateDocNumber, isBatchExpired, lockInventoryItems, ZERO } from './inventory.utils';
 
 interface LockedCandidateBalance {
@@ -66,6 +67,56 @@ function formatShortageMessage(
 }
 
 export class InventoryReservationService {
+  /**
+   * Read-only batch lookup of eligible available stock (on_hand - reserved) across
+   * (warehouseId, inventoryItemId) pairs, excluding expired and non-ACCEPTED batches.
+   * Mirrors the exact eligibility rules of reserveStockInTx / fulfillReservedStockInTx
+   * without acquiring locks or mutating inventory.
+   */
+  static async getEligibleAvailableByWarehouseAndItem(
+    pairs: Array<{ warehouseId: string; inventoryItemId: string }>,
+    refDate = new Date(),
+  ): Promise<Map<string, Prisma.Decimal>> {
+    const result = new Map<string, Prisma.Decimal>();
+    if (pairs.length === 0) return result;
+
+    const warehouseIds = [...new Set(pairs.map(p => p.warehouseId))];
+    const itemIds = [...new Set(pairs.map(p => p.inventoryItemId))];
+
+    const rows = await prisma.$queryRaw<
+      Array<{
+        warehouse_id: string;
+        inventory_item_id: string;
+        quantity_on_hand: string;
+        quantity_reserved: string;
+        expiry_date: Date | null;
+      }>
+    >`
+      SELECT b.warehouse_id, b.inventory_item_id,
+             b.quantity_on_hand::text, b.quantity_reserved::text,
+             ib.expiry_date
+      FROM inventory_balances b
+      LEFT JOIN inventory_batches ib ON ib.id = b.batch_id
+      WHERE b.warehouse_id = ANY(${warehouseIds}::text[])
+        AND b.inventory_item_id = ANY(${itemIds}::text[])
+        AND (b.quantity_on_hand - b.quantity_reserved) > 0
+        AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
+    `;
+
+    for (const row of rows) {
+      if (isBatchExpired(row.expiry_date, refDate)) continue;
+      const avail = Prisma.Decimal.max(
+        ZERO,
+        new Prisma.Decimal(row.quantity_on_hand).sub(new Prisma.Decimal(row.quantity_reserved)),
+      );
+      if (avail.lte(ZERO)) continue;
+      const key = `${row.warehouse_id}:${row.inventory_item_id}`;
+      result.set(key, (result.get(key) ?? ZERO).add(avail));
+    }
+
+    return result;
+  }
+
   /**
    * Atomically reserve non-expired available stock in a warehouse inside an active DB transaction.
    * Uses SELECT ... FOR UPDATE to prevent concurrent overselling and reports all insufficient lines.

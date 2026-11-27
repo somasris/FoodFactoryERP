@@ -8,6 +8,7 @@ export const ZERO = new Prisma.Decimal(0);
 export interface UserContext {
   userId: string;
   roles: string[];
+  permissions?: string[];
 }
 
 export const isGlobalWarehouseRole = (roles: string[]): boolean => {

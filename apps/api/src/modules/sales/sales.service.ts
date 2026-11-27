@@ -27,6 +27,219 @@ import {
 
 const HUNDRED = new Prisma.Decimal(100);
 
+export type StockAvailabilityStatus =
+  | 'SUFFICIENT'
+  | 'PARTIAL'
+  | 'INSUFFICIENT'
+  | 'NOT_APPLICABLE';
+
+export interface SalesOrderLineStockAvailability {
+  salesOrderLineId: string;
+  lineNumber: number;
+  productVariantId: string;
+  inventoryItemId: string;
+  sku: string;
+  productName: string;
+  uomSymbol: string;
+  requestedQuantity: string;
+  availableQuantity: string;
+  shortageQuantity: string;
+  isSufficient: boolean;
+}
+
+export interface SalesOrderStockAvailability {
+  status: StockAvailabilityStatus;
+  warehouseId: string;
+  warehouseCode: string;
+  warehouseName: string;
+  totalLines: number;
+  sufficientLines: number;
+  insufficientLines: number;
+  lines: SalesOrderLineStockAvailability[];
+}
+
+const NON_APPLICABLE_STOCK_STATUSES = new Set<SalesOrderStatus>([
+  SalesOrderStatus.CANCELLED,
+  SalesOrderStatus.FULFILLED,
+  SalesOrderStatus.REJECTED,
+]);
+
+const STOCK_STATUS_SORT_RANK: Record<StockAvailabilityStatus, number> = {
+  INSUFFICIENT: 0,
+  PARTIAL: 1,
+  SUFFICIENT: 2,
+  NOT_APPLICABLE: 3,
+};
+
+function canUserViewInventory(user: UserContext): boolean {
+  return (
+    user.roles.includes('OWNER') ||
+    user.roles.includes('ADMIN') ||
+    (user.permissions?.includes('inventory.read') ?? false)
+  );
+}
+
+interface StockOrderLineInput {
+  id: string;
+  lineNumber: number;
+  productVariantId: string;
+  inventoryItemId: string;
+  orderedQuantity: Prisma.Decimal | string;
+  baseQuantity: Prisma.Decimal | string;
+  reservedBaseQuantity: Prisma.Decimal | string;
+  fulfilledBaseQuantity: Prisma.Decimal | string;
+  productVariant: {
+    sku: string;
+    name: string;
+    product?: { name: string } | null;
+  };
+  uom: { symbol: string };
+}
+
+interface StockOrderInput {
+  warehouseId: string;
+  status: SalesOrderStatus;
+  warehouse: { id: string; code: string; name: string };
+  lines: StockOrderLineInput[];
+}
+
+function computeOrderStockAvailability(
+  order: StockOrderInput,
+  availableByWhItem: Map<string, Prisma.Decimal>,
+): SalesOrderStockAvailability {
+  if (NON_APPLICABLE_STOCK_STATUSES.has(order.status)) {
+    return {
+      status: 'NOT_APPLICABLE',
+      warehouseId: order.warehouse.id,
+      warehouseCode: order.warehouse.code,
+      warehouseName: order.warehouse.name,
+      totalLines: order.lines.length,
+      sufficientLines: 0,
+      insufficientLines: 0,
+      lines: [],
+    };
+  }
+
+  const localPool = new Map<string, Prisma.Decimal>();
+  const lineResults: SalesOrderLineStockAvailability[] = [];
+  let sufficientLines = 0;
+  let insufficientLines = 0;
+  const includesOwnReservation =
+    order.status === SalesOrderStatus.CONFIRMED ||
+    order.status === SalesOrderStatus.PARTIALLY_FULFILLED;
+
+  for (const line of order.lines) {
+    const baseQty = new Prisma.Decimal(line.baseQuantity);
+    const fulfilledBase = new Prisma.Decimal(line.fulfilledBaseQuantity);
+    const remainingBase = Prisma.Decimal.max(ZERO, baseQty.sub(fulfilledBase));
+    const orderedQty = new Prisma.Decimal(line.orderedQuantity);
+    const ratio = baseQty.gt(ZERO) ? orderedQty.div(baseQty) : new Prisma.Decimal(1);
+
+    const productName =
+      line.productVariant.product?.name || line.productVariant.name || line.productVariant.sku;
+
+    if (remainingBase.lte(ZERO)) {
+      sufficientLines += 1;
+      lineResults.push({
+        salesOrderLineId: line.id,
+        lineNumber: line.lineNumber,
+        productVariantId: line.productVariantId,
+        inventoryItemId: line.inventoryItemId,
+        sku: line.productVariant.sku,
+        productName,
+        uomSymbol: line.uom.symbol,
+        requestedQuantity: '0',
+        availableQuantity: '0',
+        shortageQuantity: '0',
+        isSufficient: true,
+      });
+      continue;
+    }
+
+    const key = `${order.warehouseId}:${line.inventoryItemId}`;
+    const poolAvail = localPool.has(key)
+      ? localPool.get(key)!
+      : (availableByWhItem.get(key) ?? ZERO);
+
+    const reservedForLine = includesOwnReservation
+      ? Prisma.Decimal.max(ZERO, new Prisma.Decimal(line.reservedBaseQuantity))
+      : ZERO;
+
+    const effectiveAvailBase = poolAvail.add(reservedForLine);
+    const neededFromPool = Prisma.Decimal.max(ZERO, remainingBase.sub(reservedForLine));
+    const consumedFromPool = Prisma.Decimal.min(poolAvail, neededFromPool);
+    localPool.set(key, poolAvail.sub(consumedFromPool));
+
+    const shortageBase = Prisma.Decimal.max(ZERO, remainingBase.sub(effectiveAvailBase));
+    const isSufficient = shortageBase.lte(ZERO);
+    if (isSufficient) {
+      sufficientLines += 1;
+    } else {
+      insufficientLines += 1;
+    }
+
+    const requestedDisplay = remainingBase.mul(ratio).toDecimalPlaces(4);
+    const availableDisplay = effectiveAvailBase.mul(ratio).toDecimalPlaces(4);
+    const shortageDisplay = shortageBase.mul(ratio).toDecimalPlaces(4);
+
+    lineResults.push({
+      salesOrderLineId: line.id,
+      lineNumber: line.lineNumber,
+      productVariantId: line.productVariantId,
+      inventoryItemId: line.inventoryItemId,
+      sku: line.productVariant.sku,
+      productName,
+      uomSymbol: line.uom.symbol,
+      requestedQuantity: requestedDisplay.toString(),
+      availableQuantity: availableDisplay.toString(),
+      shortageQuantity: shortageDisplay.toString(),
+      isSufficient,
+    });
+  }
+
+  let status: StockAvailabilityStatus;
+  if (insufficientLines === 0) {
+    status = 'SUFFICIENT';
+  } else if (sufficientLines > 0) {
+    status = 'PARTIAL';
+  } else {
+    status = 'INSUFFICIENT';
+  }
+
+  return {
+    status,
+    warehouseId: order.warehouse.id,
+    warehouseCode: order.warehouse.code,
+    warehouseName: order.warehouse.name,
+    totalLines: order.lines.length,
+    sufficientLines,
+    insufficientLines,
+    lines: lineResults,
+  };
+}
+
+async function attachStockAvailabilityToOrders<T extends StockOrderInput>(
+  orders: T[],
+): Promise<Array<T & { stockAvailability: SalesOrderStockAvailability }>> {
+  if (orders.length === 0) return [];
+
+  const pairs: Array<{ warehouseId: string; inventoryItemId: string }> = [];
+  for (const order of orders) {
+    if (NON_APPLICABLE_STOCK_STATUSES.has(order.status)) continue;
+    for (const line of order.lines) {
+      pairs.push({ warehouseId: order.warehouseId, inventoryItemId: line.inventoryItemId });
+    }
+  }
+
+  const availableByWhItem =
+    await InventoryReservationService.getEligibleAvailableByWarehouseAndItem(pairs);
+
+  return orders.map(order => ({
+    ...order,
+    stockAvailability: computeOrderStockAvailability(order, availableByWhItem),
+  }));
+}
+
 const ORDER_INCLUDE = {
   customer: {
     select: {
@@ -199,11 +412,22 @@ export class SalesService {
       warehouseId?: string;
       fromDate?: string;
       toDate?: string;
+      stockAvailability?: string;
+      sortBy?: string;
+      sortOrder?: string;
     },
   ) {
     const allowedWh = await getAuthorizedWarehouseIds(user, 'READ');
     if (filters.warehouseId) {
       await assertWarehouseAccess(user, filters.warehouseId, 'READ');
+    }
+
+    const canViewInventory = canUserViewInventory(user);
+    if (filters.stockAvailability && !canViewInventory) {
+      throw new AppError(
+        'Forbidden: inventory.read permission is required to filter by stock availability.',
+        403,
+      );
     }
 
     const where: Prisma.SalesOrderWhereInput = {};
@@ -227,23 +451,82 @@ export class SalesService {
       ];
     }
 
+    const listInclude = {
+      customer: { select: { id: true, code: true, legalName: true, customerType: true } },
+      warehouse: { select: { id: true, code: true, name: true } },
+      salesman: { select: { id: true, fullName: true, username: true } },
+      lines: {
+        orderBy: { lineNumber: 'asc' as const },
+        select: {
+          id: true,
+          lineNumber: true,
+          productVariantId: true,
+          inventoryItemId: true,
+          orderedQuantity: true,
+          baseQuantity: true,
+          reservedBaseQuantity: true,
+          fulfilledBaseQuantity: true,
+          productVariant: {
+            select: {
+              sku: true,
+              name: true,
+              product: { select: { name: true } },
+            },
+          },
+          uom: { select: { symbol: true } },
+        },
+      },
+      _count: { select: { lines: true } },
+    };
+
+    const needsFullStockEvaluation =
+      canViewInventory &&
+      (Boolean(filters.stockAvailability) || filters.sortBy === 'stockAvailability');
+
+    if (needsFullStockEvaluation) {
+      const allOrders = await prisma.salesOrder.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        include: listInclude,
+      });
+
+      const enriched = await attachStockAvailabilityToOrders(allOrders);
+      let filtered = filters.stockAvailability
+        ? enriched.filter(o => o.stockAvailability.status === filters.stockAvailability)
+        : enriched;
+
+      if (filters.sortBy === 'stockAvailability') {
+        const dir = filters.sortOrder === 'desc' ? -1 : 1;
+        filtered = [...filtered].sort(
+          (a, b) =>
+            dir *
+            (STOCK_STATUS_SORT_RANK[a.stockAvailability.status] -
+              STOCK_STATUS_SORT_RANK[b.stockAvailability.status]),
+        );
+      }
+
+      const total = filtered.length;
+      const paged = filtered.slice(params.skip, params.skip + params.take);
+      return paginatedResult(paged, total, params.page, params.limit);
+    }
+
     const [items, total] = await Promise.all([
       prisma.salesOrder.findMany({
         where,
         skip: params.skip,
         take: params.take,
         orderBy: { createdAt: 'desc' },
-        include: {
-          customer: { select: { id: true, code: true, legalName: true, customerType: true } },
-          warehouse: { select: { id: true, code: true, name: true } },
-          salesman: { select: { id: true, fullName: true, username: true } },
-          _count: { select: { lines: true } },
-        },
+        include: listInclude,
       }),
       prisma.salesOrder.count({ where }),
     ]);
 
-    return paginatedResult(items, total, params.page, params.limit);
+    const enrichedItems: Array<(typeof items)[number] & { stockAvailability: SalesOrderStockAvailability | null }> =
+      canViewInventory
+        ? await attachStockAvailabilityToOrders(items)
+        : items.map(item => ({ ...item, stockAvailability: null }));
+
+    return paginatedResult(enrichedItems, total, params.page, params.limit);
   }
 
   static async getOrderById(id: string, user: UserContext) {
@@ -260,7 +543,12 @@ export class SalesService {
     });
     if (!order) throw new AppError('Sales order not found.', 404);
     await assertWarehouseAccess(user, order.warehouseId, 'READ');
-    return order;
+
+    if (!canUserViewInventory(user)) {
+      return { ...order, stockAvailability: null };
+    }
+    const [enriched] = await attachStockAvailabilityToOrders([order]);
+    return enriched;
   }
 
   static async getOrderHistory(id: string, user: UserContext) {

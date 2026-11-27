@@ -20,6 +20,9 @@ export interface SalesQuery {
   warehouseId?: string;
   fromDate?: string;
   toDate?: string;
+  stockAvailability?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 const buildQuery = (params: SalesQuery = {}): string => {
