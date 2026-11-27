@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { useOffline } from '../context/OfflineContext';
-import { offlineRepo } from '../offline/offline-repository';
+import { offlineRepo, subscribeOfflineQueueChanges } from '../offline/offline-repository';
 import { syncEngine, SyncRunSummary } from '../offline/sync-engine';
 
 export function useOfflineSync() {
@@ -16,6 +16,7 @@ export function useOfflineSync() {
 
   const wasOfflineRef = useRef(false);
   const initialSyncDoneRef = useRef(false);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const refreshCounts = useCallback(async () => {
     if (!user?.id) {
@@ -50,7 +51,57 @@ export function useOfflineSync() {
 
   useEffect(() => {
     void refreshCounts();
+    return subscribeOfflineQueueChanges(() => {
+      void refreshCounts();
+    });
   }, [refreshCounts]);
+
+  // Schedule bounded automatic retry for transient-failed PENDING operations when online
+  useEffect(() => {
+    if (import.meta.env.MODE === 'test') return;
+    if (!isAuthenticated || !user?.id || !isNavigatorOnline || !isServerReachable) {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const schedulePendingRetry = async () => {
+      const pending = await offlineRepo.listOperationsByUser(user.id, 'PENDING');
+      if (cancelled || pending.length === 0) return;
+
+      const now = Date.now();
+      let earliestMs = Infinity;
+      for (const op of pending) {
+        if (op.lastErrorCode === 'SESSION_EXPIRED') continue;
+        const t = op.nextRetryAt ? new Date(op.nextRetryAt).getTime() : now;
+        if (t < earliestMs) earliestMs = t;
+      }
+      if (!Number.isFinite(earliestMs)) return;
+
+      const delayMs = Math.max(200, earliestMs - now);
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = setTimeout(() => {
+        if (!cancelled) void syncNow();
+      }, delayMs);
+    };
+
+    void schedulePendingRetry();
+    const unsub = subscribeOfflineQueueChanges(() => {
+      void schedulePendingRetry();
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
+    };
+  }, [isAuthenticated, user?.id, isNavigatorOnline, isServerReachable, syncNow]);
 
   useEffect(() => {
     if (import.meta.env.MODE === 'test') return;

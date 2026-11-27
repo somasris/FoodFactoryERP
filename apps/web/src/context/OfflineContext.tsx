@@ -151,8 +151,15 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setLastCheckedAt(new Date().toISOString());
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void triggerHealthCheck().then(scheduleNextProbe);
+      }
+    };
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     // Initial check
     triggerHealthCheck().then(scheduleNextProbe);
@@ -161,6 +168,7 @@ export const OfflineProvider: React.FC<{ children: React.ReactNode }> = ({ child
       isMounted = false;
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (debounceTimer) clearTimeout(debounceTimer);
       if (probeTimerRef.current) clearTimeout(probeTimerRef.current);
     };

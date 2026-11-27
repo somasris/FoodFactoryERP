@@ -60,18 +60,48 @@ export class SyncEngine {
     const lockResult = await withSyncLock(userId, async () => {
       summary.ran = true;
 
-      // 1. Push pending operations in bounded batches
-      const batch = await this.queue.getReadyBatch(userId, 20);
-      if (batch.length > 0) {
-        await this.pushBatch(userId, batch, summary);
+      // 1. Push pending operations in dependency order across bounded batches
+      let batches = 0;
+      const MAX_BATCHES_PER_RUN = 10;
+      while (batches < MAX_BATCHES_PER_RUN) {
+        const batch = await this.queue.getReadyBatch(userId, 20);
+        if (batch.length === 0) break;
+
+        const batchOutcome = await this.pushBatch(userId, batch, summary);
+        batches++;
+
+        if (batchOutcome === 'SESSION_EXPIRED') {
+          summary.skippedReason = 'SESSION_EXPIRED';
+          return;
+        }
+        if (batchOutcome === 'TRANSIENT_ABORT') {
+          return;
+        }
       }
 
       // 2. Pull incremental server changes
-      await this.pullIncremental(userId, summary);
+      try {
+        await this.pullIncremental(userId, summary);
+      } catch (err) {
+        if (err instanceof ApiError && err.statusCode === 401) {
+          summary.skippedReason = 'SESSION_EXPIRED';
+          return;
+        }
+        throw err;
+      }
 
-      const nowIso = new Date().toISOString();
-      await this.repo.setMetadata(userId, 'lastSuccessfulSyncAt', nowIso);
-      summary.lastSuccessfulSyncAt = nowIso;
+      if (summary.failedCount === 0 && summary.conflictCount === 0) {
+        const nowIso = new Date().toISOString();
+        await this.repo.setMetadata(userId, 'lastSuccessfulSyncAt', nowIso);
+        summary.lastSuccessfulSyncAt = nowIso;
+      }
+
+      if (
+        typeof window !== 'undefined' &&
+        (summary.syncedCount > 0 || summary.pulledCount > 0)
+      ) {
+        window.dispatchEvent(new CustomEvent('ff:offline-sync-completed', { detail: summary }));
+      }
     });
 
     if (!lockResult.acquired) {
@@ -85,7 +115,7 @@ export class SyncEngine {
     userId: string,
     batch: PendingOperationRecord[],
     summary: SyncRunSummary,
-  ): Promise<void> {
+  ): Promise<'OK' | 'SESSION_EXPIRED' | 'TRANSIENT_ABORT'> {
     const nowIso = new Date().toISOString();
     for (const op of batch) {
       await this.repo.putPendingOperation({
@@ -129,6 +159,28 @@ export class SyncEngine {
             lastErrorCode: null,
             lastErrorMessage: null,
           });
+          if (res.serverEntityId && res.serverEntityId !== op.entityId) {
+            await this.repo.setMetadata(
+              userId,
+              `localToServerId:${op.entityId}`,
+              res.serverEntityId,
+            );
+            const remainingOps = await this.repo.listOperationsByEntityId(
+              userId,
+              op.entityType,
+              op.entityId,
+            );
+            for (const depOp of remainingOps) {
+              if (depOp.operationId !== op.operationId && depOp.status === 'PENDING') {
+                await this.repo.putPendingOperation({
+                  ...depOp,
+                  entityId: res.serverEntityId,
+                  baseServerVersion:
+                    depOp.baseServerVersion ?? res.serverVersion ?? null,
+                });
+              }
+            }
+          }
           await this.repo.recordSyncAttempt({
             attemptId: generateUuid(),
             operationId: op.operationId,
@@ -150,6 +202,7 @@ export class SyncEngine {
           });
           await this.repo.saveConflict({
             conflictId: generateUuid(),
+            serverConflictId: res.serverConflictId ?? null,
             operationId: op.operationId,
             userId,
             entityType: op.entityType,
@@ -195,14 +248,62 @@ export class SyncEngine {
           summary.failedCount++;
         }
       }
+      return 'OK';
     } catch (err) {
-      const isAuthErr = err instanceof ApiError && (err.statusCode === 401 || err.statusCode === 403);
-      const isValidationErr = err instanceof ApiError && err.statusCode >= 400 && err.statusCode < 500 && !isAuthErr;
+      const isSessionExpired = err instanceof ApiError && err.statusCode === 401;
+      const isForbidden = err instanceof ApiError && err.statusCode === 403;
+      const isValidationErr =
+        err instanceof ApiError &&
+        err.statusCode >= 400 &&
+        err.statusCode < 500 &&
+        !isSessionExpired &&
+        !isForbidden;
       const errMessage = err instanceof Error ? err.message : 'Network error during sync';
+
+      if (isSessionExpired) {
+        // Pause sync cleanly without discarding or failing pending operations
+        for (const op of batch) {
+          await this.repo.putPendingOperation({
+            ...op,
+            status: 'PENDING',
+            lastErrorCode: 'SESSION_EXPIRED',
+            lastErrorMessage: 'Session expired. Reauthenticate as the same user to resume sync.',
+          });
+        }
+        return 'SESSION_EXPIRED';
+      }
+
+      if (isForbidden) {
+        for (const op of batch) {
+          await this.repo.putPendingOperation({
+            ...op,
+            status: 'CONFLICT',
+            lastErrorCode: 'INSUFFICIENT_PERMISSION',
+            lastErrorMessage: errMessage,
+          });
+          await this.repo.saveConflict({
+            conflictId: generateUuid(),
+            operationId: op.operationId,
+            userId,
+            entityType: op.entityType,
+            entityId: op.entityId,
+            operationType: op.operationType,
+            conflictCategory: 'INSUFFICIENT_PERMISSION',
+            localPayload: op.payload,
+            serverSnapshot: null,
+            reason: errMessage,
+            detectedAt: nowIso,
+            resolvedAt: null,
+            resolutionAction: null,
+          });
+          summary.conflictCount++;
+        }
+        return 'TRANSIENT_ABORT';
+      }
 
       for (const op of batch) {
         const nextRetryCount = op.retryCount + 1;
-        const isPermanent = isAuthErr || isValidationErr || nextRetryCount > MAX_TRANSIENT_RETRIES;
+        const isPermanent = isValidationErr || nextRetryCount > MAX_TRANSIENT_RETRIES;
 
         await this.repo.putPendingOperation({
           ...op,
@@ -211,7 +312,7 @@ export class SyncEngine {
           nextRetryAt: isPermanent
             ? null
             : new Date(Date.now() + computeRetryDelayMs(nextRetryCount)).toISOString(),
-          lastErrorCode: isAuthErr ? 'AUTH_ERROR' : 'NETWORK_ERROR',
+          lastErrorCode: isValidationErr ? 'VALIDATION_FAILED' : 'NETWORK_ERROR',
           lastErrorMessage: errMessage,
         });
 
@@ -222,7 +323,7 @@ export class SyncEngine {
           attemptedAt: nowIso,
           outcome: isPermanent ? 'PERMANENT_ERROR' : 'TRANSIENT_ERROR',
           httpStatus: err instanceof ApiError ? err.statusCode : null,
-          errorCode: isAuthErr ? 'AUTH_ERROR' : 'NETWORK_ERROR',
+          errorCode: isValidationErr ? 'VALIDATION_FAILED' : 'NETWORK_ERROR',
           errorMessage: errMessage,
         });
 
@@ -230,6 +331,7 @@ export class SyncEngine {
           summary.failedCount++;
         }
       }
+      return 'TRANSIENT_ABORT';
     }
   }
 

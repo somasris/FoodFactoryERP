@@ -43,6 +43,15 @@ export const AppShell: React.FC = () => {
   });
 
   useEffect(() => {
+    const handleSyncCompleted = () => {
+      void queryClient.invalidateQueries({ queryKey: ['sales'] });
+      void queryClient.invalidateQueries({ queryKey: ['offline'] });
+    };
+    window.addEventListener('ff:offline-sync-completed', handleSyncCompleted);
+    return () => window.removeEventListener('ff:offline-sync-completed', handleSyncCompleted);
+  }, [queryClient]);
+
+  useEffect(() => {
     if (!user || !prefs) return;
     const seenLocalKey = `ff_tour_seen_${user.id}`;
     const seenLocally = window.localStorage.getItem(seenLocalKey) === 'true';
