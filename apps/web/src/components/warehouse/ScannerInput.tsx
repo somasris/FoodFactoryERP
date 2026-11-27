@@ -90,6 +90,9 @@ export const ScannerInput: React.FC<ScannerInputProps> = ({
             onChange={e => onChange(e.target.value)}
             onKeyDown={e => {
               if (e.key === 'Enter' && value.trim()) {
+                if (e.nativeEvent.isComposing || e.keyCode === 229) {
+                  return;
+                }
                 e.preventDefault();
                 onScanSubmit?.(value.trim());
               }

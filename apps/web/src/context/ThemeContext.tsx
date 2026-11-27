@@ -34,17 +34,24 @@ function resolveSystemTheme(): ResolvedTheme {
   return 'light';
 }
 
-function applyThemeToDocument(resolved: ResolvedTheme): void {
+function applyThemeToDocument(resolved: ResolvedTheme, mode: ThemeMode): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
+  const colorSchemeContent = mode === 'system' ? 'light dark' : mode;
+  let meta = document.querySelector('meta[name="color-scheme"]');
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', 'color-scheme');
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', colorSchemeContent);
+
   if (resolved === 'dark') {
     root.classList.add('dark');
     root.dataset.theme = 'dark';
-    root.style.colorScheme = 'dark';
   } else {
     root.classList.remove('dark');
     root.dataset.theme = 'light';
-    root.style.colorScheme = 'light';
   }
 }
 
@@ -70,8 +77,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const resolvedTheme: ResolvedTheme = themeMode === 'system' ? systemTheme : themeMode;
 
   useEffect(() => {
-    applyThemeToDocument(resolvedTheme);
-  }, [resolvedTheme]);
+    applyThemeToDocument(resolvedTheme, themeMode);
+  }, [resolvedTheme, themeMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const storageKey = getThemeStorageKey(user?.id);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === storageKey || e.key === 'ff_theme_last') {
+        setThemeModeState(readStoredTheme(user?.id));
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [user?.id]);
 
   const setThemeMode = useCallback(
     (mode: ThemeMode) => {

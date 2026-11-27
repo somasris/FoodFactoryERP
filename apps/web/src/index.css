@@ -38,6 +38,14 @@
     'Segoe UI',
     Roboto,
     sans-serif;
+  color-scheme: light dark;
+}
+
+:root:has(> head > meta[name='color-scheme'][content='dark']) {
+  color-scheme: dark;
+}
+
+:root:has(> head > meta[name='color-scheme'][content='light']) {
   color-scheme: light;
 }
 
@@ -67,8 +75,6 @@ html.dark {
   --ff-warning: #e0aa45;
   --ff-error: #e36d69;
   --ff-info: #62a3d9;
-
-  color-scheme: dark;
 }
 
 body {
