@@ -17,7 +17,10 @@ import {
   UserContext,
   ZERO,
 } from '../inventory/inventory.utils';
-import { InventoryReservationService } from '../inventory/inventory-reservation.service';
+import {
+  InventoryReservationService,
+  WarehouseItemStockSummary,
+} from '../inventory/inventory-reservation.service';
 import { buildDateRangeFilter, resolveApplicableTaxRate } from './sales.utils';
 import {
   CreateSalesOrderInput,
@@ -41,7 +44,11 @@ export interface SalesOrderLineStockAvailability {
   sku: string;
   productName: string;
   uomSymbol: string;
+  orderedQuantity?: string;
+  fulfilledQuantity?: string;
   requestedQuantity: string;
+  onHandQuantity?: string;
+  reservedByOthersQuantity?: string;
   availableQuantity: string;
   shortageQuantity: string;
   isSufficient: boolean;
@@ -105,7 +112,7 @@ interface StockOrderInput {
 
 function computeOrderStockAvailability(
   order: StockOrderInput,
-  availableByWhItem: Map<string, Prisma.Decimal>,
+  stockSummaryByWhItem: Map<string, WarehouseItemStockSummary>,
 ): SalesOrderStockAvailability {
   if (NON_APPLICABLE_STOCK_STATUSES.has(order.status)) {
     return {
@@ -138,8 +145,26 @@ function computeOrderStockAvailability(
     const productName =
       line.productVariant.product?.name || line.productVariant.name || line.productVariant.sku;
 
+    const key = `${order.warehouseId}:${line.inventoryItemId}`;
+    const summary = stockSummaryByWhItem.get(key) ?? {
+      onHand: ZERO,
+      reserved: ZERO,
+      available: ZERO,
+    };
+    const reservedForLine = includesOwnReservation
+      ? Prisma.Decimal.max(ZERO, new Prisma.Decimal(line.reservedBaseQuantity))
+      : ZERO;
+    const reservedByOthersBase = Prisma.Decimal.max(ZERO, summary.reserved.sub(reservedForLine));
+
+    const orderedDisplay = orderedQty.toDecimalPlaces(4);
+    const fulfilledDisplay = fulfilledBase.mul(ratio).toDecimalPlaces(4);
+    const onHandDisplay = summary.onHand.mul(ratio).toDecimalPlaces(4);
+    const reservedByOthersDisplay = reservedByOthersBase.mul(ratio).toDecimalPlaces(4);
+
     if (remainingBase.lte(ZERO)) {
       sufficientLines += 1;
+      const poolAvail = localPool.has(key) ? localPool.get(key)! : summary.available;
+      const effectiveAvailDisplay = poolAvail.add(reservedForLine).mul(ratio).toDecimalPlaces(4);
       lineResults.push({
         salesOrderLineId: line.id,
         lineNumber: line.lineNumber,
@@ -148,22 +173,19 @@ function computeOrderStockAvailability(
         sku: line.productVariant.sku,
         productName,
         uomSymbol: line.uom.symbol,
+        orderedQuantity: orderedDisplay.toString(),
+        fulfilledQuantity: fulfilledDisplay.toString(),
         requestedQuantity: '0',
-        availableQuantity: '0',
+        onHandQuantity: onHandDisplay.toString(),
+        reservedByOthersQuantity: reservedByOthersDisplay.toString(),
+        availableQuantity: effectiveAvailDisplay.toString(),
         shortageQuantity: '0',
         isSufficient: true,
       });
       continue;
     }
 
-    const key = `${order.warehouseId}:${line.inventoryItemId}`;
-    const poolAvail = localPool.has(key)
-      ? localPool.get(key)!
-      : (availableByWhItem.get(key) ?? ZERO);
-
-    const reservedForLine = includesOwnReservation
-      ? Prisma.Decimal.max(ZERO, new Prisma.Decimal(line.reservedBaseQuantity))
-      : ZERO;
+    const poolAvail = localPool.has(key) ? localPool.get(key)! : summary.available;
 
     const effectiveAvailBase = poolAvail.add(reservedForLine);
     const neededFromPool = Prisma.Decimal.max(ZERO, remainingBase.sub(reservedForLine));
@@ -190,7 +212,11 @@ function computeOrderStockAvailability(
       sku: line.productVariant.sku,
       productName,
       uomSymbol: line.uom.symbol,
+      orderedQuantity: orderedDisplay.toString(),
+      fulfilledQuantity: fulfilledDisplay.toString(),
       requestedQuantity: requestedDisplay.toString(),
+      onHandQuantity: onHandDisplay.toString(),
+      reservedByOthersQuantity: reservedByOthersDisplay.toString(),
       availableQuantity: availableDisplay.toString(),
       shortageQuantity: shortageDisplay.toString(),
       isSufficient,
@@ -231,12 +257,12 @@ async function attachStockAvailabilityToOrders<T extends StockOrderInput>(
     }
   }
 
-  const availableByWhItem =
-    await InventoryReservationService.getEligibleAvailableByWarehouseAndItem(pairs);
+  const stockSummaryByWhItem =
+    await InventoryReservationService.getEligibleStockSummaryByWarehouseAndItem(pairs);
 
   return orders.map(order => ({
     ...order,
-    stockAvailability: computeOrderStockAvailability(order, availableByWhItem),
+    stockAvailability: computeOrderStockAvailability(order, stockSummaryByWhItem),
   }));
 }
 
@@ -1323,6 +1349,7 @@ export class SalesService {
           uomId: f.orderLine.uomId,
           requestedQuantity: f.requestedQty,
           baseQuantity: f.baseQty,
+          reservedBaseQuantity: new Prisma.Decimal(f.orderLine.reservedBaseQuantity),
         })),
       });
 

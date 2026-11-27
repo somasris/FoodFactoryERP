@@ -30,6 +30,13 @@ export interface FulfillmentLineRequest {
   uomId: string;
   requestedQuantity: Prisma.Decimal;
   baseQuantity: Prisma.Decimal;
+  reservedBaseQuantity?: Prisma.Decimal;
+}
+
+export interface WarehouseItemStockSummary {
+  onHand: Prisma.Decimal;
+  reserved: Prisma.Decimal;
+  available: Prisma.Decimal;
 }
 
 function sortFefo(candidates: LockedCandidateBalance[]): LockedCandidateBalance[] {
@@ -77,7 +84,27 @@ export class InventoryReservationService {
     pairs: Array<{ warehouseId: string; inventoryItemId: string }>,
     refDate = new Date(),
   ): Promise<Map<string, Prisma.Decimal>> {
+    const summary = await this.getEligibleStockSummaryByWarehouseAndItem(pairs, refDate);
     const result = new Map<string, Prisma.Decimal>();
+    for (const [key, val] of summary.entries()) {
+      if (val.available.gt(ZERO)) {
+        result.set(key, val.available);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Read-only batch lookup of eligible on-hand, reserved, and available stock across
+   * (warehouseId, inventoryItemId) pairs, excluding expired and non-ACCEPTED batches.
+   * Mirrors the exact eligibility rules of reserveStockInTx / fulfillReservedStockInTx
+   * without acquiring locks or mutating inventory.
+   */
+  static async getEligibleStockSummaryByWarehouseAndItem(
+    pairs: Array<{ warehouseId: string; inventoryItemId: string }>,
+    refDate = new Date(),
+  ): Promise<Map<string, WarehouseItemStockSummary>> {
+    const result = new Map<string, WarehouseItemStockSummary>();
     if (pairs.length === 0) return result;
 
     const warehouseIds = [...new Set(pairs.map(p => p.warehouseId))];
@@ -99,19 +126,22 @@ export class InventoryReservationService {
       LEFT JOIN inventory_batches ib ON ib.id = b.batch_id
       WHERE b.warehouse_id = ANY(${warehouseIds}::text[])
         AND b.inventory_item_id = ANY(${itemIds}::text[])
-        AND (b.quantity_on_hand - b.quantity_reserved) > 0
+        AND b.quantity_on_hand > 0
         AND (ib.id IS NULL OR ib.quality_status = 'ACCEPTED')
     `;
 
     for (const row of rows) {
       if (isBatchExpired(row.expiry_date, refDate)) continue;
-      const avail = Prisma.Decimal.max(
-        ZERO,
-        new Prisma.Decimal(row.quantity_on_hand).sub(new Prisma.Decimal(row.quantity_reserved)),
-      );
-      if (avail.lte(ZERO)) continue;
+      const onHand = Prisma.Decimal.max(ZERO, new Prisma.Decimal(row.quantity_on_hand));
+      const reserved = Prisma.Decimal.max(ZERO, new Prisma.Decimal(row.quantity_reserved));
+      const avail = Prisma.Decimal.max(ZERO, onHand.sub(reserved));
       const key = `${row.warehouse_id}:${row.inventory_item_id}`;
-      result.set(key, (result.get(key) ?? ZERO).add(avail));
+      const prev = result.get(key) ?? { onHand: ZERO, reserved: ZERO, available: ZERO };
+      result.set(key, {
+        onHand: prev.onHand.add(onHand),
+        reserved: prev.reserved.add(reserved),
+        available: prev.available.add(avail),
+      });
     }
 
     return result;
@@ -273,15 +303,19 @@ export class InventoryReservationService {
       getUomSymbolsByItem(tx, itemIds),
     ]);
 
-    // 1. Release the reserved quantities for the fulfilled items in FEFO order
-    await this.releaseReservedStockInTx(
-      tx,
-      params.warehouseId,
-      params.lines.map(l => ({
+    // 1. Release only this order's reserved quantities for the fulfilled items in FEFO order
+    // so we never release another order's active reservation if this line had 0 or partial reservation.
+    const toRelease = params.lines
+      .map(l => ({
         inventoryItemId: l.inventoryItemId,
-        baseQuantity: l.baseQuantity,
-      })),
-    );
+        baseQuantity:
+          l.reservedBaseQuantity !== undefined
+            ? Prisma.Decimal.min(l.baseQuantity, Prisma.Decimal.max(ZERO, l.reservedBaseQuantity))
+            : l.baseQuantity,
+      }))
+      .filter(l => l.baseQuantity.gt(ZERO));
+
+    await this.releaseReservedStockInTx(tx, params.warehouseId, toRelease);
 
     // 2. Create posted InventoryIssue document for full traceability
     const issue = await tx.inventoryIssue.create({
