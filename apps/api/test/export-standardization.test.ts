@@ -6,6 +6,7 @@ import {
   generateCsvExport,
   generateExcelExport,
   generatePdfExport,
+  resolveOfficialLogoPath,
 } from '../src/utils/export';
 
 const SAMPLE_COLUMNS: ExportColumn[] = [
@@ -130,6 +131,10 @@ describe('Standardized Export Utilities', () => {
       // Summary worksheet
       const summarySheet = wb.getWorksheet('Summary');
       expect(summarySheet).toBeDefined();
+
+      // Official brand symbol embedded in header
+      expect(resolveOfficialLogoPath()).toMatch(/foodfactory-symbol-256\.png$/);
+      expect(dataSheet!.getImages().length).toBe(1);
     });
   });
 
