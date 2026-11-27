@@ -47,6 +47,7 @@ export interface SyncOperationResult {
   duplicate?: boolean;
   serverEntityId?: string | null;
   serverVersion?: string | null;
+  serverConflictId?: string;
   conflictCategory?: SyncConflictCategory;
   serverSnapshot?: Record<string, unknown> | null;
   errorCode?: string;
@@ -183,11 +184,18 @@ export class SyncService {
       // 2. Server-side RBAC check
       if (!hasOperationPermission(user, op.operationType)) {
         const reason = `Insufficient permission for ${op.operationType}.`;
-        await this.recordConflict(user.userId, op, 'INSUFFICIENT_PERMISSION', reason, null);
+        const serverConflictId = await this.recordConflict(
+          user.userId,
+          op,
+          'INSUFFICIENT_PERMISSION',
+          reason,
+          null,
+        );
         results.push({
           operationId: op.operationId,
           idempotencyKey: op.idempotencyKey,
           status: 'CONFLICT',
+          serverConflictId,
           conflictCategory: 'INSUFFICIENT_PERMISSION',
           errorCode: 'INSUFFICIENT_PERMISSION',
           errorMessage: reason,
@@ -197,6 +205,20 @@ export class SyncService {
 
       // 3. Dispatch to authoritative domain service
       try {
+        if (!localToServerIdMap.has(op.entityId) && op.dependencyOperationIds?.length) {
+          const depRecord = await prisma.syncIdempotencyRecord.findFirst({
+            where: {
+              userId: user.userId,
+              operationId: { in: op.dependencyOperationIds },
+              status: 'SYNCED',
+              entityId: { not: null },
+            },
+            orderBy: { createdAt: 'desc' },
+          });
+          if (depRecord?.entityId) {
+            localToServerIdMap.set(op.entityId, depRecord.entityId);
+          }
+        }
         const resolvedEntityId = localToServerIdMap.get(op.entityId) ?? op.entityId;
         const outcome = await this.dispatchOperation(user, op, resolvedEntityId, meta);
         if (outcome.serverEntityId) {
@@ -242,13 +264,35 @@ export class SyncService {
         });
       } catch (err) {
         const classified = classifyError(err);
+        let serverConflictId: string | undefined;
+        let serverSnapshot: Record<string, unknown> | null = null;
         if (classified.status === 'CONFLICT' && classified.conflictCategory) {
-          await this.recordConflict(
+          if (
+            classified.conflictCategory === 'RECORD_MODIFIED' &&
+            op.entityType === 'SALES_ORDER'
+          ) {
+            const resolvedId = localToServerIdMap.get(op.entityId) ?? op.entityId;
+            const currentOrder = await prisma.salesOrder
+              .findUnique({
+                where: { id: resolvedId },
+                select: { id: true, orderNumber: true, status: true, updatedAt: true },
+              })
+              .catch(() => null);
+            if (currentOrder) {
+              serverSnapshot = {
+                id: currentOrder.id,
+                orderNumber: currentOrder.orderNumber,
+                status: currentOrder.status,
+                updatedAt: currentOrder.updatedAt.toISOString(),
+              };
+            }
+          }
+          serverConflictId = await this.recordConflict(
             user.userId,
             op,
             classified.conflictCategory,
             classified.errorMessage,
-            null,
+            serverSnapshot,
           );
         } else {
           await prisma.syncIdempotencyRecord.upsert({
@@ -284,7 +328,9 @@ export class SyncService {
           operationId: op.operationId,
           idempotencyKey: op.idempotencyKey,
           status: classified.status,
+          serverConflictId,
           conflictCategory: classified.conflictCategory,
+          serverSnapshot,
           errorCode: classified.errorCode,
           errorMessage: classified.errorMessage,
         });
@@ -303,8 +349,20 @@ export class SyncService {
     category: SyncConflictCategory,
     reason: string,
     serverSnapshot: Record<string, unknown> | null,
-  ) {
-    await prisma.syncConflict.create({
+  ): Promise<string> {
+    const existing = await prisma.syncConflict.findFirst({
+      where: {
+        userId,
+        operationId: op.operationId,
+        resolvedAt: null,
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      return existing.id;
+    }
+
+    const created = await prisma.syncConflict.create({
       data: {
         operationId: op.operationId,
         userId,
@@ -319,6 +377,7 @@ export class SyncService {
           : Prisma.JsonNull,
       },
     });
+    return created.id;
   }
 
   private static async dispatchOperation(

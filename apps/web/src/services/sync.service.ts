@@ -29,6 +29,7 @@ export interface PushOperationResultDto {
   duplicate?: boolean;
   serverEntityId?: string | null;
   serverVersion?: string | null;
+  serverConflictId?: string | null;
   conflictCategory?: ConflictCategory;
   serverSnapshot?: Record<string, unknown> | null;
   errorCode?: string;
