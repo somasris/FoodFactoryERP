@@ -1,4 +1,5 @@
 import { UserProfile } from '../services/auth.service';
+import { ROUTES } from './routes';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -169,12 +170,12 @@ export const NAV_GROUPS: NavGroupConfig[] = [
     items: [
       {
         label: 'Inventory Dashboard',
-        path: '/inventory/dashboard',
+        path: ROUTES.INVENTORY_DASHBOARD,
         requiredPermissions: ['inventory.read'],
       },
       {
         label: 'Stock Balances',
-        path: '/inventory/balances',
+        path: ROUTES.INVENTORY_BALANCES,
         requiredPermissions: ['inventory.read'],
       },
       {
@@ -199,7 +200,7 @@ export const NAV_GROUPS: NavGroupConfig[] = [
       },
       {
         label: 'Batch Expiry',
-        path: '/inventory/batches',
+        path: ROUTES.INVENTORY_BATCH_EXPIRY,
         requiredPermissions: ['inventory.read'],
       },
       {

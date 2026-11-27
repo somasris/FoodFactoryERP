@@ -1,3 +1,5 @@
+import { ROUTES } from './routes';
+
 export interface ShortcutDefinition {
   id: string;
   keys: string[];
@@ -38,7 +40,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     titleKey: 'commandCenter.createSalesOrder',
     defaultTitle: 'Create Sales Order',
     defaultSubtitle: 'Open new sales order draft form',
-    path: '/sales/orders/new',
+    path: ROUTES.SALES_ORDER_NEW,
     requiredPermissions: ['sales.orders.create'],
     quickAction: true,
   },
@@ -49,8 +51,8 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: 'navigation',
     titleKey: 'commandCenter.openInventory',
     defaultTitle: 'Open Inventory',
-    defaultSubtitle: 'View live warehouse stock balances',
-    path: '/inventory/stock',
+    defaultSubtitle: 'View live warehouse stock overview',
+    path: ROUTES.INVENTORY_DASHBOARD,
     requiredPermissions: ['inventory.read'],
     quickAction: true,
   },
@@ -62,7 +64,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     titleKey: 'commandCenter.viewExpiringStock',
     defaultTitle: 'View Expiring Stock',
     defaultSubtitle: 'Review batches nearing expiry',
-    path: '/inventory/expiry',
+    path: ROUTES.INVENTORY_BATCH_EXPIRY,
     requiredPermissions: ['inventory.read'],
     quickAction: true,
   },
@@ -74,7 +76,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     titleKey: 'commandCenter.openProductionCalendar',
     defaultTitle: 'Open Production Calendar',
     defaultSubtitle: 'View production plans and schedules',
-    path: '/production/plans',
+    path: ROUTES.PRODUCTION_PLANS,
     requiredPermissions: ['production.plans.read'],
     quickAction: true,
   },
@@ -86,7 +88,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     titleKey: 'commandCenter.viewPendingQuality',
     defaultTitle: 'View Pending Quality Inspections',
     defaultSubtitle: 'Inspect batches awaiting quality decision',
-    path: '/production/quality',
+    path: ROUTES.PRODUCTION_QUALITY,
     requiredPermissions: ['production.quality.read'],
     quickAction: true,
   },
@@ -98,7 +100,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     titleKey: 'commandCenter.openWorkOrders',
     defaultTitle: 'Open Work Orders',
     defaultSubtitle: 'Manage factory work orders',
-    path: '/production/work-orders',
+    path: ROUTES.PRODUCTION_WORK_ORDERS,
     requiredPermissions: ['production.work_orders.read'],
     quickAction: true,
   },
@@ -109,7 +111,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: 'navigation',
     titleKey: 'navigation.Sales Orders',
     defaultTitle: 'Sales Orders',
-    path: '/sales/orders',
+    path: ROUTES.SALES_ORDERS,
     requiredPermissions: ['sales.orders.read'],
   },
   {
@@ -119,7 +121,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: 'navigation',
     titleKey: 'navigation.Executive Dashboard',
     defaultTitle: 'Executive Dashboard',
-    path: '/reports/executive',
+    path: ROUTES.EXECUTIVE_DASHBOARD,
     requiredPermissions: ['analytics.dashboard.read'],
   },
   {
@@ -129,7 +131,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
     category: 'navigation',
     titleKey: 'ux.activityTimeline',
     defaultTitle: 'Recent Activity Timeline',
-    path: '/activity',
+    path: ROUTES.ACTIVITY_TIMELINE,
   },
 ];
 
