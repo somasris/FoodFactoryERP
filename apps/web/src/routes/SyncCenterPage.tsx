@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { useOffline } from '../context/OfflineContext';
 import { useOfflineSync } from '../hooks/useOfflineSync';
-import { offlineRepo } from '../offline/offline-repository';
+import { offlineRepo, subscribeOfflineQueueChanges } from '../offline/offline-repository';
 import { offlineQueue } from '../offline/operation-queue';
 import { offlineDb, PendingOperationRecord, SyncConflictRecord } from '../offline/db';
 import { syncApiService } from '../services/sync.service';
@@ -46,6 +46,9 @@ export const SyncCenterPage: React.FC = () => {
 
   useEffect(() => {
     void loadData();
+    return subscribeOfflineQueueChanges(() => {
+      void loadData();
+    });
   }, [loadData]);
 
   const handleManualSync = async () => {
@@ -84,7 +87,8 @@ export const SyncCenterPage: React.FC = () => {
     if (!user?.id) return;
     try {
       if (navigator.onLine) {
-        await syncApiService.resolveConflict(conflict.conflictId, action).catch(() => undefined);
+        const targetConflictId = conflict.serverConflictId ?? conflict.conflictId;
+        await syncApiService.resolveConflict(targetConflictId, action).catch(() => undefined);
       }
 
       await offlineDb.syncConflicts.update(conflict.conflictId, {

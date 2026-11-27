@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CloudOff, Edit, RefreshCw } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { useAuth } from '../../hooks/useAuth';
-import { offlineRepo } from '../../offline/offline-repository';
+import { offlineRepo, subscribeOfflineQueueChanges } from '../../offline/offline-repository';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
 import { StockAvailabilityBadge } from '../../components/sales/StockAvailabilityBadge';
 import { StockShortageTable } from '../../components/sales/StockShortageTable';
@@ -28,19 +28,22 @@ export const SalesOrderDetailPage: React.FC = () => {
   const [reason, setReason] = useState('');
   const [fulfillNotes, setFulfillNotes] = useState('');
 
+  useEffect(() => {
+    return subscribeOfflineQueueChanges(() => {
+      void queryClient.invalidateQueries({ queryKey: ['offline', 'sales-order-op', user?.id, id] });
+    });
+  }, [queryClient, user?.id, id]);
+
   const localOpQuery = useQuery({
     queryKey: ['offline', 'sales-order-op', user?.id, id],
-    queryFn: () => offlineRepo.findOperationByEntityId(user!.id, 'SALES_ORDER', id!),
+    queryFn: () => offlineRepo.getLocalSalesOrderState(user!.id, id!),
     enabled: Boolean(user?.id && id),
   });
 
-  const localOp = localOpQuery.data;
-  const reconciledServerId =
-    localOp?.status === 'SYNCED' &&
-    localOp.serverResultEntityId &&
-    localOp.serverResultEntityId !== id
-      ? localOp.serverResultEntityId
-      : null;
+  const localState = localOpQuery.data;
+  const localOp = localState?.latestOp ?? null;
+  const createOp = localState?.createOp ?? null;
+  const reconciledServerId = localState?.resolvedServerId ?? null;
 
   useEffect(() => {
     if (reconciledServerId) {
@@ -49,7 +52,7 @@ export const SalesOrderDetailPage: React.FC = () => {
   }, [reconciledServerId, navigate]);
 
   const isLocalOnlyPending = Boolean(
-    localOp && localOp.status !== 'SYNCED' && localOp.operationType === 'SALES_ORDER_DRAFT_CREATE',
+    createOp && createOp.status !== 'SYNCED' && !reconciledServerId,
   );
 
   const { data, isLoading, error } = useQuery({
@@ -141,8 +144,8 @@ export const SalesOrderDetailPage: React.FC = () => {
     );
   }
 
-  if (localOp && localOp.status !== 'SYNCED' && !data?.data) {
-    const payload = localOp.payload as {
+  if (isLocalOnlyPending && localOp && !data?.data) {
+    const payload = (localState?.mergedPayload ?? localOp.payload) as {
       customerId?: string;
       warehouseId?: string;
       expectedDeliveryDate?: string;
@@ -180,12 +183,22 @@ export const SalesOrderDetailPage: React.FC = () => {
               )}
             </div>
           </div>
-          <Link to="/sync-center">
-            <Button size="sm" variant="outline">
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              Open Sync Center
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            {localOp.status !== 'PROCESSING' && (
+              <Link to={`/sales/orders/${id}/edit`}>
+                <Button size="sm" variant="outline">
+                  <Edit className="mr-1.5 h-3.5 w-3.5" />
+                  Edit Draft
+                </Button>
+              </Link>
+            )}
+            <Link to="/sync">
+              <Button size="sm" variant="outline">
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                Open Sync Center
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">

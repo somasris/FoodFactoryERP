@@ -1,9 +1,11 @@
-import React, { useCallback, useId, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Eye, Plus, Search } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, CloudOff, Eye, Plus, Search } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { useAuth } from '../../hooks/useAuth';
+import { offlineRepo, subscribeOfflineQueueChanges } from '../../offline/offline-repository';
+import { PendingOperationRecord } from '../../offline/db';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
 import { StockAvailabilityBadge } from '../../components/sales/StockAvailabilityBadge';
 import { StockShortageTable } from '../../components/sales/StockShortageTable';
@@ -13,8 +15,9 @@ import { FilterValue } from '../../services/ux.service';
 import { SalesOrder } from '../../types/sales';
 
 export const SalesOrdersPage: React.FC = () => {
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const captionId = useId();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -39,6 +42,69 @@ export const SalesOrdersPage: React.FC = () => {
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
+
+  useEffect(() => {
+    return subscribeOfflineQueueChanges(() => {
+      void queryClient.invalidateQueries({ queryKey: ['offline', 'sales-order-list'] });
+    });
+  }, [queryClient]);
+
+  const localOpsQuery = useQuery({
+    queryKey: ['offline', 'sales-order-list', user?.id],
+    queryFn: () => offlineRepo.listOperationsByUser(user!.id),
+    enabled: Boolean(user?.id),
+    staleTime: 0,
+  });
+
+  const { localDraftRows, serverOpStatusById } = useMemo(() => {
+    const ops = (localOpsQuery.data ?? []).filter(
+      o => o.entityType === 'SALES_ORDER' && o.status !== 'SYNCED' && o.status !== 'CANCELLED',
+    );
+    const byEntity = new Map<string, PendingOperationRecord[]>();
+    for (const op of ops) {
+      const arr = byEntity.get(op.entityId) ?? [];
+      arr.push(op);
+      byEntity.set(op.entityId, arr);
+    }
+
+    const drafts: Array<{
+      id: string;
+      orderNumber: string;
+      customerId: string;
+      warehouseId: string;
+      lineCount: number;
+      clientCreatedAt: string;
+      syncStatus: PendingOperationRecord['status'];
+    }> = [];
+    const serverStatus = new Map<string, PendingOperationRecord['status']>();
+
+    for (const [entityId, entityOps] of byEntity.entries()) {
+      const createOp = entityOps.find(o => o.operationType === 'SALES_ORDER_DRAFT_CREATE');
+      const latestOp = entityOps[entityOps.length - 1];
+      if (createOp) {
+        let merged: Record<string, unknown> = { ...createOp.payload };
+        for (const o of entityOps) {
+          if (o.operationType === 'SALES_ORDER_DRAFT_UPDATE') {
+            merged = { ...merged, ...o.payload };
+          }
+        }
+        const lines = Array.isArray(merged.lines) ? merged.lines : [];
+        drafts.push({
+          id: entityId,
+          orderNumber: `LOCAL-DRAFT (${entityId.slice(0, 8)})`,
+          customerId: typeof merged.customerId === 'string' ? merged.customerId : '-',
+          warehouseId: typeof merged.warehouseId === 'string' ? merged.warehouseId : '-',
+          lineCount: lines.length,
+          clientCreatedAt: createOp.clientCreatedAt,
+          syncStatus: latestOp.status,
+        });
+      } else if (latestOp) {
+        serverStatus.set(entityId, latestOp.status);
+      }
+    }
+
+    return { localDraftRows: drafts, serverOpStatusById: serverStatus };
+  }, [localOpsQuery.data]);
 
   const orders = data?.data?.items || [];
   const pagination = data?.data?.pagination;
@@ -197,11 +263,11 @@ export const SalesOrdersPage: React.FC = () => {
         <div className="py-8 text-center text-xs text-slate-500">
           Loading sales orders and checking stock availability...
         </div>
-      ) : error ? (
+      ) : error && localDraftRows.length === 0 ? (
         <div className="rounded-md bg-red-50 p-3 text-xs text-red-700">
           {error instanceof Error ? error.message : 'Failed to load sales orders'}
         </div>
-      ) : orders.length === 0 ? (
+      ) : orders.length === 0 && localDraftRows.length === 0 ? (
         <div className="py-8 text-center text-xs text-slate-500">No sales orders found.</div>
       ) : (
         <div
@@ -255,7 +321,57 @@ export const SalesOrdersPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
+              {localDraftRows.map(draft => (
+                <tr key={`local-${draft.id}`} className="bg-amber-50/40 hover:bg-amber-50/70">
+                  <td className="px-3 py-2 font-mono font-semibold text-amber-900">
+                    <Link to={`/sales/orders/${draft.id}`} className="inline-flex items-center gap-1.5 hover:underline">
+                      <CloudOff className="h-3.5 w-3.5 text-amber-700" aria-hidden="true" />
+                      <span>{draft.orderNumber}</span>
+                    </Link>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-slate-600">
+                    <span className="font-mono">{draft.customerId.slice(0, 8)}</span>
+                  </td>
+                  <td className="px-3 py-2 font-mono text-xs text-slate-600">
+                    {draft.warehouseId.slice(0, 8)}
+                  </td>
+                  <td className="px-3 py-2">{draft.lineCount}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        draft.syncStatus === 'CONFLICT' || draft.syncStatus === 'FAILED'
+                          ? 'bg-red-100 text-red-800'
+                          : draft.syncStatus === 'PROCESSING'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-amber-100 text-amber-800'
+                      }`}
+                    >
+                      {draft.syncStatus === 'CONFLICT'
+                        ? 'Conflict'
+                        : draft.syncStatus === 'FAILED'
+                          ? 'Sync Failed'
+                          : draft.syncStatus === 'PROCESSING'
+                            ? 'Syncing'
+                            : 'Pending Sync'}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-[11px] text-slate-500">Checked on sync</td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-500">—</td>
+                  <td className="px-3 py-2 text-slate-500">
+                    {new Date(draft.clientCreatedAt).toLocaleDateString()}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <Link
+                      to={`/sales/orders/${draft.id}`}
+                      className="inline-flex items-center gap-1 rounded border border-amber-300 bg-white px-2 py-1 text-xs text-amber-900 hover:bg-amber-50"
+                    >
+                      <Eye className="h-3 w-3" /> View
+                    </Link>
+                  </td>
+                </tr>
+              ))}
               {orders.map(order => {
+                const pendingStatus = serverOpStatusById.get(order.id);
                 const stock = order.stockAvailability;
                 const isExpanded = Boolean(expandedOrderIds[order.id]);
                 const hasShortage =
@@ -276,7 +392,18 @@ export const SalesOrdersPage: React.FC = () => {
                       <td className="px-3 py-2">{order.warehouse.code}</td>
                       <td className="px-3 py-2">{order._count?.lines ?? order.lines?.length ?? 0}</td>
                       <td className="px-3 py-2">
-                        <SalesStatusBadge status={order.status} />
+                        <div className="flex flex-wrap items-center gap-1">
+                          <SalesStatusBadge status={order.status} />
+                          {pendingStatus && (
+                            <span className="inline-flex rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+                              {pendingStatus === 'CONFLICT'
+                                ? 'Conflict'
+                                : pendingStatus === 'FAILED'
+                                  ? 'Sync Failed'
+                                  : 'Pending Sync'}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-2">{renderStockSummaryCell(order)}</td>
                       <td className="px-3 py-2 text-right font-mono font-semibold">

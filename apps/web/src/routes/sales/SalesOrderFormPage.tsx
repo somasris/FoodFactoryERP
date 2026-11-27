@@ -4,6 +4,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Plus, Trash2 } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
 import { masterDataService } from '../../services/master-data.service';
+import { useAuth } from '../../hooks/useAuth';
+import { offlineRepo } from '../../offline/offline-repository';
 import { Button } from '../../components/common/Button';
 
 interface OrderLineForm {
@@ -18,6 +20,7 @@ export const SalesOrderFormPage: React.FC = () => {
   const isEdit = Boolean(id);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const [customerId, setCustomerId] = useState('');
   const [shippingAddressId, setShippingAddressId] = useState('');
@@ -30,10 +33,22 @@ export const SalesOrderFormPage: React.FC = () => {
   ]);
   const [formError, setFormError] = useState<string | null>(null);
 
+  const localStateQuery = useQuery({
+    queryKey: ['offline', 'sales-order-form', user?.id, id],
+    queryFn: () => offlineRepo.getLocalSalesOrderState(user!.id, id!),
+    enabled: isEdit && Boolean(user?.id && id),
+  });
+
+  const isLocalOnlyDraft = Boolean(
+    localStateQuery.data?.createOp &&
+      localStateQuery.data.createOp.status !== 'SYNCED' &&
+      !localStateQuery.data.resolvedServerId,
+  );
+
   const { data: existingData } = useQuery({
     queryKey: ['sales', 'order', id],
     queryFn: () => salesService.orders.getById(id!),
-    enabled: isEdit,
+    enabled: isEdit && !isLocalOnlyDraft,
   });
 
   const { data: customersData } = useQuery({
@@ -64,38 +79,72 @@ export const SalesOrderFormPage: React.FC = () => {
 
   useEffect(() => {
     const order = existingData?.data;
-    if (!order) return;
-    setCustomerId(order.customerId);
-    setShippingAddressId(order.shippingAddressId || '');
-    setWarehouseId(order.warehouseId);
-    setExpectedDeliveryDate(
-      order.expectedDeliveryDate ? order.expectedDeliveryDate.slice(0, 10) : '',
-    );
-    setNotes(order.notes || '');
-    setDeliveryInstructions(order.deliveryInstructions || '');
-    if (order.lines && order.lines.length > 0) {
-      setLines(
-        order.lines.map(l => ({
-          productVariantId: l.productVariantId,
-          uomId: l.uomId,
-          orderedQuantity: String(Number(l.orderedQuantity)),
-          discountPercent: String(Number(l.discountPercent)),
-        })),
+    if (order) {
+      setCustomerId(order.customerId);
+      setShippingAddressId(order.shippingAddressId || '');
+      setWarehouseId(order.warehouseId);
+      setExpectedDeliveryDate(
+        order.expectedDeliveryDate ? order.expectedDeliveryDate.slice(0, 10) : '',
       );
+      setNotes(order.notes || '');
+      setDeliveryInstructions(order.deliveryInstructions || '');
+      if (order.lines && order.lines.length > 0) {
+        setLines(
+          order.lines.map(l => ({
+            productVariantId: l.productVariantId,
+            uomId: l.uomId,
+            orderedQuantity: String(Number(l.orderedQuantity)),
+            discountPercent: String(Number(l.discountPercent)),
+          })),
+        );
+      }
+      return;
     }
-  }, [existingData]);
+
+    const localPayload = localStateQuery.data?.mergedPayload;
+    if (localPayload && isLocalOnlyDraft) {
+      if (typeof localPayload.customerId === 'string') setCustomerId(localPayload.customerId);
+      if (typeof localPayload.shippingAddressId === 'string') {
+        setShippingAddressId(localPayload.shippingAddressId);
+      }
+      if (typeof localPayload.warehouseId === 'string') setWarehouseId(localPayload.warehouseId);
+      if (typeof localPayload.expectedDeliveryDate === 'string') {
+        setExpectedDeliveryDate(localPayload.expectedDeliveryDate.slice(0, 10));
+      }
+      if (typeof localPayload.notes === 'string') setNotes(localPayload.notes);
+      if (typeof localPayload.deliveryInstructions === 'string') {
+        setDeliveryInstructions(localPayload.deliveryInstructions);
+      }
+      if (Array.isArray(localPayload.lines) && localPayload.lines.length > 0) {
+        setLines(
+          localPayload.lines.map((l: Record<string, unknown>) => ({
+            productVariantId: String(l.productVariantId ?? ''),
+            uomId: String(l.uomId ?? ''),
+            orderedQuantity: String(l.orderedQuantity ?? '1'),
+            discountPercent: String(l.discountPercent ?? '0'),
+          })),
+        );
+      }
+    }
+  }, [existingData, localStateQuery.data, isLocalOnlyDraft]);
 
   const mutation = useMutation({
     mutationFn: (payload: Record<string, unknown>) =>
-      isEdit ? salesService.orders.update(id!, payload) : salesService.orders.create(payload),
+      isEdit
+        ? salesService.orders.update(id!, payload, existingData?.data?.updatedAt ?? null)
+        : salesService.orders.create(payload),
     onSuccess: res => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
+      queryClient.invalidateQueries({ queryKey: ['offline'] });
       const isOfflineQueued = Boolean(
         (res.data as { isOfflineQueued?: boolean } | undefined)?.isOfflineQueued,
       );
       navigate(`/sales/orders/${res.data!.id}`, {
         state: isOfflineQueued
-          ? { offlineQueuedMessage: 'Order saved offline – waiting for sync' }
+          ? {
+              offlineQueuedMessage:
+                'Order saved on this device. It will sync automatically when the connection is restored.',
+            }
           : undefined,
       });
     },
