@@ -36,46 +36,42 @@ export async function seedExistingOrdersStock(
     throw new Error('No active user found to post inventory receipts.');
   }
 
-  const eligibleStatuses: SalesOrderStatus[] = [
-    SalesOrderStatus.APPROVED,
-    SalesOrderStatus.CONFIRMED,
-    SalesOrderStatus.PARTIALLY_FULFILLED,
-  ];
-
-  const allEligible = await client.salesOrder.findMany({
-    where: { status: { in: eligibleStatuses } },
-    include: {
-      warehouse: { select: { id: true, code: true, name: true, factoryId: true } },
-      lines: {
-        include: {
-          productVariant: { select: { sku: true, name: true } },
-          inventoryItem: { select: { id: true, code: true, uomId: true, movingAverageCost: true } },
+  const [queueOrders, recentApproved] = await Promise.all([
+    client.salesOrder.findMany({
+      where: { status: { in: [SalesOrderStatus.CONFIRMED, SalesOrderStatus.PARTIALLY_FULFILLED] } },
+      include: {
+        warehouse: { select: { id: true, code: true, name: true, factoryId: true } },
+        lines: {
+          include: {
+            productVariant: { select: { sku: true, name: true } },
+            inventoryItem: { select: { id: true, code: true, uomId: true, movingAverageCost: true } },
+          },
+          orderBy: { lineNumber: 'asc' },
         },
-        orderBy: { lineNumber: 'asc' },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  });
+      orderBy: { createdAt: 'desc' },
+    }),
+    client.salesOrder.findMany({
+      where: {
+        status: SalesOrderStatus.APPROVED,
+        orderNumber: { in: PREFERRED_EXISTING_ORDER_NUMBERS },
+      },
+      include: {
+        warehouse: { select: { id: true, code: true, name: true, factoryId: true } },
+        lines: {
+          include: {
+            productVariant: { select: { sku: true, name: true } },
+            inventoryItem: { select: { id: true, code: true, uomId: true, movingAverageCost: true } },
+          },
+          orderBy: { lineNumber: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
 
-  // Pick preferred orders that are still eligible; if fewer than 5 exist, pick additional eligible ones
-  // excluding intentionally insufficient / expired / rejected test orders
-  const preferredSet = new Set(PREFERRED_EXISTING_ORDER_NUMBERS);
-  const selected = allEligible.filter(o => preferredSet.has(o.orderNumber));
-
-  if (selected.length < 5) {
-    const selectedIds = new Set(selected.map(s => s.id));
-    for (const o of allEligible) {
-      if (selected.length >= 6) break;
-      if (selectedIds.has(o.id)) continue;
-      if (o.orderNumber === 'SO-DEMO-FUL-004' || o.orderNumber === 'SO-DEMO-FUL-003') continue;
-      if (o.lines.some(l => l.productVariant.sku.includes('-BLK-') || l.productVariant.sku.includes('-EXP-'))) {
-        continue;
-      }
-      selected.push(o);
-      selectedIds.add(o.id);
-    }
-  }
+  const allEligible = [...queueOrders, ...recentApproved];
+  const selected = allEligible;
 
   // Group demand by (warehouseId, inventoryItemId) without double-counting own reservations
   const demandMap = new Map<
@@ -162,7 +158,7 @@ export async function seedExistingOrdersStock(
     const targetRequired = demand.remainingNeeded.add(SAFETY_BUFFER);
     const deficit = targetRequired.sub(effectiveAvail);
 
-    const batchNum = `SEED-EX-${demand.warehouseCode}-${demand.sku}-B01`.slice(0, 60);
+    const batchNum = `SEED-FQ-${demand.warehouseCode}-${demand.sku}-B01`.slice(0, 60);
     const existingBatch = await client.inventoryBatch.findUnique({
       where: {
         inventoryItemId_batchNumber: {
@@ -222,7 +218,7 @@ export async function seedExistingOrdersStock(
   const receiptsPosted: ExistingOrderSeedReport['receiptsPosted'] = [];
 
   for (const [warehouseId, whEntry] of receiptLinesByWh.entries()) {
-    const idemKey = `SEED-EXISTING-ORDERS-STOCK-${warehouseId}`;
+    const idemKey = `SEED-FQ-STOCK-${warehouseId}-V2`;
     const existingReceipt = await client.inventoryReceipt.findFirst({
       where: { idempotencyKey: idemKey },
     });
