@@ -488,19 +488,19 @@ describe('Phase 2.6: Sales Invoicing Suite', () => {
       .send({ reason: '' });
     expect(badCancel.status).toBe(400);
 
-    // Cancel with reason succeeds and records audit + status history
+    // P0.2: Direct cancellation of an ISSUED invoice is blocked (must use GST Credit Note)
     const cancelRes = await request(app)
       .post(`/api/v1/sales/invoices/${invId}/cancel`)
       .set('Authorization', `Bearer ${adminToken}`)
       .set(CSRF)
       .send({ reason: 'Customer requested billing address correction' });
-    expect(cancelRes.status).toBe(200);
-    expect(cancelRes.body.data.status).toBe('CANCELLED');
+    expect(cancelRes.status).toBe(400);
+    expect(cancelRes.body.message).toMatch(/Credit Note/i);
 
     const auditCount = await prisma.auditLog.count({
       where: { entityType: 'SalesInvoice', entityId: invId },
     });
-    expect(auditCount).toBeGreaterThanOrEqual(4); // CREATE, UPDATE, ISSUE, DOWNLOAD, CANCEL
+    expect(auditCount).toBeGreaterThanOrEqual(3); // CREATE, UPDATE, ISSUE, DOWNLOAD
   });
 
   it('6. Normalizes toDate calendar filter to 23:59:59.999Z across orders, invoices, and dashboard', async () => {

@@ -114,7 +114,7 @@ describe('Phase 4.2 Financial & Compliance Management Suite', () => {
       .get('/api/v1/compliance/gst/purchase-summary')
       .set('Authorization', `Bearer ${auditorToken}`);
     expect(purchRes.status).toBe(200);
-    expect(purchRes.body.data.purchaseInvoicingSupported).toBe(false);
+    expect(purchRes.body.data.purchaseInvoicingSupported).toBe(true);
 
     // SALESMAN & PRODUCTION denied tax compliance
     const salesDenied = await request(app)
