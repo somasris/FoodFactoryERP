@@ -1609,7 +1609,7 @@ async function main() {
 
         const warehousesForRole =
           demo.role === 'SALESMAN'
-            ? [{ wh: whFG, level: 'READ' as const }]
+            ? [{ wh: whFG, level: 'READ_WRITE' as const }]
             : demo.role === 'AUDITOR'
               ? [
                   { wh: whRM, level: 'READ' as const },
@@ -1652,6 +1652,13 @@ async function main() {
             });
           });
           console.info(`  🔧 Restored missing ${demo.role} role assignment for demo account: ${demo.email}`);
+        }
+        if (demo.role === 'SALESMAN') {
+          await prisma.userWarehouseAccess.upsert({
+            where: { userId_warehouseId: { userId: existingDemo.id, warehouseId: whFG.id } },
+            update: { accessLevel: 'READ_WRITE' },
+            create: { userId: existingDemo.id, warehouseId: whFG.id, accessLevel: 'READ_WRITE' },
+          });
         }
       }
     }
