@@ -2,6 +2,7 @@ import { PrismaClient, WarehouseType } from '@prisma/client';
 import { env } from '../src/config/env';
 import { getDemoAccounts, isDemoModeEnabled } from '../src/config/demo-accounts';
 import { hashPassword, validatePasswordPolicy } from '../src/utils/password';
+import { seedMurukkuBenchmarkProfile } from './seed-murukku-benchmark';
 
 const prisma = new PrismaClient();
 
@@ -1719,6 +1720,14 @@ async function main() {
   }
 
   console.info('✅ Phase 1.4 baseline master data seed completed successfully!');
+
+  if (
+    process.env.SEED_BENCHMARK_PROFILE === 'murukku' ||
+    process.argv.includes('--benchmark')
+  ) {
+    const bm = await seedMurukkuBenchmarkProfile(prisma);
+    console.info(`✅ Optional Murukku 200 g benchmark master data seeded (${bm.bomCode}).`);
+  }
 }
 
 main()
