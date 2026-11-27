@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Download, Edit, Eye, XCircle } from 'lucide-react';
 import { salesService } from '../../services/sales.service';
+import { paymentsService } from '../../services/payments.service';
 import { useAuth } from '../../hooks/useAuth';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
 import { Button } from '../../components/common/Button';
@@ -25,6 +26,12 @@ export const SalesInvoiceDetailPage: React.FC = () => {
     queryKey: ['sales', 'invoice', id],
     queryFn: () => salesService.invoices.getById(id!),
     enabled: Boolean(id),
+  });
+
+  const paymentHistoryQuery = useQuery({
+    queryKey: ['sales', 'invoice-payments', id],
+    queryFn: () => paymentsService.getInvoicePaymentHistory(id!),
+    enabled: Boolean(id) && hasPermission('sales.payments.read'),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['sales'] });
@@ -99,9 +106,7 @@ export const SalesInvoiceDetailPage: React.FC = () => {
   const inv = data.data;
   const canEdit = hasPermission('sales.invoices.update') && inv.status === 'DRAFT';
   const canIssue = hasPermission('sales.invoices.issue') && inv.status === 'DRAFT';
-  const canCancel =
-    hasPermission('sales.invoices.cancel') &&
-    (inv.status === 'DRAFT' || inv.status === 'ISSUED');
+  const canCancel = hasPermission('sales.invoices.cancel') && inv.status === 'DRAFT';
   const canDownload = hasPermission('sales.invoices.download');
 
   return (
@@ -180,6 +185,39 @@ export const SalesInvoiceDetailPage: React.FC = () => {
       {actionError && (
         <div className="rounded-md border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-700">
           {actionError}
+        </div>
+      )}
+
+      {inv.status === 'ISSUED' && paymentHistoryQuery.data?.data && (
+        <div className="grid grid-cols-2 gap-3 rounded-lg border border-slate-200 bg-white p-3 text-xs shadow-sm sm:grid-cols-5">
+          <div>
+            <span className="text-slate-500">Payment Status</span>
+            <div className="mt-0.5 font-semibold text-slate-900">
+              {paymentHistoryQuery.data.data.paymentStatus}
+            </div>
+          </div>
+          <div>
+            <span className="text-slate-500">Invoice Total</span>
+            <div className="mt-0.5 font-semibold">₹{paymentHistoryQuery.data.data.grandTotal}</div>
+          </div>
+          <div>
+            <span className="text-slate-500">Paid</span>
+            <div className="mt-0.5 font-semibold text-emerald-700">
+              ₹{paymentHistoryQuery.data.data.netAllocatedPayments}
+            </div>
+          </div>
+          <div>
+            <span className="text-slate-500">Credit Notes</span>
+            <div className="mt-0.5 font-semibold text-indigo-700">
+              ₹{paymentHistoryQuery.data.data.issuedCreditNotesTotal}
+            </div>
+          </div>
+          <div>
+            <span className="text-slate-500">Outstanding</span>
+            <div className="mt-0.5 font-semibold text-amber-700">
+              ₹{paymentHistoryQuery.data.data.outstandingAmount}
+            </div>
+          </div>
         </div>
       )}
 

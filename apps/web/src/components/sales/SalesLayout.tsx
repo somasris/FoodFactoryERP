@@ -6,6 +6,9 @@ import {
   CheckSquare,
   PackageCheck,
   FileText,
+  IndianRupee,
+  Clock,
+  FileMinus,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { ModuleLayoutHeader } from '../common/ModuleLayoutHeader';
@@ -17,6 +20,9 @@ const salesTabs = [
   { label: 'Pending Approvals', to: '/sales/approvals', icon: CheckSquare, permission: 'sales.orders.approve' },
   { label: 'Fulfillment', to: '/sales/fulfillment', icon: PackageCheck, permission: 'sales.orders.fulfill' },
   { label: 'Invoices', to: '/sales/invoices', icon: FileText, permission: 'sales.invoices.read' },
+  { label: 'Payments', to: '/sales/payments', icon: IndianRupee, permission: 'sales.payments.read' },
+  { label: 'Receivables & Ageing', to: '/sales/receivables', icon: Clock, permission: 'sales.payments.read' },
+  { label: 'Credit Notes', to: '/sales/credit-notes', icon: FileMinus, permission: 'sales.credit_notes.read' },
 ];
 
 export const SalesLayout: React.FC = () => {

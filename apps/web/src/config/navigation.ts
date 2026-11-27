@@ -82,6 +82,39 @@ export const NAV_GROUPS: NavGroupConfig[] = [
         path: '/sales/invoices',
         requiredPermissions: ['sales.invoices.read'],
       },
+      {
+        label: 'Customer Payments',
+        path: '/sales/payments',
+        requiredPermissions: ['sales.payments.read'],
+      },
+      {
+        label: 'Receivables & Ageing',
+        path: '/sales/receivables',
+        requiredPermissions: ['sales.payments.read'],
+      },
+      {
+        label: 'Credit Notes',
+        path: '/sales/credit-notes',
+        requiredPermissions: ['sales.credit_notes.read'],
+      },
+    ],
+  },
+  {
+    id: 'purchases',
+    label: 'Purchases & GST',
+    icon: Database,
+    basePath: '/purchases',
+    items: [
+      {
+        label: 'Supplier Invoices',
+        path: '/purchases/invoices',
+        requiredPermissions: ['purchases.invoices.read'],
+      },
+      {
+        label: 'Purchase Register',
+        path: '/purchases/register',
+        requiredPermissions: ['purchases.invoices.read'],
+      },
     ],
   },
   {

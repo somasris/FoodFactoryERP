@@ -39,6 +39,12 @@ import { OrderFulfillmentPage } from './sales/OrderFulfillmentPage';
 import { SalesInvoicesPage } from './sales/SalesInvoicesPage';
 import { SalesInvoiceDetailPage } from './sales/SalesInvoiceDetailPage';
 import { SalesInvoiceFormPage } from './sales/SalesInvoiceFormPage';
+import { CustomerPaymentsPage } from './sales/CustomerPaymentsPage';
+import { ReceivablesAgeingPage } from './sales/ReceivablesAgeingPage';
+import { CreditNotesPage } from './sales/CreditNotesPage';
+import { PurchasesLayout } from '../components/purchases/PurchasesLayout';
+import { SupplierInvoicesPage } from './purchases/SupplierInvoicesPage';
+import { PurchaseRegisterPage } from './purchases/PurchaseRegisterPage';
 import { ProductionLayout } from '../components/production/ProductionLayout';
 import { ProductionPlanningDashboardPage } from './production/ProductionPlanningDashboardPage';
 import { ProductionDemandPage } from './production/ProductionDemandPage';
@@ -340,6 +346,57 @@ export const router = createBrowserRouter([
             element: (
               <ProtectedRoute requiredPermissions={['sales.invoices.create']}>
                 <SalesInvoiceFormPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'payments',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.payments.read']}>
+                <CustomerPaymentsPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'receivables',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.payments.read']}>
+                <ReceivablesAgeingPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'credit-notes',
+            element: (
+              <ProtectedRoute requiredPermissions={['sales.credit_notes.read']}>
+                <CreditNotesPage />
+              </ProtectedRoute>
+            ),
+          },
+        ],
+      },
+      {
+        path: 'purchases',
+        element: (
+          <ProtectedRoute requiredRoles={['ADMIN', 'OWNER', 'AUDITOR']}>
+            <PurchasesLayout />
+          </ProtectedRoute>
+        ),
+        children: [
+          { index: true, element: <ModuleIndexRedirect basePath="/purchases" /> },
+          {
+            path: 'invoices',
+            element: (
+              <ProtectedRoute requiredPermissions={['purchases.invoices.read']}>
+                <SupplierInvoicesPage />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: 'register',
+            element: (
+              <ProtectedRoute requiredPermissions={['purchases.invoices.read']}>
+                <PurchaseRegisterPage />
               </ProtectedRoute>
             ),
           },
