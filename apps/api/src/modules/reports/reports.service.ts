@@ -411,9 +411,10 @@ export class ReportsService {
    * 4.3.4 Production Analytics: Reuses Phase 3.7 ProductionReportsService directly.
    */
   static async getProductionAnalytics(filter: AnalyticsFilter) {
+    const dateRange = resolveDateRange(filter);
     const query = {
-      startDate: filter.startDate,
-      endDate: filter.endDate,
+      startDate: dateRange?.gte ? dateRange.gte.toISOString().slice(0, 10) : filter.startDate,
+      endDate: dateRange?.lte ? dateRange.lte.toISOString().slice(0, 10) : filter.endDate,
       warehouseId: filter.warehouseId,
       productId: filter.productId,
       page: 1,

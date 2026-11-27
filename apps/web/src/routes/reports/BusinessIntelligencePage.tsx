@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Factory, Layers, ShoppingCart, TrendingUp } from 'lucide-react';
 import { reportsService } from '../../services/reports.service';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../../components/common/Badge';
 import { ExportButtons } from '../../components/common/ExportButtons';
+import { ErrorState, LoadingState } from '../../components/common/StateViews';
 
 type BiTab = 'sales' | 'inventory' | 'production' | 'profitability' | 'factory';
 
@@ -35,8 +37,8 @@ export const BusinessIntelligencePage: React.FC = () => {
   });
 
   const prodQuery = useQuery({
-    queryKey: ['bi', 'production'],
-    queryFn: () => reportsService.getProductionAnalytics(),
+    queryKey: ['bi', 'production', financialYear],
+    queryFn: () => reportsService.getProductionAnalytics({ financialYear: financialYear || undefined }),
     enabled: canProd && tab === 'production',
   });
 
@@ -205,17 +207,146 @@ export const BusinessIntelligencePage: React.FC = () => {
         </div>
       )}
 
-      {tab === 'production' && prodQuery.data && (
-        <div className="rounded-lg border bg-white p-4 text-xs">
-          <h4 className="mb-2 text-sm font-semibold text-slate-900">
-            Integrated Production Analytics (Phase 3.7)
-          </h4>
-          <p className="text-slate-600">
-            Plan vs Actual items tracked:{' '}
-            {(prodQuery.data.planVsActual as Array<unknown>)?.length ?? 0}
-          </p>
-        </div>
+      {tab === 'production' && prodQuery.isLoading && (
+        <LoadingState label="Loading production analytics..." />
       )}
+      {tab === 'production' && prodQuery.error && (
+        <ErrorState
+          title="Failed to load production analytics"
+          message={(prodQuery.error as Error)?.message || 'Unknown error'}
+          onRetry={() => prodQuery.refetch()}
+        />
+      )}
+      {tab === 'production' &&
+        prodQuery.data &&
+        (() => {
+          const dashboard = (prodQuery.data.dashboard ?? {}) as {
+            kpis?: Record<string, string | number | boolean | null>;
+          };
+          const kpis = dashboard.kpis ?? {};
+          const planVsActual = (prodQuery.data.planVsActual ?? []) as Array<Record<string, unknown>>;
+          return (
+            <div className="space-y-4 rounded-lg border bg-white p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-900">
+                    Integrated Production Analytics
+                  </h4>
+                  <p className="text-[11px] text-slate-500">
+                    Live production output, yield, wastage, and Plan vs Actual execution.
+                  </p>
+                </div>
+                <Link
+                  to="/production/analytics"
+                  className="text-xs font-medium text-brand-blue hover:underline"
+                >
+                  Open Full Production Analytics →
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded border p-3">
+                  <div className="text-xs text-slate-500">Actual / Planned Output</div>
+                  <div className="mt-1 text-lg font-bold text-brand-navy">
+                    {Number(kpis.actualProducedQuantity ?? 0).toFixed(0)} /{' '}
+                    {Number(kpis.plannedProductionQuantity ?? 0).toFixed(0)}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Plans: {String(kpis.totalProductionPlans ?? 0)} ({String(kpis.pendingProductionPlans ?? 0)} pending)
+                  </div>
+                </div>
+                <div className="rounded border p-3">
+                  <div className="text-xs text-slate-500">Accepted FG Qty</div>
+                  <div className="mt-1 text-lg font-bold text-emerald-700">
+                    {Number(kpis.acceptedFinishedGoodsQuantity ?? 0).toFixed(0)}
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Rejected: {Number(kpis.rejectedQuantity ?? 0).toFixed(0)}
+                  </div>
+                </div>
+                <div className="rounded border p-3">
+                  <div className="text-xs text-slate-500">Overall Yield %</div>
+                  <div className="mt-1 text-lg font-bold text-brand-navy">
+                    {String(kpis.overallYieldPercentage ?? '0.00')}%
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Material Wastage: {String(kpis.materialWastagePercentage ?? '0.00')}%
+                  </div>
+                </div>
+                <div className="rounded border p-3">
+                  <div className="text-xs text-slate-500">Work Orders &amp; Batches</div>
+                  <div className="mt-1 text-lg font-bold text-slate-900">
+                    {String(kpis.completedWorkOrders ?? 0)} / {String(kpis.totalWorkOrders ?? 0)} WOs
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Batches: {String(kpis.completedBatches ?? 0)} completed · {String(kpis.batchesInProgress ?? 0)} in progress
+                  </div>
+                </div>
+              </div>
+
+              {planVsActual.length === 0 ? (
+                <div className="rounded border border-dashed border-slate-200 p-4 text-center text-xs text-slate-500">
+                  No production plan vs actual records found for the selected filter.
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded border border-slate-200">
+                  <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
+                    <thead className="bg-slate-50 font-semibold text-slate-600">
+                      <tr>
+                        <th className="px-3 py-2">Plan #</th>
+                        <th className="px-3 py-2">Product</th>
+                        <th className="px-3 py-2">Warehouse</th>
+                        <th className="px-3 py-2">Status</th>
+                        <th className="px-3 py-2 text-right">Planned</th>
+                        <th className="px-3 py-2 text-right">Actual</th>
+                        <th className="px-3 py-2 text-right">Accepted</th>
+                        <th className="px-3 py-2 text-right">Completion %</th>
+                        <th className="px-3 py-2">Variance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {planVsActual.map((row, idx) => (
+                        <tr key={`${String(row.planId)}-${String(row.productVariantId ?? idx)}`}>
+                          <td className="px-3 py-2">
+                            <div className="font-mono font-medium text-brand-navy">
+                              {String(row.planNumber)}
+                            </div>
+                            {Boolean(row.planName) && (
+                              <div className="text-[10px] text-slate-500">{String(row.planName)}</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="font-medium text-slate-800">{String(row.productName)}</div>
+                            <div className="font-mono text-[10px] text-slate-400">{String(row.sku)}</div>
+                          </td>
+                          <td className="px-3 py-2 text-slate-600">{String(row.warehouseName)}</td>
+                          <td className="px-3 py-2">
+                            <Badge variant="outline">{String(row.planStatus)}</Badge>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {Number(row.plannedQuantity ?? 0).toFixed(2)} {String(row.uomSymbol ?? '')}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {Number(row.actualProducedQuantity ?? 0).toFixed(2)} {String(row.uomSymbol ?? '')}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono text-emerald-700">
+                            {Number(row.acceptedQuantity ?? 0).toFixed(2)} {String(row.uomSymbol ?? '')}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono font-semibold">
+                            {String(row.completionPercent ?? '0.00')}%
+                          </td>
+                          <td className="px-3 py-2">
+                            <Badge variant="outline">{String(row.varianceClassification ?? '-')}</Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
       {tab === 'profitability' && profQuery.data && (
         <div className="space-y-4 rounded-lg border bg-white p-4">

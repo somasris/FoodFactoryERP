@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthContext, AuthContextType } from '../context/AuthContext';
@@ -93,6 +93,63 @@ describe('Phase 4.3 Business Intelligence Frontend Suite', () => {
     });
     expect(screen.queryByText(/Gross Margin/)).toBeNull();
     expect(screen.queryByText('Factory Performance')).toBeNull();
+  });
+
+  it('3. BusinessIntelligencePage renders Production Analytics KPIs and Plan vs Actual table', async () => {
+    vi.spyOn(reportsService, 'getSalesAnalytics').mockResolvedValue({
+      revenueSourceNote: 'Authoritative ISSUED SalesInvoices',
+      totalTaxableRevenue: '1000.00',
+      orderStatusBreakdown: [],
+      salesByCustomer: [],
+    });
+    vi.spyOn(reportsService, 'getProductionAnalytics').mockResolvedValue({
+      dashboard: {
+        kpis: {
+          totalProductionPlans: 5,
+          pendingProductionPlans: 1,
+          totalWorkOrders: 4,
+          completedWorkOrders: 3,
+          totalProductionBatches: 6,
+          batchesInProgress: 1,
+          completedBatches: 5,
+          plannedProductionQuantity: '500.0000',
+          actualProducedQuantity: '480.0000',
+          acceptedFinishedGoodsQuantity: '470.0000',
+          rejectedQuantity: '10.0000',
+          overallYieldPercentage: '96.00',
+          materialWastagePercentage: '2.50',
+        },
+      },
+      planVsActual: [
+        {
+          planId: 'p-1',
+          planNumber: 'PP-2026-001',
+          planName: 'Murukku Run',
+          planStatus: 'RELEASED',
+          warehouseName: 'Finished Goods Warehouse',
+          productName: 'Murukku 200 g',
+          sku: 'MUR-200',
+          uomSymbol: 'pcs',
+          plannedQuantity: '200.0000',
+          actualProducedQuantity: '190.0000',
+          acceptedQuantity: '188.0000',
+          completionPercent: '95.00',
+          varianceClassification: 'UNDERPRODUCED',
+        },
+      ],
+    });
+
+    const owner = makeAuthValue(['OWNER'], []);
+    renderWithProviders(<BusinessIntelligencePage />, owner);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Production Analytics' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('96.00%')).toBeTruthy();
+    });
+    expect(screen.getByText('PP-2026-001')).toBeTruthy();
+    expect(screen.getByText('Murukku 200 g')).toBeTruthy();
+    expect(screen.getByText('95.00%')).toBeTruthy();
   });
 });
 
