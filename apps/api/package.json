@@ -16,7 +16,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "seed:fulfillment-demo": "tsx prisma/seed-fulfillment-demo.ts"
+    "seed:fulfillment-demo": "tsx prisma/seed-fulfillment-demo.ts",
+    "seed:existing-orders-stock": "tsx prisma/seed-existing-orders-stock.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

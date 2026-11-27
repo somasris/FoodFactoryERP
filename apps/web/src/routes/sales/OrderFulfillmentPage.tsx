@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { salesService } from '../../services/sales.service';
 import { SalesStatusBadge } from '../../components/sales/SalesStatusBadge';
+import { StockAvailabilityBadge } from '../../components/sales/StockAvailabilityBadge';
 import { Button } from '../../components/common/Button';
 import { ConfirmDialog } from '../../components/master-data/Modal';
 
@@ -63,6 +64,7 @@ export const OrderFulfillmentPage: React.FC = () => {
                 <th className="px-3 py-2">Customer</th>
                 <th className="px-3 py-2">Warehouse</th>
                 <th className="px-3 py-2">Status</th>
+                <th className="px-3 py-2">Stock Availability</th>
                 <th className="px-3 py-2 text-right">Total</th>
                 <th className="px-3 py-2 text-right">Action</th>
               </tr>
@@ -79,6 +81,9 @@ export const OrderFulfillmentPage: React.FC = () => {
                   <td className="px-3 py-2">{o.warehouse.code}</td>
                   <td className="px-3 py-2">
                     <SalesStatusBadge status={o.status} />
+                  </td>
+                  <td className="px-3 py-2">
+                    <StockAvailabilityBadge status={o.stockAvailability?.status} />
                   </td>
                   <td className="px-3 py-2 text-right font-mono font-semibold">
                     ₹{Number(o.totalAmount).toFixed(2)}
