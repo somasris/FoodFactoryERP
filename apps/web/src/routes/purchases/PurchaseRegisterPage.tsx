@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import { purchasesService } from '../../services/purchases.service';
-import { Button } from '../../components/common/Button';
+import { ExportButtons } from '../../components/common/ExportButtons';
 
 export const PurchaseRegisterPage: React.FC = () => {
   const [itcStatus, setItcStatus] = useState('');
@@ -21,22 +20,13 @@ export const PurchaseRegisterPage: React.FC = () => {
       }),
   });
 
-  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
-    const blob = await purchasesService.downloadRegisterExport(format, {
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') =>
+    purchasesService.downloadRegisterExport(format, {
       itcStatus: itcStatus || undefined,
       matchingStatus: matchingStatus || undefined,
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `purchase-register.${format === 'excel' ? 'xls' : format}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
 
   const reg = regQuery.data?.data;
 
@@ -79,17 +69,7 @@ export const PurchaseRegisterPage: React.FC = () => {
             className="rounded-md border border-slate-300 px-2 py-1"
           />
         </div>
-        <div className="flex items-center gap-1.5">
-          <Button size="sm" variant="outline" onClick={() => handleExport('csv')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> CSV
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => handleExport('excel')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> Excel
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => handleExport('pdf')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> PDF
-          </Button>
-        </div>
+        <ExportButtons onExport={handleExport} />
       </div>
 
       {reg && (

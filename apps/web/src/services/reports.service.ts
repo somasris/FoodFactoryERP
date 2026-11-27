@@ -1,7 +1,5 @@
-import { getAccessToken } from './api-client';
 import { cachedApiGet } from '../offline/offline-cache';
 import { ApiResponse } from '../types/api';
-import { config } from '../config/env';
 
 const unwrap = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
   promise.then(res => res.data as T);
@@ -87,27 +85,17 @@ export const reportsService = {
     format: 'csv' | 'excel' | 'pdf',
     f?: AnalyticsFilters,
   ) => {
-    const token = getAccessToken();
+    const { downloadAuthenticatedExport } = await import('../utils/export-download');
     const qs = new URLSearchParams();
     qs.set('format', format);
     if (f?.financialYear) qs.set('financialYear', f.financialYear);
     if (f?.startDate) qs.set('startDate', f.startDate);
     if (f?.endDate) qs.set('endDate', f.endDate);
-
-    const res = await fetch(`${config.apiBaseUrl}/reports/export/${reportType}?${qs.toString()}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Export failed (${res.status})`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bi-${reportType}.${format === 'excel' ? 'xls' : format}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const ext = format === 'excel' ? 'xlsx' : format;
+    await downloadAuthenticatedExport(
+      `/reports/export/${reportType}?${qs.toString()}`,
+      `bi-${reportType}.${ext}`,
+    );
   },
 };
 

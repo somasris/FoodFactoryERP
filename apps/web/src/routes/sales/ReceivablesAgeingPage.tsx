@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download } from 'lucide-react';
 import { paymentsService } from '../../services/payments.service';
 import { masterDataService } from '../../services/master-data.service';
-import { Button } from '../../components/common/Button';
+import { ExportButtons } from '../../components/common/ExportButtons';
 
 export const ReceivablesAgeingPage: React.FC = () => {
   const [asOfDate, setAsOfDate] = useState(new Date().toISOString().slice(0, 10));
@@ -46,27 +45,16 @@ export const ReceivablesAgeingPage: React.FC = () => {
     enabled: view === 'collections',
   });
 
-  const handleExport = async (format: 'csv' | 'excel' | 'pdf') => {
-    const blob =
-      view === 'collections'
-        ? await paymentsService.downloadCollectionsExport(format, {
-            fromDate: fromDate || undefined,
-            toDate: toDate || undefined,
-            paymentMode: paymentMode || undefined,
-            customerId: customerId || undefined,
-            groupBy,
-          })
-        : await paymentsService.downloadAgeingExport(format, { asOfDate });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const prefix = view === 'collections' ? 'collection-summary' : 'receivables-ageing';
-    a.download = `${prefix}.${format === 'excel' ? 'xls' : format}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  };
+  const handleExport = (format: 'csv' | 'excel' | 'pdf') =>
+    view === 'collections'
+      ? paymentsService.downloadCollectionsExport(format, {
+          fromDate: fromDate || undefined,
+          toDate: toDate || undefined,
+          paymentMode: paymentMode || undefined,
+          customerId: customerId || undefined,
+          groupBy,
+        })
+      : paymentsService.downloadAgeingExport(format, { asOfDate });
 
   const rec = recQuery.data?.data;
   const ageing = ageingQuery.data?.data;
@@ -114,15 +102,7 @@ export const ReceivablesAgeingPage: React.FC = () => {
               />
             </>
           )}
-          <Button size="sm" variant="outline" onClick={() => handleExport('csv')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> CSV
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => handleExport('excel')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> Excel
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => handleExport('pdf')}>
-            <Download className="mr-1 h-3.5 w-3.5" /> PDF
-          </Button>
+          <ExportButtons onExport={handleExport} />
         </div>
       </div>
 

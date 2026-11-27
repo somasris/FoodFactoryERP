@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, FileText, IndianRupee, Layers, ShieldCheck } from 'lucide-react';
+import { FileText, IndianRupee, Layers, ShieldCheck } from 'lucide-react';
 import { complianceService } from '../../services/compliance.service';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../../components/common/Badge';
+import { ExportButtons } from '../../components/common/ExportButtons';
 
 type SubTab = 'gst' | 'valuation' | 'costing' | 'traceability' | 'documents';
 
@@ -123,29 +124,21 @@ export const FinancialCompliancePage: React.FC = () => {
         </div>
 
         {canExport && tab !== 'documents' && (
-          <div className="flex gap-1.5">
-            {(['csv', 'excel', 'pdf'] as const).map(fmt => (
-              <button
-                key={fmt}
-                onClick={() =>
-                  complianceService.downloadExport(
-                    tab === 'gst'
-                      ? 'gst-sales'
-                      : tab === 'valuation'
-                        ? 'inventory-valuation'
-                        : tab === 'costing'
-                          ? 'production-costing'
-                          : 'traceability',
-                    fmt,
-                  )
-                }
-                className="inline-flex items-center gap-1 rounded border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <Download className="h-3 w-3" />
-                {fmt.toUpperCase()}
-              </button>
-            ))}
-          </div>
+          <ExportButtons
+            onExport={fmt =>
+              complianceService.downloadExport(
+                tab === 'gst'
+                  ? 'gst-sales'
+                  : tab === 'valuation'
+                    ? 'inventory-valuation'
+                    : tab === 'costing'
+                      ? 'production-costing'
+                      : 'traceability',
+                fmt,
+                { financialYear: fy || undefined },
+              )
+            }
+          />
         )}
       </div>
 

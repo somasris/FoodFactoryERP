@@ -1,6 +1,5 @@
-import { apiClient, getAccessToken } from './api-client';
+import { apiClient } from './api-client';
 import { ApiResponse } from '../types/api';
-import { config } from '../config/env';
 
 const unwrap = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
   promise.then(res => res.data as T);
@@ -53,20 +52,11 @@ export const governanceService = {
       apiClient<{ items: Array<Record<string, unknown>> }>('/governance/transactions'),
     ),
   exportAuditCsv: async () => {
-    const token = getAccessToken();
-    const res = await fetch(`${config.apiBaseUrl}/governance/audit-logs/export`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error(`Export failed (${res.status})`);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'audit-trail-export.csv';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const { downloadAuthenticatedExport } = await import('../utils/export-download');
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    await downloadAuthenticatedExport(
+      '/governance/audit-logs/export',
+      `Audit_Trail_${dateStamp}.csv`,
+    );
   },
 };

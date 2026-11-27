@@ -1,6 +1,5 @@
-import { apiClient, getAccessToken } from './api-client';
+import { apiClient } from './api-client';
 import { ApiResponse } from '../types/api';
-import { config } from '../config/env';
 
 const unwrap = <T>(promise: Promise<ApiResponse<T>>): Promise<T> =>
   promise.then(res => res.data as T);
@@ -200,23 +199,15 @@ export const complianceService = {
   downloadExport: async (
     reportType: 'gst-sales' | 'hsn-summary' | 'inventory-valuation' | 'production-costing' | 'traceability',
     format: 'csv' | 'excel' | 'pdf',
+    filters?: { financialYear?: string },
   ) => {
-    const token = getAccessToken();
-    const res = await fetch(`${config.apiBaseUrl}/compliance/export/${reportType}?format=${format}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
-    if (!res.ok) {
-      throw new Error(`Export failed (${res.status})`);
-    }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `compliance-${reportType}.${format === 'excel' ? 'xls' : format}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const { downloadAuthenticatedExport } = await import('../utils/export-download');
+    const qs = new URLSearchParams({ format });
+    if (filters?.financialYear) qs.set('financialYear', filters.financialYear);
+    const ext = format === 'excel' ? 'xlsx' : format;
+    await downloadAuthenticatedExport(
+      `/compliance/export/${reportType}?${qs.toString()}`,
+      `compliance-${reportType}.${ext}`,
+    );
   },
 };

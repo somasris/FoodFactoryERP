@@ -1,5 +1,4 @@
-import { apiClient, getAccessToken } from './api-client';
-import { config } from '../config/env';
+import { apiClient } from './api-client';
 
 export interface CustomerPayment {
   id: string;
@@ -255,14 +254,10 @@ export const paymentsService = {
     format: 'csv' | 'excel' | 'pdf',
     params: { asOfDate?: string; customerId?: string } = {},
   ) {
+    const { downloadAuthenticatedExport } = await import('../utils/export-download');
     const qs = buildQs({ ...params, format });
-    const token = getAccessToken();
-    const res = await fetch(`${config.apiBaseUrl}/sales/ageing${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to export receivables ageing');
-    return res.blob();
+    const ext = format === 'excel' ? 'xlsx' : format;
+    await downloadAuthenticatedExport(`/sales/ageing${qs}`, `Receivables_Ageing.${ext}`);
   },
 
   getCollections: (params: {
@@ -283,13 +278,9 @@ export const paymentsService = {
       groupBy?: 'daily' | 'monthly';
     } = {},
   ) {
+    const { downloadAuthenticatedExport } = await import('../utils/export-download');
     const qs = buildQs({ ...params, format });
-    const token = getAccessToken();
-    const res = await fetch(`${config.apiBaseUrl}/sales/collections${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to export collection summary');
-    return res.blob();
+    const ext = format === 'excel' ? 'xlsx' : format;
+    await downloadAuthenticatedExport(`/sales/collections${qs}`, `Collection_Summary.${ext}`);
   },
 };

@@ -1,5 +1,4 @@
-import { apiClient, getAccessToken } from './api-client';
-import { config } from '../config/env';
+import { apiClient } from './api-client';
 
 export interface SupplierInvoice {
   id: string;
@@ -205,13 +204,9 @@ export const purchasesService = {
       toDate?: string;
     } = {},
   ) {
+    const { downloadAuthenticatedExport } = await import('../utils/export-download');
     const qs = buildQs({ ...params, format });
-    const token = getAccessToken();
-    const res = await fetch(`${config.apiBaseUrl}/purchases/register${qs}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      credentials: 'include',
-    });
-    if (!res.ok) throw new Error('Failed to export purchase register');
-    return res.blob();
+    const ext = format === 'excel' ? 'xlsx' : format;
+    await downloadAuthenticatedExport(`/purchases/register${qs}`, `GST_Purchase_Register.${ext}`);
   },
 };

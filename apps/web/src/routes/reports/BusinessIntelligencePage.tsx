@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Download, Factory, Layers, ShoppingCart, TrendingUp } from 'lucide-react';
+import { Factory, Layers, ShoppingCart, TrendingUp } from 'lucide-react';
 import { reportsService } from '../../services/reports.service';
 import { useAuth } from '../../hooks/useAuth';
 import { Badge } from '../../components/common/Badge';
+import { ExportButtons } from '../../components/common/ExportButtons';
 
 type BiTab = 'sales' | 'inventory' | 'production' | 'profitability' | 'factory';
 
@@ -128,24 +129,15 @@ export const BusinessIntelligencePage: React.FC = () => {
             className="w-28 rounded border border-slate-300 px-2 py-1 text-xs"
           />
           {canExport && tab !== 'production' && (
-            <div className="flex gap-1">
-              {(['csv', 'excel', 'pdf'] as const).map(fmt => (
-                <button
-                  key={fmt}
-                  onClick={() =>
-                    reportsService.downloadExport(
-                      tab === 'factory' ? 'factory-performance' : tab,
-                      fmt,
-                      { financialYear: financialYear || undefined },
-                    )
-                  }
-                  className="inline-flex items-center gap-1 rounded border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <Download className="h-3 w-3" />
-                  {fmt.toUpperCase()}
-                </button>
-              ))}
-            </div>
+            <ExportButtons
+              onExport={fmt =>
+                reportsService.downloadExport(
+                  tab === 'factory' ? 'factory-performance' : tab,
+                  fmt,
+                  { financialYear: financialYear || undefined },
+                )
+              }
+            />
           )}
         </div>
       </div>
