@@ -2,7 +2,6 @@ import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import {
   Menu,
-  Factory,
   LogOut,
   User as UserIcon,
   ChevronDown,
@@ -23,6 +22,7 @@ import { NotificationBell } from './NotificationBell';
 import { OfflineStatusBadge } from './OfflineStatusBadge';
 import { useTranslation } from '../../i18n/I18nContext';
 import { useTheme } from '../../context/ThemeContext';
+import { AppLogo } from '../common/AppLogo';
 
 interface NavbarProps {
   onToggleSidebar: () => void;
@@ -94,9 +94,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <Link to={homePath} className="flex items-center gap-2 shrink-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#245C3A] text-[#E8D7AA] border border-[#17452C]">
-            <Factory className="h-4 w-4" />
-          </div>
+          <AppLogo variant="auto" size="md" decorative />
           <span className="hidden sm:inline text-sm font-bold tracking-tight text-[#17452C] sm:text-base">
             FoodFactory ERP
           </span>

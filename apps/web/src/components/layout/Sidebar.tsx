@@ -5,6 +5,7 @@ import { cn } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { useTranslation } from '../../i18n/I18nContext';
 import { canAccessNavItem, NAV_GROUPS } from '../../config/navigation';
+import { AppLogo } from '../common/AppLogo';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -112,9 +113,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         {/* Mobile Header */}
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-white/10 px-4 md:hidden">
-          <span className="text-sm font-semibold text-[#F4F0E4]">
-            {t('common.navigation', 'Navigation')}
-          </span>
+          <div className="flex items-center gap-2">
+            <AppLogo variant="white" size="sm" decorative />
+            <span className="text-sm font-semibold text-[#F4F0E4]">
+              FoodFactory ERP
+            </span>
+          </div>
           <button
             type="button"
             onClick={onClose}

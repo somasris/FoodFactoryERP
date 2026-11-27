@@ -6,10 +6,10 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
-  Activity,
 } from 'lucide-react';
 import { FactoryPulseData } from '../../services/factory-pulse.service';
 import { useTranslation } from '../../i18n/I18nContext';
+import { AppLogo } from '../common/AppLogo';
 
 const TV_SECTIONS = [
   'Overview',
@@ -78,7 +78,7 @@ export const FactoryPulseTvView: React.FC<FactoryPulseTvViewProps> = ({
       {/* Top TV Header */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/15 pb-4">
         <div className="flex items-center gap-3">
-          <Activity className="h-7 w-7 text-[#E8D7AA]" />
+          <AppLogo variant="white" size="md" decorative />
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-[#E8D7AA]">
               FoodFactory ERP • Live Factory Pulse

@@ -8,7 +8,6 @@ import {
   Crown,
   Eye,
   EyeOff,
-  Factory,
   Loader2,
   Shield,
   ShoppingCart,
@@ -28,6 +27,7 @@ import {
   UserProfile,
 } from '../services/auth.service';
 import { canAccessPath, getDefaultDashboardPath } from '../config/navigation';
+import { AppLogo } from '../components/common/AppLogo';
 
 const SIGNUP_ROLE_OPTIONS: Array<{
   role: AllowedSignupRole;
@@ -382,7 +382,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
         {/* Traditional Forest Green Header */}
         <div className="bg-[#245C3A] px-6 py-7 text-center text-white">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 border border-[#E8D7AA]/30">
-            <Factory className="h-7 w-7 text-[#E8D7AA]" />
+            <AppLogo variant="white" size="md" decorative />
           </div>
           <LoginHeaderContent />
         </div>
