@@ -237,7 +237,7 @@ export const BusinessIntelligencePage: React.FC = () => {
                   </p>
                 </div>
                 <Link
-                  to="/production/analytics"
+                  to="/production/reports"
                   className="text-xs font-medium text-brand-blue hover:underline"
                 >
                   Open Full Production Analytics →
