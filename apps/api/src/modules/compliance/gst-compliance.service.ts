@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../services/prisma.service';
 import { DateRangeQuery } from './compliance.types';
+import { buildDateRangeFilter } from '../sales/sales.utils';
 
 const ZERO = new Prisma.Decimal(0);
 
@@ -186,13 +187,44 @@ export class GstComplianceService {
       }
     }
 
+    const cnDateFilter = buildDateRangeFilter(query.startDate, query.endDate);
+    const issuedCreditNotes = await prisma.creditNote.findMany({
+      where: {
+        status: 'ISSUED',
+        ...(query.warehouseId ? { warehouseId: query.warehouseId } : {}),
+        ...(query.financialYear ? { financialYear: query.financialYear } : {}),
+        ...(cnDateFilter ? { creditNoteDate: cnDateFilter } : {}),
+      },
+      orderBy: { creditNoteDate: 'desc' },
+    });
+
+    const cnTotals = issuedCreditNotes.reduce(
+      (acc, cn) => ({
+        taxableValue: acc.taxableValue.add(cn.taxableValue),
+        cgstAmount: acc.cgstAmount.add(cn.cgstAmount),
+        sgstAmount: acc.sgstAmount.add(cn.sgstAmount),
+        igstAmount: acc.igstAmount.add(cn.igstAmount),
+        taxAmount: acc.taxAmount.add(cn.taxAmount),
+        grandTotal: acc.grandTotal.add(cn.grandTotal),
+      }),
+      {
+        taxableValue: new Prisma.Decimal(0),
+        cgstAmount: new Prisma.Decimal(0),
+        sgstAmount: new Prisma.Decimal(0),
+        igstAmount: new Prisma.Decimal(0),
+        taxAmount: new Prisma.Decimal(0),
+        grandTotal: new Prisma.Decimal(0),
+      },
+    );
+
     return {
       disclaimer:
-        'Summary derived from immutable issued SalesInvoice snapshots. Not a direct GSTN portal filing submission.',
+        'Summary derived from immutable issued SalesInvoice snapshots and issued CreditNotes. Not a direct GSTN portal filing submission.',
       counts: {
         issued: issuedInvoices.length,
         cancelled: cancelledInvoices.length,
         draft: draftInvoices.length,
+        issuedCreditNotes: issuedCreditNotes.length,
       },
       totals: {
         taxableSalesValue: taxableSalesValue.toFixed(2),
@@ -203,6 +235,22 @@ export class GstComplianceService {
         grandTotal: totalGrandTotal.toFixed(2),
         intraStateTaxable: intraStateTaxable.toFixed(2),
         interStateTaxable: interStateTaxable.toFixed(2),
+      },
+      creditNoteTotals: {
+        taxableValue: cnTotals.taxableValue.toFixed(2),
+        cgstAmount: cnTotals.cgstAmount.toFixed(2),
+        sgstAmount: cnTotals.sgstAmount.toFixed(2),
+        igstAmount: cnTotals.igstAmount.toFixed(2),
+        taxAmount: cnTotals.taxAmount.toFixed(2),
+        grandTotal: cnTotals.grandTotal.toFixed(2),
+      },
+      netSalesTotals: {
+        taxableSalesValue: taxableSalesValue.sub(cnTotals.taxableValue).toFixed(2),
+        cgstAmount: totalCgst.sub(cnTotals.cgstAmount).toFixed(2),
+        sgstAmount: totalSgst.sub(cnTotals.sgstAmount).toFixed(2),
+        igstAmount: totalIgst.sub(cnTotals.igstAmount).toFixed(2),
+        totalGstCollected: totalGstCollected.sub(cnTotals.taxAmount).toFixed(2),
+        grandTotal: totalGrandTotal.sub(cnTotals.grandTotal).toFixed(2),
       },
       hsnSummary: Array.from(hsnMap.values()).map(h => ({
         hsnCode: h.hsnCode,
@@ -257,25 +305,126 @@ export class GstComplianceService {
   }
 
   /**
-   * 4.2.2 Purchase Tax Summary:
-   * Explicitly reports unavailable supplier tax invoice data without inventing ITC
-   * and without treating raw material InventoryReceipts as supplier tax invoices.
+   * 4.2.2 Purchase Tax Summary (Backed by real SupplierInvoice records):
+   * Distinguishes Purchase GST Recorded vs ITC Eligible / Pending Verification / Ineligible.
+   * InventoryReceipts are never treated as supplier tax invoices.
    */
-  static async getPurchaseTaxSummary() {
+  static async getPurchaseTaxSummary(query: DateRangeQuery = {}) {
     const supplierCount = await prisma.supplier.count({ where: { isActive: true } });
-    return {
-      purchaseInvoicingSupported: false,
-      activeSuppliersCount: supplierCount,
-      statusNotice:
-        'Supplier tax invoices and GST Input Tax Credit (ITC) ledgers are not implemented in the current ERP scope. Raw material inventory receipts are excluded from GST tax credit reporting to preserve statutory accuracy.',
-      totals: {
-        taxablePurchaseValue: '0.00',
-        cgstInput: '0.00',
-        sgstInput: '0.00',
-        igstInput: '0.00',
-        totalInputTax: '0.00',
+    const where: Prisma.SupplierInvoiceWhereInput = {
+      status: 'POSTED',
+    };
+    const dateFilter = buildDateRangeFilter(query.startDate, query.endDate);
+    if (dateFilter) where.invoiceDate = dateFilter;
+
+    const invoices = await prisma.supplierInvoice.findMany({
+      where,
+      orderBy: { invoiceDate: 'desc' },
+      include: {
+        supplier: { select: { id: true, code: true, legalName: true, gstin: true } },
+        factory: { select: { id: true, code: true, name: true } },
       },
-      suppliers: [],
+    });
+
+    let taxablePurchaseValue = new Prisma.Decimal(0);
+    let cgstInput = new Prisma.Decimal(0);
+    let sgstInput = new Prisma.Decimal(0);
+    let igstInput = new Prisma.Decimal(0);
+    let totalInputTax = new Prisma.Decimal(0);
+    let itcEligibleTax = new Prisma.Decimal(0);
+    let itcPendingTax = new Prisma.Decimal(0);
+    let itcIneligibleTax = new Prisma.Decimal(0);
+
+    const bySupplier = new Map<
+      string,
+      {
+        supplierId: string;
+        supplierCode: string;
+        supplierLegalName: string;
+        supplierGstin: string | null;
+        invoiceCount: number;
+        taxableValue: Prisma.Decimal;
+        cgstAmount: Prisma.Decimal;
+        sgstAmount: Prisma.Decimal;
+        igstAmount: Prisma.Decimal;
+        taxAmount: Prisma.Decimal;
+        itcEligibleTax: Prisma.Decimal;
+        itcPendingTax: Prisma.Decimal;
+        itcIneligibleTax: Prisma.Decimal;
+      }
+    >();
+
+    for (const inv of invoices) {
+      const tax = new Prisma.Decimal(inv.taxAmount);
+      taxablePurchaseValue = taxablePurchaseValue.add(new Prisma.Decimal(inv.taxableValue));
+      cgstInput = cgstInput.add(new Prisma.Decimal(inv.cgstAmount));
+      sgstInput = sgstInput.add(new Prisma.Decimal(inv.sgstAmount));
+      igstInput = igstInput.add(new Prisma.Decimal(inv.igstAmount));
+      totalInputTax = totalInputTax.add(tax);
+
+      if (inv.itcStatus === 'ELIGIBLE') itcEligibleTax = itcEligibleTax.add(tax);
+      else if (inv.itcStatus === 'INELIGIBLE') itcIneligibleTax = itcIneligibleTax.add(tax);
+      else itcPendingTax = itcPendingTax.add(tax);
+
+      const sup = bySupplier.get(inv.supplierId) ?? {
+        supplierId: inv.supplierId,
+        supplierCode: inv.supplier.code,
+        supplierLegalName: inv.supplierLegalName,
+        supplierGstin: inv.supplierGstin,
+        invoiceCount: 0,
+        taxableValue: new Prisma.Decimal(0),
+        cgstAmount: new Prisma.Decimal(0),
+        sgstAmount: new Prisma.Decimal(0),
+        igstAmount: new Prisma.Decimal(0),
+        taxAmount: new Prisma.Decimal(0),
+        itcEligibleTax: new Prisma.Decimal(0),
+        itcPendingTax: new Prisma.Decimal(0),
+        itcIneligibleTax: new Prisma.Decimal(0),
+      };
+      sup.invoiceCount += 1;
+      sup.taxableValue = sup.taxableValue.add(new Prisma.Decimal(inv.taxableValue));
+      sup.cgstAmount = sup.cgstAmount.add(new Prisma.Decimal(inv.cgstAmount));
+      sup.sgstAmount = sup.sgstAmount.add(new Prisma.Decimal(inv.sgstAmount));
+      sup.igstAmount = sup.igstAmount.add(new Prisma.Decimal(inv.igstAmount));
+      sup.taxAmount = sup.taxAmount.add(tax);
+      if (inv.itcStatus === 'ELIGIBLE') sup.itcEligibleTax = sup.itcEligibleTax.add(tax);
+      else if (inv.itcStatus === 'INELIGIBLE') sup.itcIneligibleTax = sup.itcIneligibleTax.add(tax);
+      else sup.itcPendingTax = sup.itcPendingTax.add(tax);
+      bySupplier.set(inv.supplierId, sup);
+    }
+
+    return {
+      purchaseInvoicingSupported: true,
+      activeSuppliersCount: supplierCount,
+      invoiceCount: invoices.length,
+      statusNotice:
+        'Purchase GST summary is backed by posted SupplierInvoice records. ITC eligibility is tracked separately (ELIGIBLE, PENDING_VERIFICATION, INELIGIBLE).',
+      totals: {
+        taxablePurchaseValue: taxablePurchaseValue.toFixed(2),
+        cgstInput: cgstInput.toFixed(2),
+        sgstInput: sgstInput.toFixed(2),
+        igstInput: igstInput.toFixed(2),
+        totalInputTax: totalInputTax.toFixed(2),
+        purchaseGstRecorded: totalInputTax.toFixed(2),
+        itcEligible: itcEligibleTax.toFixed(2),
+        itcPendingVerification: itcPendingTax.toFixed(2),
+        itcIneligible: itcIneligibleTax.toFixed(2),
+      },
+      suppliers: Array.from(bySupplier.values()).map(s => ({
+        supplierId: s.supplierId,
+        supplierCode: s.supplierCode,
+        supplierLegalName: s.supplierLegalName,
+        supplierGstin: s.supplierGstin,
+        invoiceCount: s.invoiceCount,
+        taxableValue: s.taxableValue.toFixed(2),
+        cgstAmount: s.cgstAmount.toFixed(2),
+        sgstAmount: s.sgstAmount.toFixed(2),
+        igstAmount: s.igstAmount.toFixed(2),
+        taxAmount: s.taxAmount.toFixed(2),
+        itcEligibleTax: s.itcEligibleTax.toFixed(2),
+        itcPendingTax: s.itcPendingTax.toFixed(2),
+        itcIneligibleTax: s.itcIneligibleTax.toFixed(2),
+      })),
     };
   }
 }

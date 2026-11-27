@@ -5,6 +5,7 @@ import { usersRouter } from '../modules/users/users.routes';
 import { masterDataRouter } from '../modules/master-data/master-data.routes';
 import { inventoryRouter } from '../modules/inventory/inventory.routes';
 import { salesRouter } from '../modules/sales/sales.routes';
+import { purchasesRouter } from '../modules/purchases/purchases.routes';
 import { productionRouter } from '../modules/production/production.routes';
 import { adminRouter } from '../modules/admin/admin.routes';
 import { complianceRouter } from '../modules/compliance/compliance.routes';
@@ -43,6 +44,9 @@ apiRouter.use('/inventory', inventoryRouter);
 
 // Mount Phase 2 Sales & Orders routes under /api/v1/sales
 apiRouter.use('/sales', salesRouter);
+
+// Mount P0.3 Supplier Purchase Invoices & Purchase Register routes under /api/v1/purchases
+apiRouter.use('/purchases', purchasesRouter);
 
 // Mount Phase 3 Production routes (BOMs & Planning) under /api/v1/production
 apiRouter.use('/production', productionRouter);

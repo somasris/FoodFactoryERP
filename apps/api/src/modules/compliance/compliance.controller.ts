@@ -45,10 +45,11 @@ export class ComplianceController {
     }
   }
 
-  static async getPurchaseTaxSummary(_req: Request, res: Response, next: NextFunction) {
+  static async getPurchaseTaxSummary(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await GstComplianceService.getPurchaseTaxSummary();
-      sendSuccess(res, 'Purchase tax availability summary retrieved', data);
+      const query = dateRangeQuerySchema.parse(req.query);
+      const data = await GstComplianceService.getPurchaseTaxSummary(query);
+      sendSuccess(res, 'Purchase tax compliance summary retrieved successfully', data);
     } catch (err) {
       next(err);
     }

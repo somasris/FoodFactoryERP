@@ -4,6 +4,8 @@ import { StockAuditService } from './stock-audit.service';
 import { ComplianceReportsService } from './compliance-reports.service';
 import { DateRangeQuery } from './compliance.types';
 import { UserContext } from '../inventory/inventory.utils';
+import { CustomerPaymentService } from '../sales/customer-payment.service';
+import { SupplierInvoiceService } from '../purchases/supplier-invoice.service';
 
 export type ComplianceExportType =
   | 'gst-sales'
@@ -180,5 +182,157 @@ export class ComplianceExportService {
       contentType: 'application/pdf',
       filename: `${baseName}.pdf`,
     };
+  }
+
+  private static async renderTabularExport(
+    title: string,
+    baseNamePrefix: string,
+    columns: Array<{ key: string; label: string }>,
+    rows: Array<Record<string, unknown>>,
+    format: ExportFormat,
+  ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
+    const generatedAt = new Date().toISOString();
+    const baseName = `${baseNamePrefix}-${generatedAt.slice(0, 10)}`;
+
+    if (format === 'csv') {
+      const header = columns.map(c => escapeCsv(c.label)).join(',');
+      const lines = [
+        header,
+        ...rows.map(r => columns.map(c => escapeCsv(r[c.key])).join(',')),
+      ];
+      return {
+        buffer: Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8'),
+        contentType: 'text/csv; charset=utf-8',
+        filename: `${baseName}.csv`,
+      };
+    }
+
+    if (format === 'excel') {
+      const headerRow = `<Row>${columns
+        .map(c => `<Cell><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`)
+        .join('')}</Row>`;
+      const dataRows = rows
+        .map(
+          r =>
+            `<Row>${columns
+              .map(c => `<Cell><Data ss:Type="String">${escapeXml(r[c.key])}</Data></Cell>`)
+              .join('')}</Row>`,
+        )
+        .join('');
+      const xml = `<?xml version="1.0"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Report">
+    <Table>
+      <Row><Cell><Data ss:Type="String">${escapeXml(title)}</Data></Cell></Row>
+      ${headerRow}
+      ${dataRows}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+      return {
+        buffer: Buffer.from(xml, 'utf8'),
+        contentType: 'application/vnd.ms-excel; charset=utf-8',
+        filename: `${baseName}.xls`,
+      };
+    }
+
+    const buffer = await new Promise<Buffer>((resolve, reject) => {
+      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
+      const chunks: Buffer[] = [];
+      doc.on('data', (c: Buffer) => chunks.push(c));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      doc.fontSize(14).text(title);
+      doc.fontSize(8).fillColor('#555555').text(`Generated At: ${generatedAt} | Rows: ${rows.length}`);
+      doc.moveDown(0.75).fillColor('#000000');
+
+      const previewCols = columns.slice(0, 8);
+      doc.fontSize(8).text(previewCols.map(c => c.label).join(' | '));
+      doc.moveTo(36, doc.y + 2).lineTo(800, doc.y + 2).stroke();
+      doc.moveDown(0.4);
+
+      for (const row of rows.slice(0, 250)) {
+        doc.fontSize(7).text(previewCols.map(c => String(row[c.key] ?? '-')).join(' | '));
+      }
+      doc.end();
+    });
+
+    return {
+      buffer,
+      contentType: 'application/pdf',
+      filename: `${baseName}.pdf`,
+    };
+  }
+
+  static async generateReceivablesAgeingExport(
+    format: ExportFormat,
+    user: UserContext,
+    filters: {
+      asOfDate?: string;
+      customerId?: string;
+      invoiceId?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    const ageing = await CustomerPaymentService.getAgeingReport(user, filters);
+    const columns = [
+      { key: 'invoiceNumber', label: 'Invoice #' },
+      { key: 'customerLegalName', label: 'Customer' },
+      { key: 'grandTotal', label: 'Grand Total' },
+      { key: 'paidAmount', label: 'Paid' },
+      { key: 'creditNoteAmount', label: 'Credit Notes' },
+      { key: 'outstandingAmount', label: 'Outstanding' },
+      { key: 'daysPastDue', label: 'Days Past Due' },
+      { key: 'bucket', label: 'Ageing Bucket' },
+    ];
+    return this.renderTabularExport(
+      'Customer Receivables Ageing Report',
+      'receivables-ageing',
+      columns,
+      ageing.invoices,
+      format,
+    );
+  }
+
+  static async generatePurchaseRegisterExport(
+    format: ExportFormat,
+    filters: {
+      supplierId?: string;
+      factoryId?: string;
+      status?: string;
+      matchingStatus?: string;
+      itcStatus?: string;
+      gstin?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ) {
+    const reg = await SupplierInvoiceService.getPurchaseRegister(filters);
+    const columns = [
+      { key: 'supplierName', label: 'Supplier' },
+      { key: 'supplierGstin', label: 'Supplier GSTIN' },
+      { key: 'supplierInvoiceNumber', label: 'Supplier Inv #' },
+      { key: 'internalInvoiceNumber', label: 'Internal Inv #' },
+      { key: 'hsnCode', label: 'HSN' },
+      { key: 'itemDescription', label: 'Item' },
+      { key: 'quantity', label: 'Qty' },
+      { key: 'taxableValue', label: 'Taxable' },
+      { key: 'cgstAmount', label: 'CGST' },
+      { key: 'sgstAmount', label: 'SGST' },
+      { key: 'igstAmount', label: 'IGST' },
+      { key: 'totalInvoiceValue', label: 'Invoice Total' },
+      { key: 'matchingStatus', label: 'Match Status' },
+      { key: 'itcStatus', label: 'ITC Status' },
+    ];
+    return this.renderTabularExport(
+      'GST Purchase Register',
+      'purchase-register',
+      columns,
+      reg.rows,
+      format,
+    );
   }
 }
