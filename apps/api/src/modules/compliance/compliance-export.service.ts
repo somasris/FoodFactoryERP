@@ -1,4 +1,3 @@
-import PDFDocument from 'pdfkit';
 import { GstComplianceService } from './gst-compliance.service';
 import { StockAuditService } from './stock-audit.service';
 import { ComplianceReportsService } from './compliance-reports.service';
@@ -6,6 +5,15 @@ import { DateRangeQuery } from './compliance.types';
 import { UserContext } from '../inventory/inventory.utils';
 import { CustomerPaymentService } from '../sales/customer-payment.service';
 import { SupplierInvoiceService } from '../purchases/supplier-invoice.service';
+import {
+  ExportColumn,
+  ExportFilterItem,
+  ExportFormat,
+  ExportResult,
+  ExportSummaryMetric,
+  generateStandardExport,
+  getExportCompanyInfo,
+} from '../../utils/export';
 
 export type ComplianceExportType =
   | 'gst-sales'
@@ -14,20 +22,13 @@ export type ComplianceExportType =
   | 'production-costing'
   | 'traceability';
 
-export type ExportFormat = 'csv' | 'excel' | 'pdf';
+export type { ExportFormat };
 
-const escapeCsv = (val: unknown): string => {
-  const s = val === null || val === undefined ? '' : String(val);
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
-
-const escapeXml = (val: unknown): string =>
-  String(val ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function buildDatePeriod(fromDate?: string, toDate?: string, extra?: string): string {
+  if (extra) return extra;
+  if (fromDate || toDate) return `${fromDate || 'Start'} to ${toDate || 'Present'}`;
+  return 'All Available Dates';
+}
 
 export class ComplianceExportService {
   static async generateExport(
@@ -35,235 +36,142 @@ export class ComplianceExportService {
     format: ExportFormat,
     query: DateRangeQuery,
     user: UserContext,
-  ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
+  ): Promise<ExportResult> {
     let title = '';
-    let columns: Array<{ key: string; label: string }> = [];
+    let subtitle = '';
+    let filenamePrefix = '';
+    let sheetName = '';
+    let columns: ExportColumn[] = [];
     let rows: Array<Record<string, unknown>> = [];
+    let summaryMetrics: ExportSummaryMetric[] = [];
+    const appliedFilters: ExportFilterItem[] = [];
+
+    if (query.financialYear) appliedFilters.push({ label: 'FY', value: query.financialYear });
+    if (query.warehouseId) appliedFilters.push({ label: 'Warehouse ID', value: query.warehouseId });
 
     if (reportType === 'gst-sales') {
       title = 'GST Sales Tax Summary';
+      subtitle = 'Invoice-wise GST output tax register (CGST, SGST, IGST)';
+      filenamePrefix = 'GST_Sales_Summary';
+      sheetName = 'GST Sales';
       columns = [
-        { key: 'invoiceNumber', label: 'Invoice #' },
-        { key: 'financialYear', label: 'FY' },
-        { key: 'status', label: 'Status' },
-        { key: 'customerLegalName', label: 'Customer' },
-        { key: 'customerGstin', label: 'Customer GSTIN' },
-        { key: 'taxableAmount', label: 'Taxable (INR)' },
-        { key: 'cgstAmount', label: 'CGST' },
-        { key: 'sgstAmount', label: 'SGST' },
-        { key: 'igstAmount', label: 'IGST' },
-        { key: 'grandTotal', label: 'Grand Total' },
+        { key: 'invoiceNumber', label: 'Invoice #', type: 'string', widthWeight: 14 },
+        { key: 'financialYear', label: 'FY', type: 'string', align: 'center', widthWeight: 9 },
+        { key: 'status', label: 'Status', type: 'string', align: 'center', widthWeight: 10 },
+        { key: 'customerLegalName', label: 'Customer', type: 'string', widthWeight: 22 },
+        { key: 'customerGstin', label: 'Customer GSTIN', type: 'string', widthWeight: 16 },
+        { key: 'taxableAmount', label: 'Taxable Value', type: 'currency', includeInTotal: true },
+        { key: 'cgstAmount', label: 'CGST', type: 'currency', includeInTotal: true },
+        { key: 'sgstAmount', label: 'SGST', type: 'currency', includeInTotal: true },
+        { key: 'igstAmount', label: 'IGST', type: 'currency', includeInTotal: true },
+        { key: 'grandTotal', label: 'Grand Total', type: 'currency', includeInTotal: true },
       ];
-      rows = (await GstComplianceService.getGstSalesSummary(query)).invoices;
+      const gst = await GstComplianceService.getGstSalesSummary(query);
+      rows = gst.invoices;
+      summaryMetrics = [
+        { label: 'Invoices', value: rows.length, type: 'integer' },
+        { label: 'Taxable Value', value: gst.totals.taxableSalesValue, type: 'currency' },
+        { label: 'Total GST', value: gst.totals.totalGstCollected, type: 'currency' },
+        { label: 'Grand Total', value: gst.totals.grandTotal, type: 'currency' },
+      ];
     } else if (reportType === 'hsn-summary') {
       title = 'GST HSN-Wise Sales Summary';
+      subtitle = 'HSN classification breakdown for GST return filing';
+      filenamePrefix = 'GST_HSN_Summary';
+      sheetName = 'HSN Summary';
       columns = [
-        { key: 'hsnCode', label: 'HSN Code' },
-        { key: 'lineCount', label: 'Lines' },
-        { key: 'totalQuantity', label: 'Total Qty' },
-        { key: 'taxableAmount', label: 'Taxable (INR)' },
-        { key: 'cgstAmount', label: 'CGST' },
-        { key: 'sgstAmount', label: 'SGST' },
-        { key: 'igstAmount', label: 'IGST' },
-        { key: 'totalValue', label: 'Total Value' },
+        { key: 'hsnCode', label: 'HSN Code', type: 'string', align: 'center', widthWeight: 12 },
+        { key: 'lineCount', label: 'Lines', type: 'integer', includeInTotal: true },
+        { key: 'totalQuantity', label: 'Total Qty', type: 'number', includeInTotal: true },
+        { key: 'taxableAmount', label: 'Taxable Value', type: 'currency', includeInTotal: true },
+        { key: 'cgstAmount', label: 'CGST', type: 'currency', includeInTotal: true },
+        { key: 'sgstAmount', label: 'SGST', type: 'currency', includeInTotal: true },
+        { key: 'igstAmount', label: 'IGST', type: 'currency', includeInTotal: true },
+        { key: 'totalValue', label: 'Total Value', type: 'currency', includeInTotal: true },
       ];
-      rows = (await GstComplianceService.getGstSalesSummary(query)).hsnSummary;
+      const gst = await GstComplianceService.getGstSalesSummary(query);
+      rows = gst.hsnSummary;
+      summaryMetrics = [
+        { label: 'HSN Codes', value: rows.length, type: 'integer' },
+        { label: 'Taxable Value', value: gst.totals.taxableSalesValue, type: 'currency' },
+        { label: 'Grand Total', value: gst.totals.grandTotal, type: 'currency' },
+      ];
     } else if (reportType === 'inventory-valuation') {
       title = 'Inventory Valuation Compliance Report';
+      subtitle = 'Batch-level stock on hand, valuation method, and closing inventory value';
+      filenamePrefix = 'Inventory_Valuation';
+      sheetName = 'Inventory Valuation';
       columns = [
-        { key: 'warehouseCode', label: 'Warehouse' },
-        { key: 'itemCode', label: 'Item Code' },
-        { key: 'itemName', label: 'Item Name' },
-        { key: 'itemType', label: 'Type' },
-        { key: 'valuationMethod', label: 'Method' },
-        { key: 'batchNumber', label: 'Batch' },
-        { key: 'quantityOnHand', label: 'On Hand' },
-        { key: 'unitCost', label: 'Unit Cost' },
-        { key: 'totalValue', label: 'Total Value (INR)' },
+        { key: 'warehouseCode', label: 'Warehouse', type: 'string', widthWeight: 12 },
+        { key: 'itemCode', label: 'Item Code', type: 'string', widthWeight: 12 },
+        { key: 'itemName', label: 'Item Name', type: 'string', widthWeight: 22 },
+        { key: 'itemType', label: 'Type', type: 'string', align: 'center', widthWeight: 11 },
+        { key: 'valuationMethod', label: 'Method', type: 'string', align: 'center', widthWeight: 10 },
+        { key: 'batchNumber', label: 'Batch', type: 'string', widthWeight: 14 },
+        { key: 'quantityOnHand', label: 'On Hand', type: 'number', includeInTotal: true },
+        { key: 'unitCost', label: 'Unit Cost', type: 'currency' },
+        { key: 'totalValue', label: 'Total Value', type: 'currency', includeInTotal: true },
       ];
-      rows = (await StockAuditService.getInventoryValuationReport(user, { warehouseId: query.warehouseId })).items;
+      const val = await StockAuditService.getInventoryValuationReport(user, {
+        warehouseId: query.warehouseId,
+      });
+      rows = val.items;
+      summaryMetrics = [
+        { label: 'Stock Lots', value: rows.length, type: 'integer' },
+        { label: 'Total Stock Value', value: val.summary?.totalValuation ?? 0, type: 'currency' },
+      ];
     } else if (reportType === 'production-costing') {
       title = 'Production Cost Compliance Report';
+      subtitle = 'Audit-ready batch production costing breakdown and unit cost';
+      filenamePrefix = 'Production_Cost_Compliance';
+      sheetName = 'Production Costing';
       columns = [
-        { key: 'batchNumber', label: 'Batch #' },
-        { key: 'productName', label: 'Product' },
-        { key: 'costingClassification', label: 'Classification' },
-        { key: 'materialCost', label: 'Material' },
-        { key: 'labourCost', label: 'Labour' },
-        { key: 'overheadCost', label: 'Overhead' },
-        { key: 'totalProductionCost', label: 'Total Cost' },
-        { key: 'unitCostPerAcceptedUnit', label: 'Unit Cost' },
+        { key: 'batchNumber', label: 'Batch #', type: 'string', widthWeight: 14 },
+        { key: 'productName', label: 'Product', type: 'string', widthWeight: 22 },
+        { key: 'costingClassification', label: 'Classification', type: 'string', align: 'center', widthWeight: 13 },
+        { key: 'materialCost', label: 'Material Cost', type: 'currency', includeInTotal: true },
+        { key: 'labourCost', label: 'Labour Cost', type: 'currency', includeInTotal: true },
+        { key: 'overheadCost', label: 'Overhead Cost', type: 'currency', includeInTotal: true },
+        { key: 'totalProductionCost', label: 'Total Cost', type: 'currency', includeInTotal: true },
+        { key: 'unitCostPerAcceptedUnit', label: 'Unit Cost', type: 'currency' },
       ];
-      rows = (await ComplianceReportsService.getProductionCostCompliance(query)).items;
+      const pc = await ComplianceReportsService.getProductionCostCompliance(query);
+      rows = pc.items;
+      summaryMetrics = [
+        { label: 'Total Batches', value: rows.length, type: 'integer' },
+        { label: 'Finalized Costings', value: pc.summary.finalizedCount ?? 0, type: 'integer' },
+      ];
     } else {
       title = 'Batch Traceability Compliance Report';
+      subtitle = 'FSSAI batch lineage, material classification, and quality release status';
+      filenamePrefix = 'Batch_Traceability';
+      sheetName = 'Batch Traceability';
       columns = [
-        { key: 'batchNumber', label: 'Batch #' },
-        { key: 'itemCode', label: 'Item Code' },
-        { key: 'itemName', label: 'Item Name' },
-        { key: 'itemType', label: 'Type' },
-        { key: 'qualityStatus', label: 'Quality Status' },
+        { key: 'batchNumber', label: 'Batch #', type: 'string', widthWeight: 16 },
+        { key: 'itemCode', label: 'Item Code', type: 'string', widthWeight: 14 },
+        { key: 'itemName', label: 'Item Name', type: 'string', widthWeight: 26 },
+        { key: 'itemType', label: 'Type', type: 'string', align: 'center', widthWeight: 14 },
+        { key: 'qualityStatus', label: 'Quality Status', type: 'string', align: 'center', widthWeight: 14 },
       ];
       rows = (await ComplianceReportsService.getTraceabilityReport({})).items;
+      summaryMetrics = [{ label: 'Tracked Batches', value: rows.length, type: 'integer' }];
     }
 
-    const generatedAt = new Date().toISOString();
-    const dateStamp = generatedAt.slice(0, 10);
-    const baseName = `compliance-${reportType}-${dateStamp}`;
+    const company = await getExportCompanyInfo();
 
-    if (format === 'csv') {
-      const lines = [
-        `# ${title}`,
-        `# Generated At: ${generatedAt}`,
-        columns.map(c => escapeCsv(c.label)).join(','),
-        ...rows.map(r => columns.map(c => escapeCsv(r[c.key])).join(',')),
-      ];
-      return {
-        buffer: Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8'),
-        contentType: 'text/csv; charset=utf-8',
-        filename: `${baseName}.csv`,
-      };
-    }
-
-    if (format === 'excel') {
-      const headerRow = `<Row>${columns
-        .map(c => `<Cell><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`)
-        .join('')}</Row>`;
-      const dataRows = rows
-        .map(
-          r =>
-            `<Row>${columns
-              .map(c => `<Cell><Data ss:Type="String">${escapeXml(r[c.key])}</Data></Cell>`)
-              .join('')}</Row>`,
-        )
-        .join('');
-      const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Worksheet ss:Name="Compliance">
-    <Table>
-      <Row><Cell><Data ss:Type="String">${escapeXml(title)}</Data></Cell></Row>
-      ${headerRow}
-      ${dataRows}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-      return {
-        buffer: Buffer.from(xml, 'utf8'),
-        contentType: 'application/vnd.ms-excel; charset=utf-8',
-        filename: `${baseName}.xls`,
-      };
-    }
-
-    const buffer = await new Promise<Buffer>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
-      const chunks: Buffer[] = [];
-      doc.on('data', (c: Buffer) => chunks.push(c));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      doc.fontSize(14).text(title);
-      doc.fontSize(8).fillColor('#555555').text(`Generated At: ${generatedAt} | Rows: ${rows.length}`);
-      doc.moveDown(0.75).fillColor('#000000');
-
-      const previewCols = columns.slice(0, 8);
-      doc.fontSize(8).text(previewCols.map(c => c.label).join(' | '));
-      doc.moveTo(36, doc.y + 2).lineTo(800, doc.y + 2).stroke();
-      doc.moveDown(0.4);
-
-      for (const row of rows.slice(0, 250)) {
-        doc.fontSize(7).text(previewCols.map(c => String(row[c.key] ?? '-')).join(' | '));
-      }
-      doc.end();
+    return generateStandardExport(format, {
+      title,
+      subtitle,
+      module: 'Compliance & Audit',
+      filenamePrefix,
+      sheetName,
+      company,
+      reportingPeriod: buildDatePeriod(query.startDate, query.endDate, query.financialYear),
+      appliedFilters,
+      columns,
+      rows,
+      summaryMetrics,
     });
-
-    return {
-      buffer,
-      contentType: 'application/pdf',
-      filename: `${baseName}.pdf`,
-    };
-  }
-
-  private static async renderTabularExport(
-    title: string,
-    baseNamePrefix: string,
-    columns: Array<{ key: string; label: string }>,
-    rows: Array<Record<string, unknown>>,
-    format: ExportFormat,
-  ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
-    const generatedAt = new Date().toISOString();
-    const baseName = `${baseNamePrefix}-${generatedAt.slice(0, 10)}`;
-
-    if (format === 'csv') {
-      const header = columns.map(c => escapeCsv(c.label)).join(',');
-      const lines = [
-        header,
-        ...rows.map(r => columns.map(c => escapeCsv(r[c.key])).join(',')),
-      ];
-      return {
-        buffer: Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8'),
-        contentType: 'text/csv; charset=utf-8',
-        filename: `${baseName}.csv`,
-      };
-    }
-
-    if (format === 'excel') {
-      const headerRow = `<Row>${columns
-        .map(c => `<Cell><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`)
-        .join('')}</Row>`;
-      const dataRows = rows
-        .map(
-          r =>
-            `<Row>${columns
-              .map(c => `<Cell><Data ss:Type="String">${escapeXml(r[c.key])}</Data></Cell>`)
-              .join('')}</Row>`,
-        )
-        .join('');
-      const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Worksheet ss:Name="Report">
-    <Table>
-      <Row><Cell><Data ss:Type="String">${escapeXml(title)}</Data></Cell></Row>
-      ${headerRow}
-      ${dataRows}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-      return {
-        buffer: Buffer.from(xml, 'utf8'),
-        contentType: 'application/vnd.ms-excel; charset=utf-8',
-        filename: `${baseName}.xls`,
-      };
-    }
-
-    const buffer = await new Promise<Buffer>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
-      const chunks: Buffer[] = [];
-      doc.on('data', (c: Buffer) => chunks.push(c));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      doc.fontSize(14).text(title);
-      doc.fontSize(8).fillColor('#555555').text(`Generated At: ${generatedAt} | Rows: ${rows.length}`);
-      doc.moveDown(0.75).fillColor('#000000');
-
-      const previewCols = columns.slice(0, 8);
-      doc.fontSize(8).text(previewCols.map(c => c.label).join(' | '));
-      doc.moveTo(36, doc.y + 2).lineTo(800, doc.y + 2).stroke();
-      doc.moveDown(0.4);
-
-      for (const row of rows.slice(0, 250)) {
-        doc.fontSize(7).text(previewCols.map(c => String(row[c.key] ?? '-')).join(' | '));
-      }
-      doc.end();
-    });
-
-    return {
-      buffer,
-      contentType: 'application/pdf',
-      filename: `${baseName}.pdf`,
-    };
   }
 
   static async generateReceivablesAgeingExport(
@@ -276,25 +184,55 @@ export class ComplianceExportService {
       fromDate?: string;
       toDate?: string;
     },
-  ) {
+  ): Promise<ExportResult> {
     const ageing = await CustomerPaymentService.getAgeingReport(user, filters);
-    const columns = [
-      { key: 'invoiceNumber', label: 'Invoice #' },
-      { key: 'customerLegalName', label: 'Customer' },
-      { key: 'grandTotal', label: 'Grand Total' },
-      { key: 'paidAmount', label: 'Paid' },
-      { key: 'creditNoteAmount', label: 'Credit Notes' },
-      { key: 'outstandingAmount', label: 'Outstanding' },
-      { key: 'daysPastDue', label: 'Days Past Due' },
-      { key: 'bucket', label: 'Ageing Bucket' },
+    const columns: ExportColumn[] = [
+      { key: 'invoiceNumber', label: 'Invoice #', type: 'string', widthWeight: 14 },
+      { key: 'customerLegalName', label: 'Customer', type: 'string', widthWeight: 24 },
+      { key: 'grandTotal', label: 'Invoice Amount', type: 'currency', includeInTotal: true },
+      { key: 'paidAmount', label: 'Amount Paid', type: 'currency', includeInTotal: true },
+      { key: 'creditNoteAmount', label: 'Credit Notes', type: 'currency', includeInTotal: true },
+      { key: 'outstandingAmount', label: 'Outstanding', type: 'currency', includeInTotal: true },
+      { key: 'daysPastDue', label: 'Days Past Due', type: 'integer' },
+      { key: 'bucket', label: 'Ageing Bucket', type: 'string', align: 'center', widthWeight: 13 },
     ];
-    return this.renderTabularExport(
-      'Customer Receivables Ageing Report',
-      'receivables-ageing',
-      columns,
-      ageing.invoices,
-      format,
+
+    const appliedFilters: ExportFilterItem[] = [];
+    if (filters.asOfDate) appliedFilters.push({ label: 'As Of Date', value: filters.asOfDate });
+    if (filters.customerId) appliedFilters.push({ label: 'Customer ID', value: filters.customerId });
+
+    const totalOutstanding = ageing.invoices.reduce(
+      (sum, inv) => sum + Number(inv.outstandingAmount || 0),
+      0,
     );
+    const totalPaid = ageing.invoices.reduce(
+      (sum, inv) => sum + Number(inv.paidAmount || 0),
+      0,
+    );
+    const overdueAmount = ageing.invoices
+      .filter(inv => Number(inv.daysPastDue || 0) > 0)
+      .reduce((sum, inv) => sum + Number(inv.outstandingAmount || 0), 0);
+
+    const company = await getExportCompanyInfo();
+
+    return generateStandardExport(format, {
+      title: 'Customer Receivables Ageing Report',
+      subtitle: 'Open invoice balances, credit note adjustments, and overdue ageing buckets',
+      module: 'Sales & Receivables',
+      filenamePrefix: 'Receivables_Ageing',
+      sheetName: 'Receivables Ageing',
+      company,
+      reportingPeriod: filters.asOfDate ? `As of ${filters.asOfDate}` : buildDatePeriod(filters.fromDate, filters.toDate),
+      appliedFilters,
+      columns,
+      rows: ageing.invoices,
+      summaryMetrics: [
+        { label: 'Open Invoices', value: ageing.invoices.length, type: 'integer' },
+        { label: 'Total Paid', value: totalPaid, type: 'currency' },
+        { label: 'Total Outstanding', value: totalOutstanding, type: 'currency' },
+        { label: 'Overdue Amount', value: overdueAmount, type: 'currency' },
+      ],
+    });
   }
 
   static async generatePurchaseRegisterExport(
@@ -309,31 +247,58 @@ export class ComplianceExportService {
       fromDate?: string;
       toDate?: string;
     },
-  ) {
+  ): Promise<ExportResult> {
     const reg = await SupplierInvoiceService.getPurchaseRegister(filters);
-    const columns = [
-      { key: 'supplierName', label: 'Supplier' },
-      { key: 'supplierGstin', label: 'Supplier GSTIN' },
-      { key: 'supplierInvoiceNumber', label: 'Supplier Inv #' },
-      { key: 'internalInvoiceNumber', label: 'Internal Inv #' },
-      { key: 'hsnCode', label: 'HSN' },
-      { key: 'itemDescription', label: 'Item' },
-      { key: 'quantity', label: 'Qty' },
-      { key: 'taxableValue', label: 'Taxable' },
-      { key: 'cgstAmount', label: 'CGST' },
-      { key: 'sgstAmount', label: 'SGST' },
-      { key: 'igstAmount', label: 'IGST' },
-      { key: 'totalInvoiceValue', label: 'Invoice Total' },
-      { key: 'matchingStatus', label: 'Match Status' },
-      { key: 'itcStatus', label: 'ITC Status' },
+    const columns: ExportColumn[] = [
+      { key: 'supplierName', label: 'Supplier', type: 'string', widthWeight: 20 },
+      { key: 'supplierGstin', label: 'Supplier GSTIN', type: 'string', widthWeight: 15 },
+      { key: 'supplierInvoiceNumber', label: 'Supplier Inv #', type: 'string', widthWeight: 13 },
+      { key: 'internalInvoiceNumber', label: 'Internal Inv #', type: 'string', widthWeight: 13 },
+      { key: 'hsnCode', label: 'HSN', type: 'string', align: 'center', widthWeight: 9 },
+      { key: 'itemDescription', label: 'Item', type: 'string', widthWeight: 18 },
+      { key: 'quantity', label: 'Qty', type: 'number', includeInTotal: true },
+      { key: 'taxableValue', label: 'Taxable Value', type: 'currency', includeInTotal: true },
+      { key: 'cgstAmount', label: 'CGST', type: 'currency', includeInTotal: true },
+      { key: 'sgstAmount', label: 'SGST', type: 'currency', includeInTotal: true },
+      { key: 'igstAmount', label: 'IGST', type: 'currency', includeInTotal: true },
+      { key: 'totalInvoiceValue', label: 'Invoice Total', type: 'currency', includeInTotal: true },
+      { key: 'matchingStatus', label: 'Match Status', type: 'string', align: 'center', widthWeight: 11 },
+      { key: 'itcStatus', label: 'ITC Status', type: 'string', align: 'center', widthWeight: 12 },
     ];
-    return this.renderTabularExport(
-      'GST Purchase Register',
-      'purchase-register',
+
+    const appliedFilters: ExportFilterItem[] = [];
+    if (filters.itcStatus) appliedFilters.push({ label: 'ITC Status', value: filters.itcStatus });
+    if (filters.matchingStatus) appliedFilters.push({ label: 'Match Status', value: filters.matchingStatus });
+    if (filters.status) appliedFilters.push({ label: 'Status', value: filters.status });
+    if (filters.gstin) appliedFilters.push({ label: 'GSTIN', value: filters.gstin });
+
+    const company = await getExportCompanyInfo();
+
+    return generateStandardExport(format, {
+      title: 'GST Purchase Register',
+      subtitle: 'Supplier invoice lines, 3-way matching, input GST, and ITC eligibility',
+      module: 'Purchases & Input GST',
+      filenamePrefix: 'GST_Purchase_Register',
+      sheetName: 'Purchase Register',
+      company,
+      reportingPeriod: buildDatePeriod(filters.fromDate, filters.toDate),
+      appliedFilters,
       columns,
-      reg.rows,
-      format,
-    );
+      rows: reg.rows,
+      summaryMetrics: [
+        { label: 'Posted Invoices', value: reg.invoiceCount, type: 'integer' },
+        { label: 'Taxable Value', value: reg.totals.taxableValue, type: 'currency' },
+        {
+          label: 'Total Input GST',
+          value:
+            Number(reg.totals.cgstAmount) +
+            Number(reg.totals.sgstAmount) +
+            Number(reg.totals.igstAmount),
+          type: 'currency',
+        },
+        { label: 'Invoice Total', value: reg.totals.grandTotal, type: 'currency' },
+      ],
+    });
   }
 
   static async generateCollectionReportExport(
@@ -345,22 +310,48 @@ export class ComplianceExportService {
       customerId?: string;
       groupBy?: 'daily' | 'monthly';
     },
-  ) {
+  ): Promise<ExportResult> {
     const report = await CustomerPaymentService.getCollectionReport(filters);
-    const columns = [
-      { key: 'period', label: 'Period' },
-      { key: 'transactionCount', label: 'Transactions' },
-      { key: 'grossReceived', label: 'Gross Received' },
-      { key: 'reversedAmount', label: 'Reversed' },
-      { key: 'netCollected', label: 'Net Collected' },
-      { key: 'unallocatedAdvances', label: 'Unallocated Advances' },
+    const columns: ExportColumn[] = [
+      { key: 'period', label: 'Period', type: 'string', widthWeight: 16 },
+      { key: 'transactionCount', label: 'Transactions', type: 'integer', includeInTotal: true },
+      { key: 'grossReceived', label: 'Gross Received', type: 'currency', includeInTotal: true },
+      { key: 'reversedAmount', label: 'Reversed', type: 'currency', includeInTotal: true },
+      { key: 'netCollected', label: 'Net Collected', type: 'currency', includeInTotal: true },
+      { key: 'unallocatedAdvances', label: 'Unallocated Advances', type: 'currency', includeInTotal: true },
     ];
-    return this.renderTabularExport(
-      'Customer Collection Summary Report',
-      'collection-summary',
-      columns,
-      report.byPeriod,
-      format,
+
+    const appliedFilters: ExportFilterItem[] = [];
+    if (filters.paymentMode) appliedFilters.push({ label: 'Payment Mode', value: filters.paymentMode });
+    if (filters.groupBy) appliedFilters.push({ label: 'Group By', value: filters.groupBy });
+
+    const totalCollected = report.byPeriod.reduce(
+      (sum, r) => sum + Number(r.netCollected || 0),
+      0,
     );
+    const totalTx = report.byPeriod.reduce(
+      (sum, r) => sum + Number(r.transactionCount || 0),
+      0,
+    );
+
+    const company = await getExportCompanyInfo();
+
+    return generateStandardExport(format, {
+      title: 'Customer Collection Summary Report',
+      subtitle: 'Period-wise customer receipts, reversals, and net collections',
+      module: 'Sales & Receivables',
+      filenamePrefix: 'Collection_Summary',
+      sheetName: 'Collection Summary',
+      company,
+      reportingPeriod: buildDatePeriod(filters.fromDate, filters.toDate),
+      appliedFilters,
+      columns,
+      rows: report.byPeriod,
+      summaryMetrics: [
+        { label: 'Periods', value: report.byPeriod.length, type: 'integer' },
+        { label: 'Transactions', value: totalTx, type: 'integer' },
+        { label: 'Net Collected', value: totalCollected, type: 'currency' },
+      ],
+    });
   }
 }

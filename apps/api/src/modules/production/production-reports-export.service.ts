@@ -1,142 +1,193 @@
-import PDFDocument from 'pdfkit';
-import { BaseReportQuery, ExportFormat, ExportReportType } from './production-reports.types';
+import {
+  BaseReportQuery,
+  ExportFormat,
+  ExportReportType,
+} from './production-reports.types';
 import { ProductionReportsService } from './production-reports.service';
+import {
+  ExportColumn,
+  ExportFilterItem,
+  ExportResult,
+  ExportSummaryMetric,
+  generateStandardExport,
+  getExportCompanyInfo,
+} from '../../utils/export';
 
-interface ExportColumn {
-  key: string;
-  label: string;
+interface ReportSpec {
+  title: string;
+  subtitle: string;
+  filenamePrefix: string;
+  sheetName: string;
+  columns: ExportColumn[];
 }
 
-const REPORT_CONFIG: Record<ExportReportType, { title: string; columns: ExportColumn[] }> = {
+const REPORT_CONFIG: Record<ExportReportType, ReportSpec> = {
   'plan-vs-actual': {
     title: 'Production Plan vs Actual Report',
+    subtitle: 'Planned quantities, work-order allocation, actual output, and variance analysis',
+    filenamePrefix: 'Production_Plan_vs_Actual',
+    sheetName: 'Plan vs Actual',
     columns: [
-      { key: 'planNumber', label: 'Plan #' },
-      { key: 'planStatus', label: 'Plan Status' },
-      { key: 'productName', label: 'Product' },
-      { key: 'sku', label: 'SKU' },
-      { key: 'uomSymbol', label: 'UOM' },
-      { key: 'plannedQuantity', label: 'Planned Qty' },
-      { key: 'workOrderedQuantity', label: 'Work Ordered Qty' },
-      { key: 'actualProducedQuantity', label: 'Actual Produced Qty' },
-      { key: 'acceptedQuantity', label: 'Accepted Qty' },
-      { key: 'rejectedQuantity', label: 'Rejected Qty' },
-      { key: 'remainingQuantity', label: 'Remaining Qty' },
-      { key: 'completionPercent', label: 'Completion %' },
-      { key: 'varianceClassification', label: 'Classification' },
+      { key: 'planNumber', label: 'Plan #', type: 'string', widthWeight: 12 },
+      { key: 'planStatus', label: 'Plan Status', type: 'string', align: 'center', widthWeight: 11 },
+      { key: 'productName', label: 'Product', type: 'string', widthWeight: 22 },
+      { key: 'sku', label: 'SKU', type: 'string', widthWeight: 12 },
+      { key: 'uomSymbol', label: 'UOM', type: 'string', align: 'center', widthWeight: 7 },
+      { key: 'plannedQuantity', label: 'Planned Qty', type: 'number', includeInTotal: true },
+      { key: 'workOrderedQuantity', label: 'Work Ordered Qty', type: 'number', includeInTotal: true },
+      { key: 'actualProducedQuantity', label: 'Actual Produced Qty', type: 'number', includeInTotal: true },
+      { key: 'acceptedQuantity', label: 'Accepted Qty', type: 'number', includeInTotal: true },
+      { key: 'rejectedQuantity', label: 'Rejected Qty', type: 'number', includeInTotal: true },
+      { key: 'remainingQuantity', label: 'Remaining Qty', type: 'number', includeInTotal: true },
+      { key: 'completionPercent', label: 'Completion %', type: 'percent' },
+      { key: 'varianceClassification', label: 'Classification', type: 'string', align: 'center', widthWeight: 13 },
     ],
   },
   'work-order-performance': {
     title: 'Work Order Performance Report',
+    subtitle: 'Execution status, good output, scrap, cycle duration, and schedule adherence',
+    filenamePrefix: 'Work_Order_Performance',
+    sheetName: 'Work Order Perf',
     columns: [
-      { key: 'workOrderNumber', label: 'Work Order #' },
-      { key: 'productionPlanNumber', label: 'Plan #' },
-      { key: 'productName', label: 'Product' },
-      { key: 'uomSymbol', label: 'UOM' },
-      { key: 'status', label: 'Status' },
-      { key: 'priority', label: 'Priority' },
-      { key: 'plannedQuantity', label: 'Planned Qty' },
-      { key: 'actualGoodQuantity', label: 'Actual Good Qty' },
-      { key: 'scrapQuantity', label: 'Scrap Qty' },
-      { key: 'executionDurationHours', label: 'Duration (hrs)' },
-      { key: 'delayDays', label: 'Delay (days)' },
-      { key: 'isOverdue', label: 'Overdue' },
-      { key: 'batchCount', label: 'Batches' },
+      { key: 'workOrderNumber', label: 'Work Order #', type: 'string', widthWeight: 13 },
+      { key: 'productionPlanNumber', label: 'Plan #', type: 'string', widthWeight: 12 },
+      { key: 'productName', label: 'Product', type: 'string', widthWeight: 22 },
+      { key: 'uomSymbol', label: 'UOM', type: 'string', align: 'center', widthWeight: 7 },
+      { key: 'status', label: 'Status', type: 'string', align: 'center', widthWeight: 11 },
+      { key: 'priority', label: 'Priority', type: 'string', align: 'center', widthWeight: 9 },
+      { key: 'plannedQuantity', label: 'Planned Qty', type: 'number', includeInTotal: true },
+      { key: 'actualGoodQuantity', label: 'Actual Good Qty', type: 'number', includeInTotal: true },
+      { key: 'scrapQuantity', label: 'Scrap Qty', type: 'number', includeInTotal: true },
+      { key: 'executionDurationHours', label: 'Duration (hrs)', type: 'number' },
+      { key: 'delayDays', label: 'Delay (days)', type: 'integer' },
+      { key: 'isOverdue', label: 'Overdue', type: 'boolean' },
+      { key: 'batchCount', label: 'Batches', type: 'integer', includeInTotal: true },
     ],
   },
   'batch-yield': {
     title: 'Batch Production & Yield Report',
+    subtitle: 'Batch-level output, QC acceptance, scrap, and expected vs actual yield',
+    filenamePrefix: 'Batch_Production_Yield',
+    sheetName: 'Batch Yield',
     columns: [
-      { key: 'batchNumber', label: 'Batch #' },
-      { key: 'workOrderNumber', label: 'Work Order #' },
-      { key: 'productName', label: 'Product' },
-      { key: 'uomSymbol', label: 'UOM' },
-      { key: 'status', label: 'Status' },
-      { key: 'plannedQuantity', label: 'Planned Qty' },
-      { key: 'actualOutputQuantity', label: 'Actual Output Qty' },
-      { key: 'acceptedQuantity', label: 'Accepted Qty' },
-      { key: 'rejectedQuantity', label: 'Rejected Qty' },
-      { key: 'scrapQuantity', label: 'Scrap Qty' },
-      { key: 'actualYieldPercent', label: 'Actual Yield %' },
-      { key: 'expectedYieldPercent', label: 'Expected Yield %' },
-      { key: 'yieldVariancePercent', label: 'Yield Variance %' },
+      { key: 'batchNumber', label: 'Batch #', type: 'string', widthWeight: 14 },
+      { key: 'workOrderNumber', label: 'Work Order #', type: 'string', widthWeight: 13 },
+      { key: 'productName', label: 'Product', type: 'string', widthWeight: 22 },
+      { key: 'uomSymbol', label: 'UOM', type: 'string', align: 'center', widthWeight: 7 },
+      { key: 'status', label: 'Status', type: 'string', align: 'center', widthWeight: 11 },
+      { key: 'plannedQuantity', label: 'Planned Qty', type: 'number', includeInTotal: true },
+      { key: 'actualOutputQuantity', label: 'Actual Output Qty', type: 'number', includeInTotal: true },
+      { key: 'acceptedQuantity', label: 'Accepted Qty', type: 'number', includeInTotal: true },
+      { key: 'rejectedQuantity', label: 'Rejected Qty', type: 'number', includeInTotal: true },
+      { key: 'scrapQuantity', label: 'Scrap Qty', type: 'number', includeInTotal: true },
+      { key: 'actualYieldPercent', label: 'Actual Yield %', type: 'percent' },
+      { key: 'expectedYieldPercent', label: 'Expected Yield %', type: 'percent' },
+      { key: 'yieldVariancePercent', label: 'Yield Variance %', type: 'percent' },
     ],
   },
   'material-consumption': {
     title: 'Material Consumption & Wastage Report',
+    subtitle: 'BOM standard vs actual raw material consumption, returns, and wastage cost',
+    filenamePrefix: 'Material_Consumption_Wastage',
+    sheetName: 'Material Consumption',
     columns: [
-      { key: 'batchNumber', label: 'Batch #' },
-      { key: 'productName', label: 'Product' },
-      { key: 'itemCode', label: 'Material Code' },
-      { key: 'itemName', label: 'Material Name' },
-      { key: 'itemType', label: 'Type' },
-      { key: 'uomSymbol', label: 'UOM' },
-      { key: 'sourceBatchNumbers', label: 'Source Batches' },
-      { key: 'bomPlannedQuantity', label: 'BOM Planned Qty' },
-      { key: 'actualConsumedQuantity', label: 'Consumed Qty' },
-      { key: 'returnedQuantity', label: 'Returned Qty' },
-      { key: 'netConsumption', label: 'Net Consumption' },
-      { key: 'expectedWastage', label: 'Expected Wastage' },
-      { key: 'actualWastage', label: 'Actual Wastage' },
-      { key: 'wastagePercent', label: 'Wastage %' },
-      { key: 'materialCost', label: 'Material Cost (INR)' },
+      { key: 'batchNumber', label: 'Batch #', type: 'string', widthWeight: 13 },
+      { key: 'productName', label: 'Product', type: 'string', widthWeight: 18 },
+      { key: 'itemCode', label: 'Material Code', type: 'string', widthWeight: 12 },
+      { key: 'itemName', label: 'Material Name', type: 'string', widthWeight: 20 },
+      { key: 'itemType', label: 'Type', type: 'string', align: 'center', widthWeight: 10 },
+      { key: 'uomSymbol', label: 'UOM', type: 'string', align: 'center', widthWeight: 7 },
+      { key: 'sourceBatchNumbers', label: 'Source Batches', type: 'string', widthWeight: 16 },
+      { key: 'bomPlannedQuantity', label: 'BOM Planned Qty', type: 'number', includeInTotal: true },
+      { key: 'actualConsumedQuantity', label: 'Consumed Qty', type: 'number', includeInTotal: true },
+      { key: 'returnedQuantity', label: 'Returned Qty', type: 'number', includeInTotal: true },
+      { key: 'netConsumption', label: 'Net Consumption', type: 'number', includeInTotal: true },
+      { key: 'expectedWastage', label: 'Expected Wastage', type: 'number', includeInTotal: true },
+      { key: 'actualWastage', label: 'Actual Wastage', type: 'number', includeInTotal: true },
+      { key: 'wastagePercent', label: 'Wastage %', type: 'percent' },
+      { key: 'materialCost', label: 'Material Cost', type: 'currency', includeInTotal: true },
     ],
   },
   quality: {
     title: 'Finished Goods & Quality Analytics Report',
+    subtitle: 'Inspection decisions, accepted, rejected, quarantined, and pending quantities',
+    filenamePrefix: 'Quality_Analytics',
+    sheetName: 'Quality Analytics',
     columns: [
-      { key: 'inspectionNumber', label: 'Inspection #' },
-      { key: 'productionBatchNumber', label: 'Prod Batch #' },
-      { key: 'inventoryBatchNumber', label: 'FG Batch #' },
-      { key: 'productName', label: 'Product' },
-      { key: 'uomSymbol', label: 'UOM' },
-      { key: 'decision', label: 'Decision' },
-      { key: 'qualityStatus', label: 'Quality Status' },
-      { key: 'inspectedQuantity', label: 'Inspected Qty' },
-      { key: 'acceptedQuantity', label: 'Accepted Qty' },
-      { key: 'rejectedQuantity', label: 'Rejected Qty' },
-      { key: 'quarantinedQuantity', label: 'Quarantined Qty' },
-      { key: 'pendingQuantity', label: 'Pending Qty' },
+      { key: 'inspectionNumber', label: 'Inspection #', type: 'string', widthWeight: 14 },
+      { key: 'productionBatchNumber', label: 'Prod Batch #', type: 'string', widthWeight: 14 },
+      { key: 'inventoryBatchNumber', label: 'FG Batch #', type: 'string', widthWeight: 14 },
+      { key: 'productName', label: 'Product', type: 'string', widthWeight: 22 },
+      { key: 'uomSymbol', label: 'UOM', type: 'string', align: 'center', widthWeight: 7 },
+      { key: 'decision', label: 'Decision', type: 'string', align: 'center', widthWeight: 11 },
+      { key: 'qualityStatus', label: 'Quality Status', type: 'string', align: 'center', widthWeight: 12 },
+      { key: 'inspectedQuantity', label: 'Inspected Qty', type: 'number', includeInTotal: true },
+      { key: 'acceptedQuantity', label: 'Accepted Qty', type: 'number', includeInTotal: true },
+      { key: 'rejectedQuantity', label: 'Rejected Qty', type: 'number', includeInTotal: true },
+      { key: 'quarantinedQuantity', label: 'Quarantined Qty', type: 'number', includeInTotal: true },
+      { key: 'pendingQuantity', label: 'Pending Qty', type: 'number', includeInTotal: true },
     ],
   },
   costing: {
     title: 'Production Cost & Variance Analytics Report',
+    subtitle: 'Standard vs actual material, labour, machine, and overhead costing per batch',
+    filenamePrefix: 'Production_Costing_Variance',
+    sheetName: 'Production Costing',
     columns: [
-      { key: 'batchNumber', label: 'Batch #' },
-      { key: 'productName', label: 'Product' },
-      { key: 'uomSymbol', label: 'UOM' },
-      { key: 'status', label: 'Costing Status' },
-      { key: 'standardMaterialCost', label: 'Std Material (INR)' },
-      { key: 'actualMaterialCost', label: 'Actual Material (INR)' },
-      { key: 'labourCost', label: 'Labour (INR)' },
-      { key: 'machineCost', label: 'Machine (INR)' },
-      { key: 'overheadCost', label: 'Overhead (INR)' },
-      { key: 'standardTotalCost', label: 'Std Total (INR)' },
-      { key: 'totalActualCost', label: 'Actual Total (INR)' },
-      { key: 'costVariance', label: 'Variance (INR)' },
-      { key: 'costVariancePercent', label: 'Variance %' },
-      { key: 'acceptedGoodQuantity', label: 'Accepted Qty' },
-      { key: 'costPerAcceptedUnit', label: 'Unit Cost (INR)' },
-      { key: 'wastageAndRejectionCost', label: 'Wastage/Rej Cost (INR)' },
+      { key: 'batchNumber', label: 'Batch #', type: 'string', widthWeight: 13 },
+      { key: 'productName', label: 'Product', type: 'string', widthWeight: 20 },
+      { key: 'uomSymbol', label: 'UOM', type: 'string', align: 'center', widthWeight: 7 },
+      { key: 'status', label: 'Costing Status', type: 'string', align: 'center', widthWeight: 12 },
+      { key: 'standardMaterialCost', label: 'Std Material', type: 'currency', includeInTotal: true },
+      { key: 'actualMaterialCost', label: 'Actual Material', type: 'currency', includeInTotal: true },
+      { key: 'labourCost', label: 'Labour', type: 'currency', includeInTotal: true },
+      { key: 'machineCost', label: 'Machine', type: 'currency', includeInTotal: true },
+      { key: 'overheadCost', label: 'Overhead', type: 'currency', includeInTotal: true },
+      { key: 'standardTotalCost', label: 'Std Total', type: 'currency', includeInTotal: true },
+      { key: 'totalActualCost', label: 'Actual Total', type: 'currency', includeInTotal: true },
+      { key: 'costVariance', label: 'Variance', type: 'currency', includeInTotal: true },
+      { key: 'costVariancePercent', label: 'Variance %', type: 'percent' },
+      { key: 'acceptedGoodQuantity', label: 'Accepted Qty', type: 'number', includeInTotal: true },
+      { key: 'costPerAcceptedUnit', label: 'Unit Cost', type: 'currency' },
+      { key: 'wastageAndRejectionCost', label: 'Wastage/Rej Cost', type: 'currency', includeInTotal: true },
     ],
   },
 };
 
-function escapeCsvCell(value: unknown): string {
-  const s = value === null || value === undefined ? '' : String(value);
-  if (/[",\r\n]/.test(s)) {
-    return `"${s.replace(/"/g, '""')}"`;
+async function fetchAllPaginatedRows<T extends Record<string, unknown>, R extends { items: T[]; pagination: { totalPages: number } }>(
+  fetcher: (q: BaseReportQuery) => Promise<R>,
+  baseQuery: BaseReportQuery,
+): Promise<{ items: T[]; firstPage: R }> {
+  const first = await fetcher({ ...baseQuery, page: 1, limit: 2000 });
+  const items: T[] = [...first.items];
+  const totalPages = first.pagination?.totalPages ?? 1;
+  for (let p = 2; p <= totalPages; p += 1) {
+    const next = await fetcher({ ...baseQuery, page: p, limit: 2000 });
+    items.push(...next.items);
   }
-  return s;
+  return { items, firstPage: first };
 }
 
-function escapeXml(value: unknown): string {
-  const s = value === null || value === undefined ? '' : String(value);
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+function buildPeriodLabel(query: BaseReportQuery): string {
+  if (query.fromDate || query.toDate) {
+    return `${query.fromDate || 'Start'} to ${query.toDate || 'Present'}`;
+  }
+  const map: Record<string, string> = {
+    today: 'Today',
+    week: 'This Week',
+    month: 'This Month',
+    fy: 'This Financial Year',
+    custom: 'Custom Range',
+  };
+  return map[query.period || 'month'] || 'This Month';
+}
+
+function buildAppliedFilters(query: BaseReportQuery): ExportFilterItem[] {
+  const filters: ExportFilterItem[] = [];
+  if (query.status) filters.push({ label: 'Status', value: query.status });
+  if (query.priority) filters.push({ label: 'Priority', value: query.priority });
+  if (query.search) filters.push({ label: 'Search', value: query.search });
+  return filters;
 }
 
 export class ProductionReportsExportService {
@@ -144,112 +195,123 @@ export class ProductionReportsExportService {
     reportType: ExportReportType,
     format: ExportFormat,
     query: BaseReportQuery,
-  ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
+  ): Promise<ExportResult> {
     const config = REPORT_CONFIG[reportType];
     let rows: Array<Record<string, unknown>> = [];
+    let summaryMetrics: ExportSummaryMetric[] = [];
+
+    const sumField = (key: string) =>
+      rows.reduce((acc, r) => acc + (Number(r[key]) || 0), 0);
 
     switch (reportType) {
-      case 'plan-vs-actual':
-        rows = (await ProductionReportsService.getPlanVsActualReport(query)).items;
+      case 'plan-vs-actual': {
+        const res = await fetchAllPaginatedRows(
+          q => ProductionReportsService.getPlanVsActualReport(q),
+          query,
+        );
+        rows = res.items;
+        const planned = sumField('plannedQuantity');
+        const produced = sumField('actualProducedQuantity');
+        const completionPct = planned > 0 ? (produced / planned) * 100 : 0;
+        summaryMetrics = [
+          { label: 'Total Plans', value: rows.length, type: 'integer' },
+          { label: 'Total Planned Qty', value: planned, type: 'number' },
+          { label: 'Actual Produced Qty', value: produced, type: 'number' },
+          { label: 'Overall Completion', value: completionPct, type: 'percent' },
+        ];
         break;
-      case 'work-order-performance':
-        rows = (await ProductionReportsService.getWorkOrderPerformanceReport(query)).items;
-        break;
-      case 'batch-yield':
-        rows = (await ProductionReportsService.getBatchYieldReport(query)).items;
-        break;
-      case 'material-consumption':
-        rows = (await ProductionReportsService.getMaterialConsumptionReport(query)).items;
-        break;
-      case 'quality':
-        rows = (await ProductionReportsService.getQualityReport(query)).items;
-        break;
-      case 'costing':
-        rows = (await ProductionReportsService.getCostingReport(query)).items;
-        break;
-    }
-
-    const generatedAt = new Date().toISOString();
-    const dateStamp = generatedAt.slice(0, 10);
-    const safeBase = `foodfactory-${reportType}-${dateStamp}`;
-
-    if (format === 'csv') {
-      const headerMeta = [
-        `# ${config.title}`,
-        `# Generated At: ${generatedAt}`,
-        config.columns.map(c => escapeCsvCell(c.label)).join(','),
-      ];
-      const dataLines = rows.map(r =>
-        config.columns.map(c => escapeCsvCell(r[c.key])).join(','),
-      );
-      const csv = `\uFEFF${[...headerMeta, ...dataLines].join('\r\n')}`;
-      return {
-        buffer: Buffer.from(csv, 'utf8'),
-        contentType: 'text/csv; charset=utf-8',
-        filename: `${safeBase}.csv`,
-      };
-    }
-
-    if (format === 'excel') {
-      const headerRow = `<Row>${config.columns
-        .map(c => `<Cell><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`)
-        .join('')}</Row>`;
-      const dataRows = rows
-        .map(
-          r =>
-            `<Row>${config.columns
-              .map(c => `<Cell><Data ss:Type="String">${escapeXml(r[c.key])}</Data></Cell>`)
-              .join('')}</Row>`,
-        )
-        .join('');
-      const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Worksheet ss:Name="Report">
-    <Table>
-      <Row><Cell><Data ss:Type="String">${escapeXml(config.title)}</Data></Cell></Row>
-      <Row><Cell><Data ss:Type="String">Generated At: ${escapeXml(generatedAt)}</Data></Cell></Row>
-      ${headerRow}
-      ${dataRows}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-      return {
-        buffer: Buffer.from(xml, 'utf8'),
-        contentType: 'application/vnd.ms-excel; charset=utf-8',
-        filename: `${safeBase}.xls`,
-      };
-    }
-
-    // PDF export via pdfkit
-    const buffer = await new Promise<Buffer>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
-      const chunks: Buffer[] = [];
-      doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
-
-      doc.fontSize(14).text(config.title, { align: 'left' });
-      doc.fontSize(8).fillColor('#555555').text(`Generated At: ${generatedAt} | Rows: ${rows.length}`);
-      doc.moveDown(0.75);
-      doc.fillColor('#000000');
-
-      const previewCols = config.columns.slice(0, 8);
-      doc.fontSize(8).text(previewCols.map(c => c.label).join(' | '));
-      doc.moveTo(36, doc.y + 2).lineTo(800, doc.y + 2).stroke();
-      doc.moveDown(0.4);
-
-      for (const row of rows.slice(0, 250)) {
-        const line = previewCols.map(c => String(row[c.key] ?? '-')).join(' | ');
-        doc.fontSize(7).text(line);
       }
-      doc.end();
-    });
+      case 'work-order-performance': {
+        const res = await fetchAllPaginatedRows(
+          q => ProductionReportsService.getWorkOrderPerformanceReport(q),
+          query,
+        );
+        rows = res.items;
+        const s = res.firstPage.summary as Record<string, unknown>;
+        summaryMetrics = [
+          { label: 'Total Work Orders', value: Number(s.totalWorkOrders ?? rows.length), type: 'integer' },
+          { label: 'Completed', value: Number(s.completedCount ?? 0), type: 'integer' },
+          { label: 'Overdue', value: Number(s.overdueCount ?? 0), type: 'integer' },
+          { label: 'Actual Good Qty', value: sumField('actualGoodQuantity'), type: 'number' },
+        ];
+        break;
+      }
+      case 'batch-yield': {
+        const res = await fetchAllPaginatedRows(
+          q => ProductionReportsService.getBatchYieldReport(q),
+          query,
+        );
+        rows = res.items;
+        const avgYield =
+          rows.length > 0 ? sumField('actualYieldPercent') / rows.length : 0;
+        summaryMetrics = [
+          { label: 'Total Batches', value: rows.length, type: 'integer' },
+          { label: 'Planned Qty', value: sumField('plannedQuantity'), type: 'number' },
+          { label: 'Actual Output Qty', value: sumField('actualOutputQuantity'), type: 'number' },
+          { label: 'Avg Actual Yield', value: avgYield, type: 'percent' },
+        ];
+        break;
+      }
+      case 'material-consumption': {
+        const res = await fetchAllPaginatedRows(
+          q => ProductionReportsService.getMaterialConsumptionReport(q),
+          query,
+        );
+        rows = res.items;
+        summaryMetrics = [
+          { label: 'Material Lines', value: rows.length, type: 'integer' },
+          { label: 'BOM Planned Qty', value: sumField('bomPlannedQuantity'), type: 'number' },
+          { label: 'Net Consumption', value: sumField('netConsumption'), type: 'number' },
+          { label: 'Total Material Cost', value: sumField('materialCost'), type: 'currency' },
+        ];
+        break;
+      }
+      case 'quality': {
+        const res = await fetchAllPaginatedRows(
+          q => ProductionReportsService.getQualityReport(q),
+          query,
+        );
+        rows = res.items;
+        const s = res.firstPage.summary as Record<string, unknown>;
+        summaryMetrics = [
+          { label: 'Inspections', value: Number(s.totalInspections ?? rows.length), type: 'integer' },
+          { label: 'Accepted Qty', value: sumField('acceptedQuantity'), type: 'number' },
+          { label: 'Rejected Qty', value: sumField('rejectedQuantity'), type: 'number' },
+          { label: 'Pass Rate', value: Number(s.passRatePercent ?? 0), type: 'percent' },
+        ];
+        break;
+      }
+      case 'costing': {
+        const res = await fetchAllPaginatedRows(
+          q => ProductionReportsService.getCostingReport(q),
+          query,
+        );
+        rows = res.items;
+        const s = res.firstPage.summary as Record<string, unknown>;
+        summaryMetrics = [
+          { label: 'Batches Costed', value: Number(s.totalBatches ?? rows.length), type: 'integer' },
+          { label: 'Standard Cost', value: sumField('standardTotalCost'), type: 'currency' },
+          { label: 'Actual Cost', value: sumField('totalActualCost'), type: 'currency' },
+          { label: 'Cost Variance', value: sumField('costVariance'), type: 'currency' },
+        ];
+        break;
+      }
+    }
 
-    return {
-      buffer,
-      contentType: 'application/pdf',
-      filename: `${safeBase}.pdf`,
-    };
+    const company = await getExportCompanyInfo();
+
+    return generateStandardExport(format, {
+      title: config.title,
+      subtitle: config.subtitle,
+      module: 'Production Reports',
+      filenamePrefix: config.filenamePrefix,
+      sheetName: config.sheetName,
+      company,
+      reportingPeriod: buildPeriodLabel(query),
+      appliedFilters: buildAppliedFilters(query),
+      columns: config.columns,
+      rows,
+      summaryMetrics,
+    });
   }
 }

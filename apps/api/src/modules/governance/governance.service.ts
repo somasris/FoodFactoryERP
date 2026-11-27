@@ -572,31 +572,47 @@ export class GovernanceService {
   }
 
   /**
-   * 4.4.6 Redacted CSV Export of Audit Logs.
+   * 4.4.6 Redacted CSV Export of Audit Logs (paginated across all matching rows).
    */
   static async exportAuditLogsCsv(params: AuditListParams): Promise<Buffer> {
-    const data = await this.listAuditLogs({ ...params, page: 1, limit: 500 });
-    const escapeCsv = (v: unknown) => {
-      const s = v === null || v === undefined ? '' : String(v);
-      const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-      return `"${safe.replace(/"/g, '""')}"`;
-    };
-    const header = ['Timestamp', 'Action', 'Entity Type', 'Entity ID', 'User', 'IP Address', 'Remarks']
-      .map(escapeCsv)
-      .join(',');
-    const rows = data.items.map(l =>
-      [
-        l.createdAt.toISOString(),
-        l.action,
-        l.entityType,
-        l.entityId,
-        l.user?.username || 'system',
-        l.ipAddress || '',
-        l.remarks || '',
-      ]
-        .map(escapeCsv)
-        .join(','),
-    );
-    return Buffer.from(`\uFEFF${[header, ...rows].join('\r\n')}`, 'utf8');
+    const allItems: Array<Record<string, unknown>> = [];
+    const pageSize = 500;
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      const data = await this.listAuditLogs({ ...params, page, limit: pageSize });
+      for (const l of data.items) {
+        allItems.push({
+          createdAt: l.createdAt,
+          action: l.action,
+          entityType: l.entityType,
+          entityId: l.entityId,
+          username: l.user?.username || 'system',
+          ipAddress: l.ipAddress || '',
+          remarks: l.remarks || '',
+        });
+      }
+      totalPages = data.pagination?.totalPages ?? 1;
+      page += 1;
+    } while (page <= totalPages && page <= 40);
+
+    const { generateCsvExport } = await import('../../utils/export');
+    const result = generateCsvExport({
+      title: 'Audit Trail Export',
+      module: 'Governance & Audit',
+      filenamePrefix: 'Audit_Trail',
+      columns: [
+        { key: 'createdAt', label: 'Timestamp', type: 'datetime' },
+        { key: 'action', label: 'Action', type: 'string' },
+        { key: 'entityType', label: 'Entity Type', type: 'string' },
+        { key: 'entityId', label: 'Entity ID', type: 'string' },
+        { key: 'username', label: 'User', type: 'string' },
+        { key: 'ipAddress', label: 'IP Address', type: 'string' },
+        { key: 'remarks', label: 'Remarks', type: 'string' },
+      ],
+      rows: allItems,
+    });
+    return result.buffer;
   }
 }

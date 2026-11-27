@@ -41,8 +41,9 @@ export class GovernanceController {
         page: 1,
         limit: 500,
       });
+      const dateStamp = new Date().toISOString().slice(0, 10);
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename="audit-trail-export.csv"');
+      res.setHeader('Content-Disposition', `attachment; filename="Audit_Trail_${dateStamp}.csv"`);
       res.send(buffer);
     } catch (err) {
       next(err);

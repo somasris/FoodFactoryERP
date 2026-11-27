@@ -1,23 +1,18 @@
-import PDFDocument from 'pdfkit';
 import { ReportsService } from './reports.service';
 import { AnalyticsFilter } from './reports.types';
 import { UserContext } from '../inventory/inventory.utils';
+import {
+  ExportColumn,
+  ExportFilterItem,
+  ExportFormat,
+  ExportResult,
+  ExportSummaryMetric,
+  generateStandardExport,
+  getExportCompanyInfo,
+} from '../../utils/export';
 
 export type AnalyticsExportType = 'sales' | 'inventory' | 'profitability' | 'factory-performance';
-export type ExportFormat = 'csv' | 'excel' | 'pdf';
-
-const escapeCsv = (val: unknown): string => {
-  const s = val === null || val === undefined ? '' : String(val);
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return `"${safe.replace(/"/g, '""')}"`;
-};
-
-const escapeXml = (val: unknown): string =>
-  String(val ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+export type { ExportFormat };
 
 export class ReportsExportService {
   static async generateExport(
@@ -25,127 +20,118 @@ export class ReportsExportService {
     format: ExportFormat,
     filter: AnalyticsFilter,
     user: UserContext,
-  ): Promise<{ buffer: Buffer; contentType: string; filename: string }> {
+  ): Promise<ExportResult> {
     let title = '';
-    let columns: Array<{ key: string; label: string }> = [];
+    let subtitle = '';
+    let filenamePrefix = '';
+    let sheetName = '';
+    let columns: ExportColumn[] = [];
     let rows: Array<Record<string, unknown>> = [];
+    let summaryMetrics: ExportSummaryMetric[] = [];
 
     if (reportType === 'sales') {
       title = 'Sales Analytics by Product';
+      subtitle = 'Issued invoice product-wise sales volume and taxable revenue';
+      filenamePrefix = 'BI_Sales_Analytics';
+      sheetName = 'Sales Analytics';
       columns = [
-        { key: 'productName', label: 'Product' },
-        { key: 'categoryName', label: 'Category' },
-        { key: 'quantity', label: 'Sold Qty' },
-        { key: 'revenue', label: 'Taxable Revenue (INR)' },
+        { key: 'productName', label: 'Product', type: 'string', widthWeight: 26 },
+        { key: 'categoryName', label: 'Category', type: 'string', widthWeight: 18 },
+        { key: 'quantity', label: 'Sold Qty', type: 'number', includeInTotal: true },
+        { key: 'revenue', label: 'Taxable Revenue', type: 'currency', includeInTotal: true },
       ];
-      rows = (await ReportsService.getSalesAnalytics(filter)).salesByProduct;
+      const data = await ReportsService.getSalesAnalytics(filter);
+      rows = data.salesByProduct;
+      summaryMetrics = [
+        { label: 'Products Sold', value: rows.length, type: 'integer' },
+        { label: 'Total Taxable Revenue', value: data.totalTaxableRevenue ?? 0, type: 'currency' },
+      ];
     } else if (reportType === 'inventory') {
       title = 'Inventory Analytics by Warehouse';
+      subtitle = 'Warehouse-wise active SKU counts and closing stock valuation';
+      filenamePrefix = 'BI_Inventory_Analytics';
+      sheetName = 'Inventory Analytics';
       columns = [
-        { key: 'warehouseCode', label: 'Warehouse Code' },
-        { key: 'warehouseName', label: 'Warehouse Name' },
-        { key: 'itemCount', label: 'Active Items' },
-        { key: 'value', label: 'Total Value (INR)' },
+        { key: 'warehouseCode', label: 'Warehouse Code', type: 'string', widthWeight: 16 },
+        { key: 'warehouseName', label: 'Warehouse Name', type: 'string', widthWeight: 26 },
+        { key: 'itemCount', label: 'Active Items', type: 'integer', includeInTotal: true },
+        { key: 'value', label: 'Total Value', type: 'currency', includeInTotal: true },
       ];
-      rows = (await ReportsService.getInventoryAnalytics(filter, user)).warehouseComparison;
+      const data = await ReportsService.getInventoryAnalytics(filter, user);
+      rows = data.warehouseComparison;
+      const totalVal = rows.reduce((sum, r) => sum + Number(r.value || 0), 0);
+      summaryMetrics = [
+        { label: 'Warehouses', value: rows.length, type: 'integer' },
+        { label: 'Total Inventory Value', value: totalVal, type: 'currency' },
+      ];
     } else if (reportType === 'profitability') {
       title = 'Product Gross Margin Report';
+      subtitle = 'Revenue, production cost, gross margin, and margin percentage by product';
+      filenamePrefix = 'BI_Product_Profitability';
+      sheetName = 'Profitability';
       columns = [
-        { key: 'productCode', label: 'Code' },
-        { key: 'productName', label: 'Product' },
-        { key: 'soldQuantity', label: 'Sold Qty' },
-        { key: 'revenue', label: 'Revenue (INR)' },
-        { key: 'productionCost', label: 'Production Cost' },
-        { key: 'grossMargin', label: 'Gross Margin' },
-        { key: 'grossMarginPercent', label: 'Margin %' },
+        { key: 'productCode', label: 'Code', type: 'string', widthWeight: 12 },
+        { key: 'productName', label: 'Product', type: 'string', widthWeight: 24 },
+        { key: 'soldQuantity', label: 'Sold Qty', type: 'number', includeInTotal: true },
+        { key: 'revenue', label: 'Revenue', type: 'currency', includeInTotal: true },
+        { key: 'productionCost', label: 'Production Cost', type: 'currency', includeInTotal: true },
+        { key: 'grossMargin', label: 'Gross Margin', type: 'currency', includeInTotal: true },
+        { key: 'grossMarginPercent', label: 'Margin %', type: 'percent' },
       ];
-      rows = (await ReportsService.getProfitabilityReport(filter)).products;
+      const data = await ReportsService.getProfitabilityReport(filter);
+      rows = data.products;
+      const totalRev = rows.reduce((sum, r) => sum + Number(r.revenue || 0), 0);
+      const totalMargin = rows.reduce((sum, r) => sum + Number(r.grossMargin || 0), 0);
+      summaryMetrics = [
+        { label: 'Products', value: rows.length, type: 'integer' },
+        { label: 'Total Revenue', value: totalRev, type: 'currency' },
+        { label: 'Total Gross Margin', value: totalMargin, type: 'currency' },
+      ];
     } else {
       title = 'Factory Performance Comparison';
+      subtitle = 'Cross-factory warehouse count, inventory value, work orders, and output';
+      filenamePrefix = 'BI_Factory_Performance';
+      sheetName = 'Factory Performance';
       columns = [
-        { key: 'factoryCode', label: 'Factory Code' },
-        { key: 'factoryName', label: 'Factory Name' },
-        { key: 'warehouseCount', label: 'Warehouses' },
-        { key: 'inventoryValue', label: 'Inventory Value' },
-        { key: 'completedWorkOrders', label: 'Completed WOs' },
-        { key: 'productionOutputQty', label: 'Good Output' },
+        { key: 'factoryCode', label: 'Factory Code', type: 'string', widthWeight: 14 },
+        { key: 'factoryName', label: 'Factory Name', type: 'string', widthWeight: 24 },
+        { key: 'warehouseCount', label: 'Warehouses', type: 'integer', includeInTotal: true },
+        { key: 'inventoryValue', label: 'Inventory Value', type: 'currency', includeInTotal: true },
+        { key: 'completedWorkOrders', label: 'Completed WOs', type: 'integer', includeInTotal: true },
+        { key: 'productionOutputQty', label: 'Good Output', type: 'number', includeInTotal: true },
       ];
-      rows = (await ReportsService.getFactoryPerformance(filter, user)).items;
-    }
-
-    const generatedAt = new Date().toISOString();
-    const baseName = `bi-${reportType}-${generatedAt.slice(0, 10)}`;
-
-    if (format === 'csv') {
-      const lines = [
-        `# ${title}`,
-        `# Generated At: ${generatedAt}`,
-        columns.map(c => escapeCsv(c.label)).join(','),
-        ...rows.map(r => columns.map(c => escapeCsv(r[c.key])).join(',')),
+      const data = await ReportsService.getFactoryPerformance(filter, user);
+      rows = data.items;
+      const totalOutput = rows.reduce((sum, r) => sum + Number(r.productionOutputQty || 0), 0);
+      summaryMetrics = [
+        { label: 'Factories', value: rows.length, type: 'integer' },
+        { label: 'Total Good Output', value: totalOutput, type: 'number' },
       ];
-      return {
-        buffer: Buffer.from(`\uFEFF${lines.join('\r\n')}`, 'utf8'),
-        contentType: 'text/csv; charset=utf-8',
-        filename: `${baseName}.csv`,
-      };
     }
 
-    if (format === 'excel') {
-      const headerRow = `<Row>${columns
-        .map(c => `<Cell><Data ss:Type="String">${escapeXml(c.label)}</Data></Cell>`)
-        .join('')}</Row>`;
-      const dataRows = rows
-        .map(
-          r =>
-            `<Row>${columns
-              .map(c => `<Cell><Data ss:Type="String">${escapeXml(r[c.key])}</Data></Cell>`)
-              .join('')}</Row>`,
-        )
-        .join('');
-      const xml = `<?xml version="1.0"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
-  <Worksheet ss:Name="Analytics">
-    <Table>
-      <Row><Cell><Data ss:Type="String">${escapeXml(title)}</Data></Cell></Row>
-      ${headerRow}
-      ${dataRows}
-    </Table>
-  </Worksheet>
-</Workbook>`;
-      return {
-        buffer: Buffer.from(xml, 'utf8'),
-        contentType: 'application/vnd.ms-excel; charset=utf-8',
-        filename: `${baseName}.xls`,
-      };
-    }
+    const appliedFilters: ExportFilterItem[] = [];
+    if (filter.financialYear) appliedFilters.push({ label: 'FY', value: filter.financialYear });
+    if (filter.factoryId) appliedFilters.push({ label: 'Factory ID', value: filter.factoryId });
 
-    const buffer = await new Promise<Buffer>((resolve, reject) => {
-      const doc = new PDFDocument({ margin: 36, size: 'A4', layout: 'landscape' });
-      const chunks: Buffer[] = [];
-      doc.on('data', (c: Buffer) => chunks.push(c));
-      doc.on('end', () => resolve(Buffer.concat(chunks)));
-      doc.on('error', reject);
+    const reportingPeriod =
+      filter.startDate || filter.endDate
+        ? `${filter.startDate || 'Start'} to ${filter.endDate || 'Present'}`
+        : filter.financialYear || 'Current Period';
 
-      doc.fontSize(14).text(title);
-      doc.fontSize(8).fillColor('#555555').text(`Generated At: ${generatedAt} | Rows: ${rows.length}`);
-      doc.moveDown(0.75).fillColor('#000000');
+    const company = await getExportCompanyInfo();
 
-      doc.fontSize(8).text(columns.map(c => c.label).join(' | '));
-      doc.moveTo(36, doc.y + 2).lineTo(800, doc.y + 2).stroke();
-      doc.moveDown(0.4);
-
-      for (const row of rows.slice(0, 250)) {
-        doc.fontSize(7).text(columns.map(c => String(row[c.key] ?? '-')).join(' | '));
-      }
-      doc.end();
+    return generateStandardExport(format, {
+      title,
+      subtitle,
+      module: 'Business Intelligence',
+      filenamePrefix,
+      sheetName,
+      company,
+      reportingPeriod,
+      appliedFilters,
+      columns,
+      rows,
+      summaryMetrics,
     });
-
-    return {
-      buffer,
-      contentType: 'application/pdf',
-      filename: `${baseName}.pdf`,
-    };
   }
 }
-
