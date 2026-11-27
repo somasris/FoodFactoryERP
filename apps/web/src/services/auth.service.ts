@@ -189,7 +189,7 @@ export const authService = {
   },
 
   async getDemoAccounts(): Promise<DemoAccountsConfig> {
-    if (import.meta.env.PROD || import.meta.env.VITE_DEMO_MODE === 'false') {
+    if (import.meta.env.VITE_DEMO_MODE === 'false') {
       return { enabled: false, accounts: [] };
     }
     try {
@@ -199,7 +199,7 @@ export const authService = {
       return response.data ?? { enabled: false, accounts: [] };
     } catch {
       return {
-        enabled: import.meta.env.VITE_DEMO_MODE === 'true' || import.meta.env.DEV,
+        enabled: true,
         accounts: [],
         configError: true,
       };

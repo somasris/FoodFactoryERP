@@ -409,13 +409,20 @@ describe('Public Sign Up & Secure RBAC Suite', () => {
         'AUDITOR',
       ]);
 
-      // Forced disabled in production even if DEMO_MODE_ENABLED=true
+      // Enabled in production demo deployments unless DEMO_MODE_ENABLED=false
       env.NODE_ENV = 'production';
-      env.DEMO_MODE_ENABLED = true;
-      const prodRes = await request(app).get('/api/v1/auth/demo-accounts');
-      expect(prodRes.status).toBe(200);
-      expect(prodRes.body.data.enabled).toBe(false);
-      expect(prodRes.body.data.accounts).toEqual([]);
+      env.DEMO_MODE_ENABLED = undefined;
+      const prodDefaultRes = await request(app).get('/api/v1/auth/demo-accounts');
+      expect(prodDefaultRes.status).toBe(200);
+      expect(prodDefaultRes.body.data.enabled).toBe(true);
+      expect(prodDefaultRes.body.data.accounts).toHaveLength(5);
+
+      // Explicitly disabled in production when DEMO_MODE_ENABLED=false
+      env.DEMO_MODE_ENABLED = false;
+      const prodDisabledRes = await request(app).get('/api/v1/auth/demo-accounts');
+      expect(prodDisabledRes.status).toBe(200);
+      expect(prodDisabledRes.body.data.enabled).toBe(false);
+      expect(prodDisabledRes.body.data.accounts).toEqual([]);
     } finally {
       env.DEMO_MODE_ENABLED = origDemo;
       env.NODE_ENV = origNodeEnv;

@@ -61,6 +61,14 @@ const SIGNUP_ROLE_OPTIONS: Array<{
   },
 ];
 
+const DEMO_ROLE_LABELS: Record<DemoAccountOption['role'], string> = {
+  ADMIN: 'Admin Demo',
+  SALESMAN: 'Salesman Demo',
+  PRODUCTION: 'Production Demo',
+  OWNER: 'Owner Demo',
+  AUDITOR: 'Auditor Demo',
+};
+
 const DEMO_ROLE_ICONS: Record<DemoAccountOption['role'], React.ComponentType<{ className?: string }>> = {
   OWNER: Crown,
   ADMIN: Shield,
@@ -231,6 +239,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
   const [showPassword, setShowPassword] = useState(false);
   const [demoConfig, setDemoConfig] = useState<DemoAccountsConfig>({ enabled: false, accounts: [] });
   const [selectedDemoRole, setSelectedDemoRole] = useState<DemoAccountOption['role'] | null>(null);
+  const [demoLoadingRole, setDemoLoadingRole] = useState<DemoAccountOption['role'] | null>(null);
 
   // Sign Up state
   const [fullName, setFullName] = useState('');
@@ -518,7 +527,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
               </form>
 
               {demoConfig.enabled && (
-                <div className="border-t border-[#E1E7DD] pt-4">
+                <div className="border-t border-[#E1E7DD] pt-4 space-y-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#66756A]">
+                    Quick Demo Sign-In
+                  </div>
                   {demoConfig.configError || demoConfig.accounts.length === 0 ? (
                     <div
                       role="status"
@@ -536,6 +548,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                       {demoConfig.accounts.map((demo, idx) => {
                         const Icon = DEMO_ROLE_ICONS[demo.role];
                         const isSelected = selectedDemoRole === demo.role;
+                        const isLoadingThis = demoLoadingRole === demo.role;
+                        const isAnyBusy = isSubmitting || demoLoadingRole !== null;
                         const isLastOdd =
                           demoConfig.accounts.length % 2 === 1 &&
                           idx === demoConfig.accounts.length - 1;
@@ -543,7 +557,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                           <button
                             key={demo.role}
                             type="button"
-                            onClick={() => {
+                            disabled={isAnyBusy}
+                            onClick={async () => {
+                              if (isAnyBusy) return;
                               if (!demo.email || !demo.password) {
                                 setServerError(
                                   `Demo credentials for ${demo.role} are not configured.`,
@@ -553,11 +569,28 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                               setUsernameOrEmail(demo.email);
                               setPassword(demo.password);
                               setSelectedDemoRole(demo.role);
+                              setDemoLoadingRole(demo.role);
                               setFieldErrors({});
                               setServerError(null);
+                              try {
+                                const loggedInUser = await login(demo.email, demo.password);
+                                if (loggedInUser) {
+                                  navigate(resolvePostLoginDestination(loggedInUser), {
+                                    replace: true,
+                                  });
+                                }
+                              } catch (err) {
+                                setServerError(
+                                  err instanceof Error
+                                    ? err.message
+                                    : `Demo login failed for ${DEMO_ROLE_LABELS[demo.role]}.`,
+                                );
+                              } finally {
+                                setDemoLoadingRole(null);
+                              }
                             }}
                             aria-pressed={isSelected}
-                            className={`flex h-11 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245C3A] ${
+                            className={`flex h-10 items-center justify-center gap-2 rounded-md border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#245C3A] disabled:cursor-not-allowed disabled:opacity-60 ${
                               isLastOdd ? 'sm:col-span-2' : ''
                             } ${
                               isSelected
@@ -565,13 +598,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode = 'signin' }) 
                                 : 'border-[#E1E7DD] bg-[#FAFBF8] text-[#24352A] hover:border-[#245C3A]/40 hover:bg-[#EAF1E8]/60'
                             }`}
                           >
-                            <Icon
-                              className={`h-4 w-4 shrink-0 ${
-                                isSelected ? 'text-[#17452C]' : 'text-[#245C3A]'
-                              }`}
-                              aria-hidden="true"
-                            />
-                            <span>{demo.role}</span>
+                            {isLoadingThis ? (
+                              <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#17452C]" aria-hidden="true" />
+                            ) : (
+                              <Icon
+                                className={`h-4 w-4 shrink-0 ${
+                                  isSelected ? 'text-[#17452C]' : 'text-[#245C3A]'
+                                }`}
+                                aria-hidden="true"
+                              />
+                            )}
+                            <span>{DEMO_ROLE_LABELS[demo.role] ?? demo.label}</span>
                           </button>
                         );
                       })}

@@ -239,25 +239,35 @@ describe('Public Sign Up UI Suite', () => {
     renderLoginPage('signin', makeUnauthenticatedAuth(loginMock));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'OWNER' })).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'ADMIN' })).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'SALESMAN' })).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'PRODUCTION' })).toBeTruthy();
-      expect(screen.getByRole('button', { name: 'AUDITOR' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Owner Demo' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Admin Demo' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Salesman Demo' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Production Demo' })).toBeTruthy();
+      expect(screen.getByRole('button', { name: 'Auditor Demo' })).toBeTruthy();
     });
 
     expect(screen.queryByText(/Try Demo Accounts/i)).toBeNull();
     expect(screen.queryByText(/evaluation purposes/i)).toBeNull();
 
+    const labelMap: Record<string, string> = {
+      OWNER: 'Owner Demo',
+      ADMIN: 'Admin Demo',
+      SALESMAN: 'Salesman Demo',
+      PRODUCTION: 'Production Demo',
+      AUDITOR: 'Auditor Demo',
+    };
+
     for (const demo of demoAccounts) {
-      const btn = screen.getByRole('button', { name: demo.role });
+      const btn = screen.getByRole('button', { name: labelMap[demo.role] });
       fireEvent.click(btn);
+      await waitFor(() => {
+        expect(loginMock).toHaveBeenCalledWith(demo.email, demo.password);
+      });
       expect(btn.getAttribute('aria-pressed')).toBe('true');
       expect((screen.getByLabelText('Username or Email') as HTMLInputElement).value).toBe(
         demo.email,
       );
       expect((screen.getByLabelText('Password') as HTMLInputElement).value).toBe(demo.password);
-      expect(loginMock).not.toHaveBeenCalled();
     }
 
     cleanup();
@@ -268,7 +278,7 @@ describe('Public Sign Up UI Suite', () => {
     renderLoginPage('signin', makeUnauthenticatedAuth(loginMock));
 
     await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'OWNER' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Owner Demo' })).toBeNull();
     });
   });
 

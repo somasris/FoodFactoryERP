@@ -13,24 +13,20 @@ export interface DemoAccountConfig {
 }
 
 /**
- * Demo mode is strictly prohibited in production environments.
- * In development, it defaults to enabled unless explicitly set to DEMO_MODE_ENABLED=false.
- * In test, it is enabled only when DEMO_MODE_ENABLED=true.
+ * Demo mode is enabled by default in development and demo deployments unless explicitly
+ * disabled via DEMO_MODE_ENABLED=false. In test, it is enabled only when DEMO_MODE_ENABLED=true.
  */
 export function isDemoModeEnabled(): boolean {
-  if (env.NODE_ENV === 'production') {
-    return false;
-  }
   if (env.DEMO_MODE_ENABLED !== undefined) {
     return env.DEMO_MODE_ENABLED === true;
   }
-  return env.NODE_ENV === 'development';
+  return env.NODE_ENV !== 'test';
 }
 
 /**
  * Centralized development/demo account configuration.
  * Never uses production administrator credentials.
- * Returns an empty list whenever demo mode is disabled or NODE_ENV === 'production'.
+ * Returns an empty list whenever demo mode is disabled.
  */
 export function getDemoAccounts(): DemoAccountConfig[] {
   if (!isDemoModeEnabled()) {

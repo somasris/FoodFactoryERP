@@ -162,17 +162,8 @@ describe('Role-Based Authentication, Redirects & Dynamic Navigation', () => {
       ['/login'],
     );
 
-    const ownerDemoBtn = await screen.findByRole('button', { name: /^OWNER$/i });
+    const ownerDemoBtn = await screen.findByRole('button', { name: /^Owner Demo$/i });
     fireEvent.click(ownerDemoBtn);
-
-    const usernameInput = screen.getByLabelText(/Username or Email/i) as HTMLInputElement;
-    const passwordInput = screen.getByLabelText(/^Password/i) as HTMLInputElement;
-    expect(usernameInput.value).toBe('demo.owner@foodfactory.local');
-    expect(passwordInput.value).toBe('DemoFactory2026!');
-    expect(passwordInput.type).toBe('password');
-
-    const signInButtons = screen.getAllByRole('button', { name: /Sign In/i });
-    fireEvent.click(signInButtons[signInButtons.length - 1]);
 
     await waitFor(() => {
       expect(loginMock).toHaveBeenCalledWith('demo.owner@foodfactory.local', 'DemoFactory2026!');
