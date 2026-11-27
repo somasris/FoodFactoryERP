@@ -11,6 +11,7 @@ import {
   formatDateIso,
   formatDateTimeReadable,
   isNumericColumnType,
+  resolveOfficialLogoPath,
 } from './export-theme';
 
 function formatPdfNumber(value: unknown, decimals = 2, prefix = '', suffix = ''): string {
@@ -153,10 +154,11 @@ export async function generatePdfExport(
     const drawFirstPageHeader = () => {
       const headerTop = y;
       let textLeft = margin;
+      const logoPath = options.company?.logoPath ?? resolveOfficialLogoPath();
 
-      if (options.company?.logoPath) {
+      if (logoPath) {
         try {
-          doc.image(options.company.logoPath, margin, headerTop, { width: 32, height: 32 });
+          doc.image(logoPath, margin, headerTop, { width: 32, height: 32 });
           textLeft = margin + 40;
         } catch {
           // Ignore invalid image files gracefully
@@ -195,7 +197,7 @@ export async function generatePdfExport(
           align: 'right',
         });
 
-      y = Math.max(doc.y + 8, headerTop + (options.company?.logoPath ? 36 : 20));
+      y = Math.max(doc.y + 8, headerTop + (logoPath ? 36 : 20));
 
       // Accent rule
       doc

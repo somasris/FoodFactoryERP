@@ -10,6 +10,7 @@ import {
   formatDateIso,
   formatDateTimeReadable,
   isNumericColumnType,
+  resolveOfficialLogoPath,
 } from './export-theme';
 
 function sanitizeWorksheetName(raw: string, fallback = 'Report'): string {
@@ -115,6 +116,21 @@ export async function generateExcelExport(
   });
 
   // 1. Report Header & Metadata Block (above the data table — no merged cells inside table)
+  const logoPath = options.company?.logoPath ?? resolveOfficialLogoPath();
+  if (logoPath) {
+    try {
+      const imageId = workbook.addImage({ filename: logoPath, extension: 'png' });
+      const anchorCol = Math.max(2, options.columns.length - 1);
+      sheet.addImage(imageId, {
+        tl: { col: anchorCol, row: 0.15 },
+        ext: { width: 36, height: 36 },
+        editAs: 'oneCell',
+      });
+    } catch {
+      // Ignore invalid image files gracefully
+    }
+  }
+
   const titleRow = sheet.addRow([options.title]);
   titleRow.height = 26;
   const titleCell = titleRow.getCell(1);

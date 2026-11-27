@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { Prisma } from '@prisma/client';
+import { resolveOfficialLogoPath } from '../../utils/export/export-theme';
 
 export interface CreditNotePdfLine {
   lineNumber: number;
@@ -66,6 +67,15 @@ export class CreditNotePdfService {
       doc.on('data', (c: Buffer) => chunks.push(c));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
+
+      const logoPath = resolveOfficialLogoPath();
+      if (logoPath) {
+        try {
+          doc.image(logoPath, 36, 36, { width: 30, height: 30 });
+        } catch {
+          // Ignore invalid image files gracefully
+        }
+      }
 
       doc.font('Helvetica-Bold').fontSize(16).fillColor('#1b4332').text('GST CREDIT NOTE', { align: 'center' });
       doc.moveDown(0.3);

@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import { Prisma } from '@prisma/client';
+import { resolveOfficialLogoPath } from '../../utils/export/export-theme';
 
 export interface InvoicePdfLine {
   lineNumber: number;
@@ -157,17 +158,29 @@ export class SalesInvoicePdfService {
 
       // Seller & Invoice Meta Box
       const topY = doc.y;
+      const logoPath = resolveOfficialLogoPath();
+      let sellerX = 36;
+      let sellerWidth = 280;
+      if (logoPath) {
+        try {
+          doc.image(logoPath, 36, topY, { width: 32, height: 32 });
+          sellerX = 76;
+          sellerWidth = 240;
+        } catch {
+          // Ignore invalid image files gracefully
+        }
+      }
       doc
         .font('Helvetica-Bold')
         .fontSize(11)
         .fillColor('#1E293B')
-        .text(invoice.companyLegalName, 36, topY, { width: 280 });
+        .text(invoice.companyLegalName, sellerX, topY, { width: sellerWidth });
       doc
         .font('Helvetica')
         .fontSize(8.5)
-        .text(invoice.companyAddress, 36, doc.y + 2, { width: 280 })
+        .text(invoice.companyAddress, sellerX, doc.y + 2, { width: sellerWidth })
         .text(`GSTIN: ${invoice.companyGstin}  |  State Code: ${invoice.companyStateCode}`, {
-          width: 280,
+          width: sellerWidth,
         });
 
       const metaX = 340;

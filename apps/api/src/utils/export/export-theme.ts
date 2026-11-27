@@ -37,12 +37,19 @@ export const EXPORT_EXCEL_COLORS = {
 } as const;
 
 const CANDIDATE_LOGO_PATHS = [
-  path.resolve(process.cwd(), 'apps/web/public/icons/icon-192.png'),
-  path.resolve(process.cwd(), '../web/public/icons/icon-192.png'),
-  path.resolve(__dirname, '../../../../web/public/icons/icon-192.png'),
+  path.resolve(__dirname, '../../../assets/brand/foodfactory-symbol-256.png'),
+  path.resolve(process.cwd(), 'assets/brand/foodfactory-symbol-256.png'),
+  path.resolve(process.cwd(), 'apps/api/assets/brand/foodfactory-symbol-256.png'),
+  path.resolve(process.cwd(), 'apps/web/public/brand/foodfactory-symbol-256.png'),
+  path.resolve(process.cwd(), '../web/public/brand/foodfactory-symbol-256.png'),
+  path.resolve(__dirname, '../../../../web/public/brand/foodfactory-symbol-256.png'),
 ];
 
-function resolveExistingLogoPath(customUrl?: string | null): string | null {
+/**
+ * Resolves the official FoodFactoryERP symbol PNG path from the API runtime.
+ * Works in both monorepo development and compiled production builds.
+ */
+export function resolveOfficialLogoPath(customUrl?: string | null): string | null {
   if (customUrl && !/^https?:\/\//i.test(customUrl)) {
     const resolved = path.isAbsolute(customUrl)
       ? customUrl
@@ -95,7 +102,7 @@ export async function getExportCompanyInfo(companyId?: string): Promise<ExportCo
       tradeName: company.tradeName,
       gstin: company.gstin || null,
       address: company.address || null,
-      logoPath: resolveExistingLogoPath(company.logoUrl),
+      logoPath: resolveOfficialLogoPath(company.logoUrl),
     };
   } catch {
     return null;
