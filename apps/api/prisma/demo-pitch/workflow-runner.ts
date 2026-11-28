@@ -60,6 +60,155 @@ export async function loadDemoActors(prisma: PrismaClient): Promise<RoleActorSet
   };
 }
 
+async function withRetry<T>(fn: () => Promise<T>, retries = 2): Promise<T> {
+  try {
+    return await fn();
+  } catch (err: unknown) {
+    const code = (err as { code?: string })?.code;
+    const msg = (err as { message?: string })?.message ?? '';
+    if (retries > 0 && (code === 'P1017' || msg.includes('Server has closed the connection') || msg.includes('ConnectionReset'))) {
+      await new Promise(r => setTimeout(r, 1500));
+      return withRetry(fn, retries - 1);
+    }
+    throw err;
+  }
+}
+
+async function ensureReleasedPlan(
+  prisma: PrismaClient,
+  idempotencyKey: string,
+  input: Parameters<typeof ProductionPlanService.createPlan>[0],
+  actors: RoleActorSet,
+) {
+  let plan = await prisma.productionPlan.findFirst({ where: { idempotencyKey }, include: { items: true } });
+  if (!plan) {
+    const created = await withRetry(() => ProductionPlanService.createPlan(input, actors.production.user, actors.production.meta));
+    plan = await prisma.productionPlan.findUniqueOrThrow({ where: { id: created.id }, include: { items: true } });
+  }
+  if (plan.status === 'DRAFT') {
+    await withRetry(() => ProductionPlanService.submitPlan(plan!.id, actors.production.user, actors.production.meta));
+    plan = await prisma.productionPlan.findUniqueOrThrow({ where: { id: plan.id }, include: { items: true } });
+  }
+  if (plan.status === 'SUBMITTED') {
+    await withRetry(() => ProductionPlanService.approvePlan(plan!.id, actors.admin.user, actors.admin.meta));
+    plan = await prisma.productionPlan.findUniqueOrThrow({ where: { id: plan.id }, include: { items: true } });
+  }
+  if (plan.status === 'APPROVED') {
+    await withRetry(() => ProductionPlanService.releasePlan(plan!.id, actors.production.user, actors.production.meta));
+    plan = await prisma.productionPlan.findUniqueOrThrow({ where: { id: plan.id }, include: { items: true } });
+  }
+  return plan;
+}
+
+async function ensureReleasedWorkOrder(
+  prisma: PrismaClient,
+  idempotencyKey: string,
+  input: Parameters<typeof WorkOrderService.createWorkOrder>[0],
+  actors: RoleActorSet,
+) {
+  let wo = await prisma.workOrder.findFirst({ where: { idempotencyKey } });
+  if (!wo) {
+    wo = await withRetry(() => WorkOrderService.createWorkOrder(input, actors.production.user, actors.production.meta));
+  }
+  if (wo.status === 'DRAFT') {
+    wo = await withRetry(() => WorkOrderService.submitWorkOrder(wo!.id, actors.production.user, actors.production.meta));
+  }
+  if (wo.status === 'SUBMITTED') {
+    wo = await withRetry(() => WorkOrderService.approveWorkOrder(wo!.id, actors.admin.user, actors.admin.meta));
+  }
+  if (wo.status === 'APPROVED') {
+    wo = await withRetry(() => WorkOrderService.releaseWorkOrder(wo!.id, actors.production.user, actors.production.meta));
+  }
+  return wo;
+}
+
+async function ensureCompletedBatch(
+  prisma: PrismaClient,
+  idempotencyKey: string,
+  workOrderId: string,
+  plannedQuantity: string,
+  consumeLines: Array<{ inventoryItemId: string; warehouseId: string; uomId: string; quantity: string }>,
+  output: { goodQuantity: string; rejectedQuantity: string; wastageQuantity: string; wastageReason: string },
+  today: string,
+  inspectNotes: string,
+  labourRate: string,
+  labourDesc: string,
+  finalizeRemarks: string | null,
+  actors: RoleActorSet,
+) {
+  let batch = await prisma.productionBatch.findFirst({
+    where: { idempotencyKey },
+    include: { consumptions: true, qualityInspection: true, costing: true },
+  });
+  if (!batch) {
+    const created = await ProductionBatchService.createBatch(
+      { workOrderId, plannedQuantity, idempotencyKey },
+      actors.production.user,
+      actors.production.meta,
+    );
+    batch = await prisma.productionBatch.findUniqueOrThrow({
+      where: { id: created.id },
+      include: { consumptions: true, qualityInspection: true, costing: true },
+    });
+  }
+  if (batch.status === 'CREATED') {
+    await ProductionBatchService.startBatch(batch.id, actors.production.user, actors.production.meta);
+    batch = await prisma.productionBatch.findUniqueOrThrow({
+      where: { id: batch.id },
+      include: { consumptions: true, qualityInspection: true, costing: true },
+    });
+  }
+  if (batch.status === 'IN_PROGRESS' && batch.consumptions.length === 0) {
+    await ProductionBatchService.consumeMaterials(
+      batch.id,
+      { idempotencyKey: `${idempotencyKey}-CONS`, lines: consumeLines },
+      actors.production.user,
+      actors.production.meta,
+    );
+  }
+  if (batch.status === 'IN_PROGRESS') {
+    await ProductionBatchService.recordOutput(batch.id, output, actors.production.user, actors.production.meta);
+    await ProductionBatchService.completeBatch(
+      batch.id,
+      { goodQuantity: output.goodQuantity, manufacturingDate: today },
+      actors.production.user,
+      actors.production.meta,
+    );
+    batch = await prisma.productionBatch.findUniqueOrThrow({
+      where: { id: batch.id },
+      include: { consumptions: true, qualityInspection: true, costing: true },
+    });
+  }
+  if (batch.qualityInspection && batch.qualityInspection.decision === 'PENDING') {
+    await MaterialFgService.inspectQuality(
+      batch.qualityInspection.id,
+      { decision: 'ACCEPTED', notes: inspectNotes },
+      actors.production.user,
+      actors.production.meta,
+    );
+  }
+  if (!batch.costing || batch.costing.status === 'DRAFT') {
+    const existingEntries = batch.costing
+      ? await prisma.productionCostEntry.findMany({ where: { costingId: batch.costing.id } })
+      : [];
+    if (existingEntries.length === 0) {
+      const ce = await ProductionCostingService.addCostEntry(
+        batch.id,
+        { entryType: 'DIRECT_LABOUR', description: labourDesc, quantityOrHours: '1', rate: labourRate },
+        actors.production.user,
+        actors.production.meta,
+      );
+      await ProductionCostingService.reviewCostEntry(ce.id, { decision: 'APPROVED' }, actors.admin.user, actors.admin.meta);
+    }
+    await ProductionCostingService.calculateBatchCosting(batch.id, { includeBomOverheads: false }, actors.admin.user, actors.admin.meta);
+    if (finalizeRemarks) {
+      await ProductionCostingService.reviewBatchCosting(batch.id, { remarks: `Reviewed ${finalizeRemarks}` }, actors.admin.user, actors.admin.meta);
+      await ProductionCostingService.finalizeBatchCosting(batch.id, { remarks: finalizeRemarks }, actors.owner.user, actors.owner.meta);
+    }
+  }
+  return batch;
+}
+
 async function ensurePostedReceipt(
   prisma: PrismaClient,
   idempotencyKey: string,
@@ -83,14 +232,26 @@ async function ensurePostedReceipt(
   });
   if (existing) return existing;
 
-  const created = await InventoryReceiptService.create(
-    { warehouseId, supplierRef, notes, lines },
-    actor.user,
-    actor.meta,
-  );
-  await InventoryReceiptService.submit(created.id, actor.user, actor.meta);
-  await InventoryReceiptService.approve(created.id, actor.user, actor.meta);
-  return InventoryReceiptService.post(created.id, idempotencyKey, actor.user, actor.meta);
+  return withRetry(async () => {
+    const existingByRef = await prisma.inventoryReceipt.findFirst({
+      where: { supplierRef, warehouseId, status: { in: ['DRAFT', 'SUBMITTED', 'APPROVED'] } },
+    });
+    let r = existingByRef;
+    if (!r) {
+      r = await InventoryReceiptService.create(
+        { warehouseId, supplierRef, notes, lines },
+        actor.user,
+        actor.meta,
+      );
+    }
+    if (r.status === 'DRAFT') {
+      r = await InventoryReceiptService.submit(r.id, actor.user, actor.meta);
+    }
+    if (r.status === 'SUBMITTED') {
+      r = await InventoryReceiptService.approve(r.id, actor.user, actor.meta);
+    }
+    return InventoryReceiptService.post(r.id, idempotencyKey, actor.user, actor.meta);
+  });
 }
 
 async function ensurePostedMatchedSupplierInvoice(
@@ -106,22 +267,34 @@ async function ensurePostedMatchedSupplierInvoice(
   const existing = await prisma.supplierInvoice.findFirst({
     where: { supplierId, supplierInvoiceNumber },
   });
-  if (existing) return existing;
+  if (existing && existing.status === 'POSTED' && existing.matchingStatus === 'MATCHED') return existing;
 
-  const draft = await SupplierInvoiceService.createDraft(
-    {
-      supplierId,
-      factoryId,
-      supplierInvoiceNumber,
-      invoiceDate,
-      itcStatus: 'ELIGIBLE',
-      lines,
-    },
-    actor.user,
-    actor.meta,
-  );
-  await SupplierInvoiceService.postInvoice(draft.id, actor.user, actor.meta);
-  return SupplierInvoiceService.matchToReceipts(draft.id, { receiptIds }, actor.user, actor.meta);
+  return withRetry(async () => {
+    let inv = await prisma.supplierInvoice.findFirst({
+      where: { supplierId, supplierInvoiceNumber },
+    });
+    if (!inv) {
+      inv = await SupplierInvoiceService.createDraft(
+        {
+          supplierId,
+          factoryId,
+          supplierInvoiceNumber,
+          invoiceDate,
+          itcStatus: 'ELIGIBLE',
+          lines,
+        },
+        actor.user,
+        actor.meta,
+      );
+    }
+    if (inv.status === 'DRAFT') {
+      inv = await SupplierInvoiceService.postInvoice(inv.id, actor.user, actor.meta);
+    }
+    if (inv.matchingStatus !== 'MATCHED') {
+      inv = await SupplierInvoiceService.matchToReceipts(inv.id, { receiptIds }, actor.user, actor.meta);
+    }
+    return inv;
+  });
 }
 
 /**
@@ -227,52 +400,37 @@ export async function runPitchDemoWorkflows(
   //    Must execute BEFORE additional oil/packaging purchases so exact MWAC
   //    (43.125 Flour, 140 Oil, 200 Spice, 2.50 Pouch, 15 Carton -> Rs 4,055) holds!
   // ---------------------------------------------------------------------------
-  let plan1 = await prisma.productionPlan.findFirst({
-    where: { idempotencyKey: 'PITCH-PLAN-MUR-01' },
-    include: { items: true },
-  });
-  if (!plan1) {
-    const createdPlan1 = await ProductionPlanService.createPlan(
-      {
-        name: 'November Murukku 200g Production Plan',
-        warehouseId: ctx.whFgId,
-        planDate: today,
-        targetStartDate: today,
-        targetEndDate: today,
-        notes: 'Benchmark Murukku 200g production batch',
-        idempotencyKey: 'PITCH-PLAN-MUR-01',
-        items: [{ productVariantId: ctx.products.MURUKKU.variantId, plannedQuantity: '200', manualDemandQuantity: '200', demandSources: [] }],
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionPlanService.submitPlan(createdPlan1.id, actors.production.user, actors.production.meta);
-    await ProductionPlanService.approvePlan(createdPlan1.id, actors.admin.user, actors.admin.meta);
-    await ProductionPlanService.releasePlan(createdPlan1.id, actors.production.user, actors.production.meta);
-    plan1 = await prisma.productionPlan.findUniqueOrThrow({ where: { id: createdPlan1.id }, include: { items: true } });
-  }
+  const plan1 = await ensureReleasedPlan(
+    prisma,
+    'PITCH-PLAN-MUR-01',
+    {
+      name: 'November Murukku 200g Production Plan',
+      warehouseId: ctx.whFgId,
+      planDate: today,
+      targetStartDate: today,
+      targetEndDate: today,
+      notes: 'Benchmark Murukku 200g production batch',
+      idempotencyKey: 'PITCH-PLAN-MUR-01',
+      items: [{ productVariantId: ctx.products.MURUKKU.variantId, plannedQuantity: '200', manualDemandQuantity: '200', demandSources: [] }],
+    },
+    actors,
+  );
 
-  let wo1 = await prisma.workOrder.findFirst({ where: { idempotencyKey: 'PITCH-WO-MUR-01' } });
-  if (!wo1) {
-    const createdWo1 = await WorkOrderService.createWorkOrder(
-      {
-        productionPlanId: plan1.id,
-        productionPlanItemId: plan1.items[0].id,
-        plannedQuantity: '200',
-        priority: 'HIGH',
-        productionLine: 'Line A - Traditional Fryer',
-        assignedToId: actors.production.user.userId,
-        notes: 'Murukku 200g Benchmark Work Order',
-        idempotencyKey: 'PITCH-WO-MUR-01',
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await WorkOrderService.submitWorkOrder(createdWo1.id, actors.production.user, actors.production.meta);
-    await WorkOrderService.approveWorkOrder(createdWo1.id, actors.admin.user, actors.admin.meta);
-    await WorkOrderService.releaseWorkOrder(createdWo1.id, actors.production.user, actors.production.meta);
-    wo1 = createdWo1;
-  }
+  const wo1 = await ensureReleasedWorkOrder(
+    prisma,
+    'PITCH-WO-MUR-01',
+    {
+      productionPlanId: plan1.id,
+      productionPlanItemId: plan1.items[0].id,
+      plannedQuantity: '200',
+      priority: 'HIGH',
+      productionLine: 'Line A - Traditional Fryer',
+      assignedToId: actors.production.user.userId,
+      notes: 'Murukku 200g Benchmark Work Order',
+      idempotencyKey: 'PITCH-WO-MUR-01',
+    },
+    actors,
+  );
 
   let batch1 = await prisma.productionBatch.findFirst({ where: { idempotencyKey: 'PITCH-BATCH-MUR-01' } });
   if (!batch1) {
@@ -440,197 +598,131 @@ export async function runPitchDemoWorkflows(
   // ---------------------------------------------------------------------------
   // 5. ADDITIONAL PRODUCTION BATCHES (Scenario D: Ribbon Pakoda, Spicy Mixture, Ragi WIP)
   // ---------------------------------------------------------------------------
-  let plan2 = await prisma.productionPlan.findFirst({
-    where: { idempotencyKey: 'PITCH-PLAN-SAV-02' },
-    include: { items: true },
-  });
-  if (!plan2) {
-    const createdPlan2 = await ProductionPlanService.createPlan(
-      {
-        name: 'Ribbon Pakoda & Spicy Mixture Weekly Plan',
-        warehouseId: ctx.whFgId,
-        planDate: today,
-        targetStartDate: today,
-        targetEndDate: today,
-        idempotencyKey: 'PITCH-PLAN-SAV-02',
-        items: [
-          { productVariantId: ctx.products.RIBBON.variantId, plannedQuantity: '150', manualDemandQuantity: '150', demandSources: [] },
-          { productVariantId: ctx.products.MIXTURE.variantId, plannedQuantity: '120', manualDemandQuantity: '120', demandSources: [] },
-        ],
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionPlanService.submitPlan(createdPlan2.id, actors.production.user, actors.production.meta);
-    await ProductionPlanService.approvePlan(createdPlan2.id, actors.admin.user, actors.admin.meta);
-    await ProductionPlanService.releasePlan(createdPlan2.id, actors.production.user, actors.production.meta);
-    plan2 = await prisma.productionPlan.findUniqueOrThrow({ where: { id: createdPlan2.id }, include: { items: true } });
-  }
+  const plan2 = await ensureReleasedPlan(
+    prisma,
+    'PITCH-PLAN-SAV-02',
+    {
+      name: 'Ribbon Pakoda & Spicy Mixture Weekly Plan',
+      warehouseId: ctx.whFgId,
+      planDate: today,
+      targetStartDate: today,
+      targetEndDate: today,
+      idempotencyKey: 'PITCH-PLAN-SAV-02',
+      items: [
+        { productVariantId: ctx.products.RIBBON.variantId, plannedQuantity: '150', manualDemandQuantity: '150', demandSources: [] },
+        { productVariantId: ctx.products.MIXTURE.variantId, plannedQuantity: '120', manualDemandQuantity: '120', demandSources: [] },
+      ],
+    },
+    actors,
+  );
 
   // Batch 2: Ribbon Pakoda (uses BOM v2!)
-  let wo2 = await prisma.workOrder.findFirst({ where: { idempotencyKey: 'PITCH-WO-RIB-02' } });
-  if (!wo2) {
-    const ribItem = plan2.items.find(i => i.productVariantId === ctx.products.RIBBON.variantId)!;
-    const createdWo2 = await WorkOrderService.createWorkOrder(
-      {
-        productionPlanId: plan2.id,
-        productionPlanItemId: ribItem.id,
-        plannedQuantity: '150',
-        priority: 'NORMAL',
-        productionLine: 'Line B - Extruder',
-        assignedToId: actors.production.user.userId,
-        idempotencyKey: 'PITCH-WO-RIB-02',
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await WorkOrderService.submitWorkOrder(createdWo2.id, actors.production.user, actors.production.meta);
-    await WorkOrderService.approveWorkOrder(createdWo2.id, actors.admin.user, actors.admin.meta);
-    await WorkOrderService.releaseWorkOrder(createdWo2.id, actors.production.user, actors.production.meta);
-    wo2 = createdWo2;
-  }
+  const ribItem = plan2.items.find(i => i.productVariantId === ctx.products.RIBBON.variantId)!;
+  const wo2 = await ensureReleasedWorkOrder(
+    prisma,
+    'PITCH-WO-RIB-02',
+    {
+      productionPlanId: plan2.id,
+      productionPlanItemId: ribItem.id,
+      plannedQuantity: '150',
+      priority: 'NORMAL',
+      productionLine: 'Line B - Extruder',
+      assignedToId: actors.production.user.userId,
+      idempotencyKey: 'PITCH-WO-RIB-02',
+    },
+    actors,
+  );
 
-  if (!(await prisma.productionBatch.findFirst({ where: { idempotencyKey: 'PITCH-BATCH-RIB-02' } }))) {
-    const b2 = await ProductionBatchService.createBatch(
-      { workOrderId: wo2.id, plannedQuantity: '150', idempotencyKey: 'PITCH-BATCH-RIB-02' },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionBatchService.startBatch(b2.id, actors.production.user, actors.production.meta);
-    await ProductionBatchService.consumeMaterials(
-      b2.id,
-      {
-        idempotencyKey: 'PITCH-CONS-RIB-02',
-        lines: [
-          { inventoryItemId: ctx.rawMaterials.BESAN.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '22' },
-          { inventoryItemId: ctx.rawMaterials.FLOUR.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '10' },
-          { inventoryItemId: ctx.rawMaterials.OIL.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomLId, quantity: '7' },
-          { inventoryItemId: ctx.rawMaterials.SPICE.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '1.2' },
-          { inventoryItemId: ctx.rawMaterials.POUCH.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '148' },
-          { inventoryItemId: ctx.rawMaterials.CARTON.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '7' },
-        ],
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionBatchService.recordOutput(
-      b2.id,
-      { goodQuantity: '145', rejectedQuantity: '0', wastageQuantity: '5', wastageReason: 'Extruder startup trimmings' },
-      actors.production.user,
-      actors.production.meta,
-    );
-    const comp2 = await ProductionBatchService.completeBatch(b2.id, { goodQuantity: '145', manufacturingDate: today }, actors.production.user, actors.production.meta);
-    await MaterialFgService.inspectQuality(comp2.qualityInspection!.id, { decision: 'ACCEPTED', notes: 'Approved Ribbon Pakoda batch' }, actors.production.user, actors.production.meta);
-    const ceRib = await ProductionCostingService.addCostEntry(b2.id, { entryType: 'DIRECT_LABOUR', description: 'Line B Labour', quantityOrHours: '1', rate: '900' }, actors.production.user, actors.production.meta);
-    await ProductionCostingService.reviewCostEntry(ceRib.id, { decision: 'APPROVED' }, actors.admin.user, actors.admin.meta);
-    await ProductionCostingService.calculateBatchCosting(b2.id, { includeBomOverheads: false }, actors.admin.user, actors.admin.meta);
-    await ProductionCostingService.reviewBatchCosting(b2.id, { remarks: 'Reviewed Ribbon Pakoda batch' }, actors.admin.user, actors.admin.meta);
-    await ProductionCostingService.finalizeBatchCosting(b2.id, { remarks: 'Finalized Ribbon Pakoda batch' }, actors.owner.user, actors.owner.meta);
-  }
+  await ensureCompletedBatch(
+    prisma,
+    'PITCH-BATCH-RIB-02',
+    wo2.id,
+    '150',
+    [
+      { inventoryItemId: ctx.rawMaterials.BESAN.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '22' },
+      { inventoryItemId: ctx.rawMaterials.FLOUR.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '10' },
+      { inventoryItemId: ctx.rawMaterials.OIL.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomLId, quantity: '7' },
+      { inventoryItemId: ctx.rawMaterials.SPICE.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '1.2' },
+      { inventoryItemId: ctx.rawMaterials.POUCH.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '148' },
+      { inventoryItemId: ctx.rawMaterials.CARTON.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '7' },
+    ],
+    { goodQuantity: '145', rejectedQuantity: '0', wastageQuantity: '5', wastageReason: 'Extruder startup trimmings' },
+    today,
+    'Approved Ribbon Pakoda batch',
+    '900',
+    'Line B Labour',
+    'Finalized Ribbon Pakoda batch',
+    actors,
+  );
 
   // Batch 3: Spicy Mixture (uses same Plan 2, second Work Order -> 120 planned, 116 good)
-  let wo3 = await prisma.workOrder.findFirst({ where: { idempotencyKey: 'PITCH-WO-MIX-03' } });
-  if (!wo3) {
-    const mixItem = plan2.items.find(i => i.productVariantId === ctx.products.MIXTURE.variantId)!;
-    const createdWo3 = await WorkOrderService.createWorkOrder(
-      {
-        productionPlanId: plan2.id,
-        productionPlanItemId: mixItem.id,
-        plannedQuantity: '120',
-        priority: 'NORMAL',
-        productionLine: 'Line B - Extruder',
-        assignedToId: actors.production.user.userId,
-        idempotencyKey: 'PITCH-WO-MIX-03',
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await WorkOrderService.submitWorkOrder(createdWo3.id, actors.production.user, actors.production.meta);
-    await WorkOrderService.approveWorkOrder(createdWo3.id, actors.admin.user, actors.admin.meta);
-    await WorkOrderService.releaseWorkOrder(createdWo3.id, actors.production.user, actors.production.meta);
-    wo3 = createdWo3;
-  }
+  const mixItem = plan2.items.find(i => i.productVariantId === ctx.products.MIXTURE.variantId)!;
+  const wo3 = await ensureReleasedWorkOrder(
+    prisma,
+    'PITCH-WO-MIX-03',
+    {
+      productionPlanId: plan2.id,
+      productionPlanItemId: mixItem.id,
+      plannedQuantity: '120',
+      priority: 'NORMAL',
+      productionLine: 'Line B - Extruder',
+      assignedToId: actors.production.user.userId,
+      idempotencyKey: 'PITCH-WO-MIX-03',
+    },
+    actors,
+  );
 
-  if (!(await prisma.productionBatch.findFirst({ where: { idempotencyKey: 'PITCH-BATCH-MIX-03' } }))) {
-    const b3 = await ProductionBatchService.createBatch(
-      { workOrderId: wo3.id, plannedQuantity: '120', idempotencyKey: 'PITCH-BATCH-MIX-03' },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionBatchService.startBatch(b3.id, actors.production.user, actors.production.meta);
-    await ProductionBatchService.consumeMaterials(
-      b3.id,
-      {
-        idempotencyKey: 'PITCH-CONS-MIX-03',
-        lines: [
-          { inventoryItemId: ctx.rawMaterials.BESAN.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '20' },
-          { inventoryItemId: ctx.rawMaterials.OIL.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomLId, quantity: '6' },
-          { inventoryItemId: ctx.rawMaterials.SPICE.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '1.5' },
-          { inventoryItemId: ctx.rawMaterials.POUCH.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '118' },
-          { inventoryItemId: ctx.rawMaterials.CARTON.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '6' },
-        ],
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionBatchService.recordOutput(
-      b3.id,
-      { goodQuantity: '116', rejectedQuantity: '0', wastageQuantity: '4', wastageReason: 'Sieve fines loss' },
-      actors.production.user,
-      actors.production.meta,
-    );
-    const comp3 = await ProductionBatchService.completeBatch(b3.id, { goodQuantity: '116', manufacturingDate: today }, actors.production.user, actors.production.meta);
-    await MaterialFgService.inspectQuality(comp3.qualityInspection!.id, { decision: 'ACCEPTED', notes: 'Approved Spicy Mixture batch' }, actors.production.user, actors.production.meta);
-    const ceMix = await ProductionCostingService.addCostEntry(b3.id, { entryType: 'DIRECT_LABOUR', description: 'Blending & Packing Labour', quantityOrHours: '1', rate: '800' }, actors.production.user, actors.production.meta);
-    await ProductionCostingService.reviewCostEntry(ceMix.id, { decision: 'APPROVED' }, actors.admin.user, actors.admin.meta);
-    await ProductionCostingService.calculateBatchCosting(b3.id, { includeBomOverheads: false }, actors.admin.user, actors.admin.meta);
-  }
+  await ensureCompletedBatch(
+    prisma,
+    'PITCH-BATCH-MIX-03',
+    wo3.id,
+    '120',
+    [
+      { inventoryItemId: ctx.rawMaterials.BESAN.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '20' },
+      { inventoryItemId: ctx.rawMaterials.OIL.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomLId, quantity: '6' },
+      { inventoryItemId: ctx.rawMaterials.SPICE.inventoryItemId, warehouseId: ctx.whRmId, uomId: ctx.uomKgId, quantity: '1.5' },
+      { inventoryItemId: ctx.rawMaterials.POUCH.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '118' },
+      { inventoryItemId: ctx.rawMaterials.CARTON.inventoryItemId, warehouseId: ctx.whPkgId, uomId: ctx.uomPcsId, quantity: '6' },
+    ],
+    { goodQuantity: '116', rejectedQuantity: '0', wastageQuantity: '4', wastageReason: 'Sieve fines loss' },
+    today,
+    'Approved Spicy Mixture batch',
+    '800',
+    'Blending & Packing Labour',
+    null,
+    actors,
+  );
 
   // Plan 3 / WO 4 / Batch 4: Ragi Health Mix (IN_PROGRESS on shop floor)
-  let plan3 = await prisma.productionPlan.findFirst({
-    where: { idempotencyKey: 'PITCH-PLAN-RAG-03' },
-    include: { items: true },
-  });
-  if (!plan3) {
-    const createdPlan3 = await ProductionPlanService.createPlan(
-      {
-        name: 'Ragi Health Mix Roasting Plan',
-        warehouseId: ctx.whFgId,
-        planDate: today,
-        targetStartDate: today,
-        targetEndDate: today,
-        idempotencyKey: 'PITCH-PLAN-RAG-03',
-        items: [{ productVariantId: ctx.products.RAGI.variantId, plannedQuantity: '100', manualDemandQuantity: '100', demandSources: [] }],
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await ProductionPlanService.submitPlan(createdPlan3.id, actors.production.user, actors.production.meta);
-    await ProductionPlanService.approvePlan(createdPlan3.id, actors.admin.user, actors.admin.meta);
-    await ProductionPlanService.releasePlan(createdPlan3.id, actors.production.user, actors.production.meta);
-    plan3 = await prisma.productionPlan.findUniqueOrThrow({ where: { id: createdPlan3.id }, include: { items: true } });
-  }
+  const plan3 = await ensureReleasedPlan(
+    prisma,
+    'PITCH-PLAN-RAG-03',
+    {
+      name: 'Ragi Health Mix Roasting Plan',
+      warehouseId: ctx.whFgId,
+      planDate: today,
+      targetStartDate: today,
+      targetEndDate: today,
+      idempotencyKey: 'PITCH-PLAN-RAG-03',
+      items: [{ productVariantId: ctx.products.RAGI.variantId, plannedQuantity: '100', manualDemandQuantity: '100', demandSources: [] }],
+    },
+    actors,
+  );
 
-  let wo4 = await prisma.workOrder.findFirst({ where: { idempotencyKey: 'PITCH-WO-RAG-04' } });
-  if (!wo4) {
-    const createdWo4 = await WorkOrderService.createWorkOrder(
-      {
-        productionPlanId: plan3.id,
-        productionPlanItemId: plan3.items[0].id,
-        plannedQuantity: '100',
-        priority: 'NORMAL',
-        productionLine: 'Line C - Roaster',
-        assignedToId: actors.production.user.userId,
-        idempotencyKey: 'PITCH-WO-RAG-04',
-      },
-      actors.production.user,
-      actors.production.meta,
-    );
-    await WorkOrderService.submitWorkOrder(createdWo4.id, actors.production.user, actors.production.meta);
-    await WorkOrderService.approveWorkOrder(createdWo4.id, actors.admin.user, actors.admin.meta);
-    await WorkOrderService.releaseWorkOrder(createdWo4.id, actors.production.user, actors.production.meta);
-    wo4 = createdWo4;
-  }
+  const wo4 = await ensureReleasedWorkOrder(
+    prisma,
+    'PITCH-WO-RAG-04',
+    {
+      productionPlanId: plan3.id,
+      productionPlanItemId: plan3.items[0].id,
+      plannedQuantity: '100',
+      priority: 'NORMAL',
+      productionLine: 'Line C - Roaster',
+      assignedToId: actors.production.user.userId,
+      idempotencyKey: 'PITCH-WO-RAG-04',
+    },
+    actors,
+  );
 
   if (!(await prisma.productionBatch.findFirst({ where: { idempotencyKey: 'PITCH-BATCH-RAG-04' } }))) {
     const b4 = await ProductionBatchService.createBatch(
@@ -659,30 +751,46 @@ export async function runPitchDemoWorkflows(
   // 6. SALES ORDERS, INVOICES, PAYMENTS & CREDIT NOTE
   // ---------------------------------------------------------------------------
   // SO 1: Benchmark Retailer A (Sri Annapoorna Stores) — 150 Murukku 200g -> Rs 7,875 -> Rs 4,000 paid
-  let so1 = await prisma.salesOrder.findFirst({ where: { idempotencyKey: 'PITCH-SO-RETAILER-A' }, include: { lines: true } });
+  const so1Note = 'Benchmark Retailer A order: 150 packets Murukku 200g';
+  let so1 = await prisma.salesOrder.findFirst({
+    where: { customerId: ctx.customers.RETAILER_A.id, notes: so1Note },
+    include: { lines: true },
+  });
   if (!so1) {
     const c1 = await SalesService.createOrder(
       {
         customerId: ctx.customers.RETAILER_A.id,
         warehouseId: ctx.whFgId,
         orderDate: today,
-        notes: 'Benchmark Retailer A order: 150 packets Murukku 200g',
+        notes: so1Note,
         idempotencyKey: 'PITCH-SO-RETAILER-A',
         lines: [{ productVariantId: ctx.products.MURUKKU.variantId, uomId: ctx.uomPcsId, orderedQuantity: '150' }],
       },
       actors.salesman.user,
       actors.salesman.meta,
     );
-    await SalesService.submitOrder(c1.id, actors.salesman.user, actors.salesman.meta);
-    await SalesService.approveOrder(c1.id, actors.admin.user, actors.admin.meta);
-    await SalesService.confirmOrder(c1.id, 'PITCH-CONF-SO-1', actors.admin.user, actors.admin.meta);
+    so1 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: c1.id }, include: { lines: true } });
+  }
+  if (so1.status === 'DRAFT') {
+    await SalesService.submitOrder(so1.id, actors.salesman.user, actors.salesman.meta);
+    so1 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so1.id }, include: { lines: true } });
+  }
+  if (so1.status === 'SUBMITTED') {
+    await SalesService.approveOrder(so1.id, actors.admin.user, actors.admin.meta);
+    so1 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so1.id }, include: { lines: true } });
+  }
+  if (so1.status === 'APPROVED') {
+    await SalesService.confirmOrder(so1.id, 'PITCH-CONF-SO-1', actors.admin.user, actors.admin.meta);
+    so1 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so1.id }, include: { lines: true } });
+  }
+  if (so1.status === 'CONFIRMED') {
     await SalesService.fulfillOrder(
-      c1.id,
-      { idempotencyKey: 'PITCH-FUL-SO-1', lines: [{ salesOrderLineId: c1.lines[0].id, quantity: '150' }] },
+      so1.id,
+      { idempotencyKey: 'PITCH-FUL-SO-1', lines: [{ salesOrderLineId: so1.lines[0].id, quantity: '150' }] },
       actors.admin.user,
       actors.admin.meta,
     );
-    so1 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: c1.id }, include: { lines: true } });
+    so1 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so1.id }, include: { lines: true } });
   }
 
   let inv1 = await prisma.salesInvoice.findFirst({ where: { idempotencyKey: 'PITCH-INV-RETAILER-A' }, include: { lines: true } });
@@ -713,22 +821,28 @@ export async function runPitchDemoWorkflows(
   }
 
   // SO 2: Benchmark Distributor B (Kaveri Wholesale Mart) — 120 Murukku 200g -> APPROVED (Shortage: 88 avail, 32 short)
-  const so2 = await prisma.salesOrder.findFirst({ where: { idempotencyKey: 'PITCH-SO-DIST-B' } });
+  const so2Note = 'Benchmark Distributor B order: 120 packets Murukku 200g (88 available, 32 short)';
+  let so2 = await prisma.salesOrder.findFirst({ where: { customerId: ctx.customers.DIST_B.id, notes: so2Note } });
   if (!so2) {
-    const c2 = await SalesService.createOrder(
+    so2 = await SalesService.createOrder(
       {
         customerId: ctx.customers.DIST_B.id,
         warehouseId: ctx.whFgId,
         orderDate: today,
-        notes: 'Benchmark Distributor B order: 120 packets Murukku 200g (88 available, 32 short)',
+        notes: so2Note,
         idempotencyKey: 'PITCH-SO-DIST-B',
         lines: [{ productVariantId: ctx.products.MURUKKU.variantId, uomId: ctx.uomPcsId, orderedQuantity: '120' }],
       },
       actors.salesman.user,
       actors.salesman.meta,
     );
-    await SalesService.submitOrder(c2.id, actors.salesman.user, actors.salesman.meta);
-    await SalesService.approveOrder(c2.id, actors.admin.user, actors.admin.meta);
+  }
+  if (so2.status === 'DRAFT') {
+    await SalesService.submitOrder(so2.id, actors.salesman.user, actors.salesman.meta);
+    so2 = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so2.id } });
+  }
+  if (so2.status === 'SUBMITTED') {
+    await SalesService.approveOrder(so2.id, actors.admin.user, actors.admin.meta);
   }
 
   // Helper for additional fulfilled + invoiced orders
@@ -739,7 +853,7 @@ export async function runPitchDemoWorkflows(
     notes: string,
     lines: Array<{ productVariantId: string; quantity: string }>,
   ) {
-    let so = await prisma.salesOrder.findFirst({ where: { idempotencyKey: orderKey }, include: { lines: true } });
+    let so = await prisma.salesOrder.findFirst({ where: { customerId, notes }, include: { lines: true } });
     if (!so) {
       const created = await SalesService.createOrder(
         {
@@ -753,14 +867,26 @@ export async function runPitchDemoWorkflows(
         actors.salesman.user,
         actors.salesman.meta,
       );
-      await SalesService.submitOrder(created.id, actors.salesman.user, actors.salesman.meta);
-      await SalesService.approveOrder(created.id, actors.admin.user, actors.admin.meta);
-      await SalesService.confirmOrder(created.id, `${orderKey}-CONF`, actors.admin.user, actors.admin.meta);
+      so = await prisma.salesOrder.findUniqueOrThrow({ where: { id: created.id }, include: { lines: true } });
+    }
+    if (so.status === 'DRAFT') {
+      await SalesService.submitOrder(so.id, actors.salesman.user, actors.salesman.meta);
+      so = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so.id }, include: { lines: true } });
+    }
+    if (so.status === 'SUBMITTED') {
+      await SalesService.approveOrder(so.id, actors.admin.user, actors.admin.meta);
+      so = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so.id }, include: { lines: true } });
+    }
+    if (so.status === 'APPROVED') {
+      await SalesService.confirmOrder(so.id, `${orderKey}-CONF`, actors.admin.user, actors.admin.meta);
+      so = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so.id }, include: { lines: true } });
+    }
+    if (so.status === 'CONFIRMED') {
       await SalesService.fulfillOrder(
-        created.id,
+        so.id,
         {
           idempotencyKey: `${orderKey}-FUL`,
-          lines: created.lines.map((ol: { id: string }, idx: number) => ({
+          lines: so.lines.map((ol: { id: string }, idx: number) => ({
             salesOrderLineId: ol.id,
             quantity: lines[idx].quantity,
           })),
@@ -768,7 +894,7 @@ export async function runPitchDemoWorkflows(
         actors.admin.user,
         actors.admin.meta,
       );
-      so = await prisma.salesOrder.findUniqueOrThrow({ where: { id: created.id }, include: { lines: true } });
+      so = await prisma.salesOrder.findUniqueOrThrow({ where: { id: so.id }, include: { lines: true } });
     }
 
     let inv = await prisma.salesInvoice.findFirst({ where: { idempotencyKey: invKey }, include: { lines: true } });
@@ -850,8 +976,9 @@ export async function runPitchDemoWorkflows(
       actors.salesman.meta,
     );
   }
-  if (!(await prisma.creditNote.findUnique({ where: { idempotencyKey: 'PITCH-CN-LAKSHMI-04' } }))) {
-    const cn = await CreditNoteService.createDraft(
+  let cn = await prisma.creditNote.findUnique({ where: { idempotencyKey: 'PITCH-CN-LAKSHMI-04' } });
+  if (!cn) {
+    cn = await CreditNoteService.createDraft(
       {
         salesInvoiceId: inv4.id,
         creditNoteDate: today,
@@ -862,6 +989,8 @@ export async function runPitchDemoWorkflows(
       actors.admin.user,
       actors.admin.meta,
     );
+  }
+  if (cn.status === 'DRAFT') {
     await CreditNoteService.issueCreditNote(cn.id, actors.admin.user, actors.admin.meta);
   }
 
@@ -871,7 +1000,7 @@ export async function runPitchDemoWorkflows(
     'PITCH-INV-CHENNAI-05',
     ctx.customers.CHENNAI_DIST.id,
     'Scenario C (Order 1): Ragi Health Mix 500g wholesale order',
-    [{ productVariantId: ctx.products.RAGI.variantId, quantity: '60' }],
+    [{ productVariantId: ctx.products.RAGI.variantId, quantity: '30' }],
   );
   if (!(await prisma.customerPayment.findUnique({ where: { idempotencyKey: 'PITCH-PAY-CHENNAI-05' } }))) {
     await CustomerPaymentService.createPayment(
