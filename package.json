@@ -15,7 +15,10 @@
     "test": "pnpm --filter @foodfactory/api test && pnpm --filter @foodfactory/web test",
     "db:generate": "pnpm --filter @foodfactory/api db:generate",
     "db:migrate": "pnpm --filter @foodfactory/api db:migrate",
-    "db:studio": "pnpm --filter @foodfactory/api db:studio"
+    "db:studio": "pnpm --filter @foodfactory/api db:studio",
+    "seed:pitch-demo": "pnpm --filter @foodfactory/api seed:pitch-demo",
+    "seed:pitch-demo:verify": "pnpm --filter @foodfactory/api seed:pitch-demo:verify",
+    "seed:pitch-demo:reset": "pnpm --filter @foodfactory/api seed:pitch-demo:reset"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

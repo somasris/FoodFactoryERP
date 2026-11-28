@@ -7,6 +7,10 @@ class PrismaService {
     if (!PrismaService.instance) {
       PrismaService.instance = new PrismaClient({
         log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
+        transactionOptions: {
+          maxWait: 10000,
+          timeout: 30000,
+        },
       });
     }
     return PrismaService.instance;
